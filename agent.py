@@ -31,21 +31,23 @@ def tailor_resume(state):
     Tailors the resume to the job description using an LLM.
     """
     print("---TAILORING RESUME---")
-    chat = ChatGroq(temperature=0.7, model_name="deepseek-r1-distill-llama-70b", api_key = GROQ_API_KEY)
+    chat = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
 
     prompt = f"""
             You are an expert resume writer and LaTeX editor. Your task is to tailor a given LaTeX resume to a specific job description.
             Instructions:
             1.  Analyze the resume's Work Experience, Projects, and Technical Skills sections.
             2.  Compare these sections against the provided job description.
-            3.  Change the bullet points to better align to the job description. Make up the experience if needed, I'll handle it later. Only change if needed. Try to make it concise and elaborate
-            4. Try to follow STAR, XYZ or CAR methodology
+            3.  Change the bullet points to better align to the job description. Make up the experience if needed, I'll handle it later. Only change if needed. Try to make it concise and emphazize on achievements
+            4.  Try to follow STAR, XYZ or CAR methodology with metrics where ever possible
             5.  **Modify the resume content rules:**
+                -   Under the 'Technical Skills' section, add any relevant skills from the job description that are missing.
+                -   Remove the 'Technical Skills' that redundant and Do no create new Sub Headings inside it. Try to fit inside one of the existing categories
                 -   Rephrase bullet points in the work experience and projects to highlight skills and accomplishments relevant to the job description.
                 -   Always Integrate keywords from the job description naturally.
-                -   Under the 'Technical Skills' section, add any relevant skills from the job description that are missing.
-                -   Remove any skills or technologies that are irrelevant to the job description and make space for relevant onces.
-                -   Bold the important keywords in the bullet points using \textbf{{}}  
+                -   Bold the important keywords in the bullet points using \textbf{{}}
+                -   Feel Free to change all the points slightly if needed
+                -   Focus on impact, and ensure all changes are highly tailored to the job description  
             6.  **Maintain LaTeX format:** You MUST output a valid LaTeX document. Do not change the structure or section commands of the resume. Only modify the content within the sections i.e. \resumeItem.
             7.  Return only the full, modified LaTeX code for the resume with in ```latex ```. Do not include any explanations or introductory text.
             8.  Again Don't forget. Do not include anything like explanation or any other text. Only give full LaTex code with the structure insdie ```latex ```as it is and only the content modified.

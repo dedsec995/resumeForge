@@ -19,8 +19,7 @@ pip-selfcheck.json
 
 # Logging
 agent_log.txt
-
 delete/
 output/
-Gemini.md
+GEMINI.md
 prompt.md
