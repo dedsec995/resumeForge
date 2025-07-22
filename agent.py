@@ -8,6 +8,7 @@ from langchain_groq import ChatGroq
 from langgraph.graph import END, StateGraph
 from dotenv import load_dotenv
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+from utils import clean_the_text
 
 load_dotenv()
 
@@ -37,21 +38,24 @@ def tailor_resume(state):
             Instructions:
             1.  Analyze the resume's Work Experience, Projects, and Technical Skills sections.
             2.  Compare these sections against the provided job description.
-            3.  **Modify the resume content:**
+            3.  Change the bullet points to better align to the job description. Make up the experience if needed, I'll handle it later. Only change if needed. Try to make it concise and elaborate
+            4. Try to follow STAR, XYZ or CAR methodology
+            5.  **Modify the resume content rules:**
                 -   Rephrase bullet points in the work experience and projects to highlight skills and accomplishments relevant to the job description.
                 -   Always Integrate keywords from the job description naturally.
                 -   Under the 'Technical Skills' section, add any relevant skills from the job description that are missing.
-                -   Remove any skills or technologies that are clearly irrelevant to the job description to save space.
-                -   Bold the important keywords in the bullet points using \textbf{{}}
-            4.  **Maintain LaTeX format:** You MUST output a valid LaTeX document. Do not change the structure or section commands of the resume. Only modify the content within the sections.
-            5.  Return only the full, modified LaTeX code for the resume with in ```latex ```. Do not include any explanations or introductory text.
-            6.  Again Don't forget. Do not include anything like explanation or any other text. Only give full LaTex code with the structure insdie ```latex ```as it is and only the content modified.
+                -   Remove any skills or technologies that are irrelevant to the job description and make space for relevant onces.
+                -   Bold the important keywords in the bullet points using \textbf{{}}  
+            6.  **Maintain LaTeX format:** You MUST output a valid LaTeX document. Do not change the structure or section commands of the resume. Only modify the content within the sections i.e. \resumeItem.
+            7.  Return only the full, modified LaTeX code for the resume with in ```latex ```. Do not include any explanations or introductory text.
+            8.  Again Don't forget. Do not include anything like explanation or any other text. Only give full LaTex code with the structure insdie ```latex ```as it is and only the content modified.
             Here is the resume:\n\n{state["resume_tex"]}\n\nHere is the job description:\n\n{state["job_description"]}
             Go through each points in the resume and decide if they need the change. Change it according to the above instructions.
              """
 
     response = chat.invoke(prompt)
-    return {"tailored_resume_tex": response.content, "shortening_attempts": 0}
+    filtered_tailored_resume_tex = clean_the_text(response.content)
+    return {"tailored_resume_tex": filtered_tailored_resume_tex, "shortening_attempts": 0}
 
 def compile_resume(state):
     """
@@ -193,45 +197,58 @@ if __name__ == "__main__":
     with open("/home/dedsec995/resumeForge/template/resume.tex", "r") as f:
         resume_tex = f.read()    
         inputs = {"job_description": """
-                At T-Mobile, we invest in YOU!  Our Total Rewards Package ensures that employees get the same big love we give our customers.  All team members receive a competitive base salary and compensation package - this is Total Rewards. Employees enjoy multiple wealth-building opportunities through our annual stock grant, employee stock purchase plan, 401(k), and access to free, year-round money coaches. That’s how we’re UNSTOPPABLE for our employees!
+                The Software Engineer will work as part of a team within the Advanced Computing & Analytics Laboratory (ACAL) under the Enterprise Data and Analytics Division (EDA) and the School of Applied Computational Sciences (SACS). An integral component of the EDA and the SACS, the ACAL is a recognized center of excellence on the Meharry Medical College campus which fosters a culture of innovation, learning, engagement, and personal growth in support of EDA business intelligence and SACS research and development mission statements which both seek to develop and deploy impactful and socially-responsible scientific knowledge and practical technologies that empower society to improve the quality of life. The Software Engineer will be critical in achieving this vision and strategy for solving complex business problems with cutting-edge solutions driven by the latest advancements in artificial intelligence and machine learning
+                Position Summary: 
 
-                The Machine Learning (ML) Engineer focuses on coding, deploying, and maintaining large-scale machine learning models throughout their lifecycle. By combining software engineering principles and data science/machine learning knowledge, the ML Engineer develops the data processes that make ML models generally available for use in products for end-users and customers. The ML engineer should understand machine learning algorithms, have experience in software engineering and various programming languages, including Python, SQL, and Apache Spark. By combining software engineering principles and ML/AI expertise, the engineer builds scalable infrastructure and workflows in modern MLOps environments such as Azure Databricks and GitLab CI/CD. They enable robust experimentation, versioning, and observability using tools like MLflow, LangGraph, and DSPy An understanding of the latest cloud technologies is imperative for the development and deployment of ML solutions as well. The ML Engineer’s core value lies in making AI solutions production-ready, performant, and maintainable using cloud-native services and open-source frameworks.
-                Job Responsibilities:
+                The Software Engineer will work as part of a team within the Advanced Computing & Analytics Laboratory (ACAL) under the Enterprise Data and Analytics Division (EDA) and the School of Applied Computational Sciences (SACS). An integral component of the EDA and the SACS, the ACAL is a recognized center of excellence on the Meharry Medical College campus which fosters a culture of innovation, learning, engagement, and personal growth in support of EDA business intelligence and SACS research and development mission statements which both seek to develop and deploy impactful and socially-responsible scientific knowledge and practical technologies that empower society to improve the quality of life. The Software Engineer will be critical in achieving this vision and strategy for solving complex business problems with cutting-edge solutions driven by the latest advancements in artificial intelligence and machine learning.
 
-                Build and maintain full machine learning lifecycles including experiment tracking, model governance, deployment, and monitoring using tools like MLflow, Databricks, DSPy, LangGraph, and Azure DevOps. 
-                Assemble and transform large, complex datasets from Databricks, PostgreSQL, Apache-based sources, and other structured/unstructured systems, ensuring scalability and performance in production environments. 
-                Collaborate with data science, ML, and platform teams to build graph-based or modular workflows (e.g., LangGraph), ML pipelines (e.g., in Databricks), and integration with DevOps and GitLab systems. 
-                Ensure ML models are scalable, reproducible, and well-documented, leveraging MLOps tooling and open standards. 
-                Also responsible for other Duties/Projects as assigned by business management as needed. 
+                Essential Functions:
 
-                Education and Work Experience:
-
-                Bachelor's Degree Computer Science, Statistics, Informatics, Information Systems, Machine Learning, or another quantitative field  (Required)
-                Master's/Advanced Degree Computer Science, Statistics, Informatics, Information Systems, Machine Learning, or another quantitative field  (Preferred)
-                Data Engineering, Data Science (Required)
-                Experience with big data architecture and pipeline,  Spark (Required)
-                Experience performing root cause analysis on internal and external data and processes to answer specific business questions and find opportunities for improvement Required
-                Experience in programming languages such as Python/R, Java/Scala, and/ or Go Required(Required)
-                Experience in Apache Spark and Databricks (Preferred)
-                Experience in the telecom industry (Preferred)
+                Distill complex business problems into clear data science and machine learning projects.
+                Provide software engineering expertise and recommend data science approaches to meet various stakeholder needs.
+                Analyze complex “business” problems and execute use cases from existing data assets.
+                Work closely with product managers to identify and answer important product questions that help improve outcomes.
+                Interpret problems and provide solutions using appropriate data modeling techniques.
+                Develop prototypes for new data product ideas
+                Design large scale models using Logistic Regression, Decision Trees, Conjoint Analysis, Spatial models, Time-series models, and Machine Learning algorithms
+                Communicate findings to product managers and development groups
+                Drive the collection of new data and the refinement of existing data
+                Analyze and interpret the results of product experiments
+                Regularly invent new and novel approaches to problems; take initiative and break down barriers to solve problems; be recognized within team as the source of solutions
+                Manipulate and analyze complex, high-volume, high-dimensionality data from multiple sources
+                Bring a strong passion for empirical research and for answering hard questions with data
+                Communicate complex quantitative analysis in a clear, precise, and actionable manner
+                Provide software engineering training to various EDA and SACS clients.
+                Performs other related duties as assigned.
+                                                                                                                                                    
 
                 Knowledge, Skills and Abilities:
 
-                Experience with Python-based ML tooling including DSPy, LangGraph, and MLflow. Strong SQL skills for interacting with PostgreSQL and data lakes. (Required)
-                Proficiency with distributed computing (Apache Spark, MosaicML), orchestration (MLflow), and graph-based AI workflows (LangGraph).  (Required)
+                Solid programming fundamentals with preferred emphasis on Python, R, Postgres and/or SQL-based technologies, and SAS, as well as other useful mainstream programming languages for data science including Java, Scala, Julia, MATLAB, JavaScript, TensorFlow, Go, Spark.
+                Experience leading end-to-end data science project implementation.
+                Experience working with cross-functional project teams and managing communications including in-person or virtual meetings is preferred.
+                Motivation to learn, lead, and contribute as a team player on a variety of data and software engineering projects.
+                Exceptional technical writing skills.
+                Ability to communicate ideas and execution plans clearly to both technical and non-technical teams.
+                Analytical and problem-solving skills.
+                Experience with machine learning and AI.
+                Familiarity with data management tools.
+                Ability to work independently and with team members from different backgrounds.
+                Excellent attention to detail.
+                Proficiency in statistics, data analysis, and research methods.
+                Ability to use independent judgment and to manage and impart confidential information.
+                Ability to develop and deliver presentations.
+                Ability to plan, assess, and evaluate programs.
+                Education and Experience:
 
-                Licenses and Certifications:
+                Master’s Degree in Software Engineering, Computer Science, Data Science, or a related field.
+                Minimum of two (2) years’ demonstrated experience applying software engineering methodologies to real-world data problems.
+                Environmental Conditions and Physical Demands
 
-                Databricks Certified Machine Learning Professional. (Preferred)
-                Azure Machine Learning Engineer Associate or related cloud/AI certification. (Preferred)
-                #LI-Corporate
-
-                #LI-Hybrid
-
-                At least 18 years of age
-                Legally authorized to work in the United States
-                Base Pay Range: $97,700 - $176,200
-                Corporate Bonus Target: 15%
+                Work is normally performed in a typical interior/office work environment.
+                No or very limited physical effort required.
+                No or very limited exposure to physical risk.
+                May require extended work hours and/or travel.
 
                 ""","resume_tex": resume_tex,}    
         app = workflow.compile()    

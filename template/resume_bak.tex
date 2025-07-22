@@ -1,7 +1,5 @@
 \documentclass[letterpaper,10pt]{article}
-
 \usepackage{latexsym}
-% \usepackage[empty]{fullpage}
 \usepackage{titlesec}
 \usepackage{marvosym}
 \usepackage[usenames,dvipsnames]{color}
@@ -20,14 +18,14 @@
 
 
 \pagestyle{fancy}
-\fancyhf{} % clear all header and footer fields
+\fancyhf{}
 \fancyfoot{}
 \renewcommand{\headrulewidth}{0pt}
 \renewcommand{\footrulewidth}{0pt}
 
 % Adjust margins
 \addtolength{\oddsidemargin}{-0.2in}
- \addtolength{\textwidth}{0.35in}
+\addtolength{\textwidth}{0.35in}
 
 \urlstyle{same}
 
@@ -65,7 +63,6 @@
     \end{tabular*}\vspace{-7pt}
 }
 
-% Company, Position Title | Location ............................. Dates
 \newcommand{\workExSubheading}[4]{
   \vspace{-2pt}\item
     \begin{tabular*}{1.0\textwidth}[t]{@{\extracolsep{\fill}}l r}
@@ -113,7 +110,7 @@
     \vspace{-5pt}
 \end{center}
 
-  %-----------PROGRAMMING SKILLS-----------
+%-----------TECHNICAL SKILLS-----------
 \section{Technical Skills}
  \begin{itemize}[leftmargin=0.0in, label={}]
     \small{\item{   
@@ -126,90 +123,72 @@
  \end{itemize}
  \vspace{-13pt}
 
- %-----------EDUCATION-----------
+%-----------EDUCATION-----------
 \section{Education}
   \resumeSubHeadingListStart
     \resumeSubheading
       {State University of New York at Binghamton}{December 2024}
-      {Master of Science in Computer Science | Artificial Intelligence Track
-      }{}
+      {Master of Science in Computer Science | Artificial Intelligence Track}{}
       
   \resumeSubHeadingListEnd
   \vspace{-4pt}
     Coursework: Operating Systems, Machine Learning, Computer Architecture, Algorithms and Data Structures \vspace{-4pt}
     \vspace{-4pt}
-%-----------Experience---------------
+
+%-----------EXPERIENCE---------------
 \section{Work Experience}
-    \resumeSubHeadingListStart
-                \workExSubheading{Binghamton University}{Machine Learning Assistant}{Binghamton, NY}{January 2025 -- Present} 
-                \resumeItemListStart
-                    \resumeItem{Architected 'Data Insight', a \textbf{multi-agent AI platform} that accelerates the product development lifecycle by automating \textbf{EDA} and feature engineering. System achieved over \textbf{90\% accuracy}  in feature identification, enabling data scientists to rapidly uncover data}
-                    \resumeItem{Collaborated in a team of six researchers to architect an automated \textbf{AutoML pipeline}, orchestrated agentic workflows for training diverse ML models and leveraged \textbf{MLflow} for experiment tracking, resulting 70\% reduction in end-to-end analysis}
-                    \resumeItemListEnd
-                \workExSubheading{Binghamton University}{SafeRide Assistant}{Binghamton, NY}{August 2024 -- December 2024} 
-                \resumeItemListStart
-                    \resumeItem{Developed and deployed a scalable, \textbf{LLM-powered chatbot} using Python and \textbf{Langchain}, integrating with a existing platform to automate user inquiries}
-                    \resumeItem{Constructed Python scripts and tooling to execute \textbf{dynamic SQL queries} against database, significantly improving the data processing efficiency of the AI agent and removing human interaction}
-                    \resumeItem{Implemented comprehensive \textbf{LLM observability using Langfuse} for detailed tracing and cost monitoring, ensuring the reliability and quality of the production service}
-                    \resumeItemListEnd
-                \workExSubheading{Flow.ai}{Artificial Intelligence Engineer intern}{Austin, Texas}{January 2024 -- May 2024} 
-                \resumeItemListStart
-                    \resumeItem{Architected end-to-end NLP solutions for Django SaaS platform utilizing \textbf{Transformer}, \textbf{Bedrock}, \textbf{SageMaker}, and \textbf{ECS}}
-                    \resumeItem{Increased \textbf{Mixtral 8x7B} accuracy in sales-related query processing by \textbf{31\%} through \textbf{document chunk mechanisms} within \textbf{RAG}}
-                    \resumeItem{Reduced \textbf{LLM inference latency} to an average of \textbf{2.78s} using \textbf{vLLM} and \textbf{PagedAttention} for optimized \textbf{KV cache} handling}
-                    \resumeItem{Improved \textbf{response times} by \textbf{40\%} through \textbf{Redis caching} of frequent queries, reducing redundant \textbf{LLM calls}}
-                    \resumeItemListEnd
-            \workExSubheading{Tata Elxsi}{Software Engineer}{Pune, India}{May 2023 -- Sep 2023} 
-                \resumeItemListStart
-                    \resumeItem{Enhanced a \textbf{large-scale data processing system} by optimizing a \textbf{C++ framework} for \textbf{real-time telemetry}, reducing data transmission latency by \textbf{21\%} (\textbf{55.3 ms}) to improve downstream data availability for \textbf{millions of vehicles}}
-                    \resumeItem{Developed a \textbf{data pipeline} managing diverse CAN protocols, implementing \textbf{thread-safe concurrent data transfer} of \textbf{3 million vehicles} data via \textbf{Spark}, pipelined through \textbf{Kafka}, and scaled with \textbf{Kubernetes} to process \textbf{100,000+ events/second}}
-                    \resumeItem{Utilized \textbf{Apache Airflow} to monitor \textbf{data pipeline performance}, troubleshoot issues, and ensure \textbf{data quality} and \textbf{reliability}}
-                    \resumeItem{Partnered with the testing team to design a \textbf{car emulator}, obviating \textbf{testing costs} by eliminating the necessity of physical vehicles for testing}
-                    \resumeItemListEnd
-            \workExSubheading{Shree Hari Enterprise}{Software Engineer}{Mumbai, India}{Jun 2022 -- Sep 2022}
-                \resumeItemListStart
-                    \resumeItem{Designed and deployed a \textbf{dynamic route optimization engine} (\textbf{VRP-based}) utilizing \textbf{real-time Mumbai traffic data}, reduced \textbf{vehicle idle time by 40 minutes per day} and optimized delivery sequences for \textbf{400+ daily orders}}
-                    \resumeItem{Developed a \textbf{hyper-local demand forecasting model} using \textbf{XGBoost} for \textbf{FMCG products}, leveraging \textbf{Tally ERP data} and improving \textbf{forecast accuracy by 13\%} and \textbf{preventing stockouts}}
-                    \resumeItem{Implemented an \textbf{MLOps pipeline} using \textbf{MLFlow} for \textbf{continuous integration and deployment} of the forecasting model, automating model retraining cycles and \textbf{reducing deployment time by 50\%}}
-                    \resumeItem{Collaborated with stakeholders to \textbf{decrease excess inventory holding costs by 7\%} while maintaining a \textbf{99\% service level}}
-                    \resumeItemListEnd
-    \resumeSubHeadingListEnd
-    \vspace{-12pt}
+  \resumeSubHeadingListStart
+    \workExSubheading{Binghamton University}{Machine Learning Assistant}{Binghamton, NY}{January 2025 -- Present} 
+      \resumeItemListStart
+          \resumeItem{Architected 'Data Insight', a \textbf{multi-agent AI platform} that accelerates the product development lifecycle by automating \textbf{EDA} and feature engineering. System achieved over \textbf{90\% accuracy}  in feature identification, enabling data scientists to rapidly uncover data}
+          \resumeItem{Collaborated in a team of six researchers to architect an automated \textbf{AutoML pipeline}, orchestrated agentic workflows for training diverse ML models and leveraged \textbf{MLflow} for experiment tracking, resulting 70\% reduction in end-to-end analysis}
+          \resumeItemListEnd
+    \workExSubheading{Binghamton University}{SafeRide Assistant}{Binghamton, NY}{August 2024 -- December 2024} 
+      \resumeItemListStart
+          \resumeItem{Developed and deployed a scalable, \textbf{LLM-powered chatbot} using Python and \textbf{Langchain}, integrating with a existing platform to automate user inquiries}
+          \resumeItem{Constructed Python scripts and tooling to execute \textbf{dynamic SQL queries} against database, significantly improving the data processing efficiency of the AI agent and removing human interaction}
+          \resumeItem{Implemented comprehensive \textbf{LLM observability using Langfuse} for detailed tracing and cost monitoring, ensuring the reliability and quality of the production service}
+          \resumeItemListEnd
+    \workExSubheading{Flow.ai}{Artificial Intelligence Engineer intern}{Austin, Texas}{January 2024 -- May 2024} 
+      \resumeItemListStart
+          \resumeItem{Architected end-to-end NLP solutions for Django SaaS platform utilizing \textbf{Transformer}, \textbf{Bedrock}, \textbf{SageMaker}, and \textbf{ECS}}
+          \resumeItem{Increased \textbf{Mixtral 8x7B} accuracy in sales-related query processing by \textbf{31\%} through \textbf{document chunk mechanisms} within \textbf{RAG}}
+          \resumeItem{Reduced \textbf{LLM inference latency} to an average of \textbf{2.78s} using \textbf{vLLM} and \textbf{PagedAttention} for optimized \textbf{KV cache} handling}
+          \resumeItem{Improved \textbf{response times} by \textbf{40\%} through \textbf{Redis caching} of frequent queries, reducing redundant \textbf{LLM calls}}
+          \resumeItemListEnd
+    \workExSubheading{Tata Elxsi}{Software Engineer}{Pune, India}{May 2023 -- Sep 2023} 
+      \resumeItemListStart
+          \resumeItem{Enhanced a \textbf{large-scale data processing system} by optimizing a \textbf{C++ framework} for \textbf{real-time telemetry}, reducing data transmission latency by \textbf{21\%} (\textbf{55.3 ms}) to improve downstream data availability for \textbf{millions of vehicles}}
+          \resumeItem{Developed a \textbf{data pipeline} managing diverse CAN protocols, implementing \textbf{thread-safe concurrent data transfer} of \textbf{3 million vehicles} data via \textbf{Spark}, pipelined through \textbf{Kafka}, and scaled with \textbf{Kubernetes} to process \textbf{100,000+ events/second}}
+          \resumeItem{Utilized \textbf{Apache Airflow} to monitor \textbf{data pipeline performance}, troubleshoot issues, and ensure \textbf{data quality} and \textbf{reliability}}
+          \resumeItem{Partnered with the testing team to design a \textbf{car emulator}, obviating \textbf{testing costs} by eliminating the necessity of physical vehicles for testing}
+          \resumeItemListEnd
+    \workExSubheading{Shree Hari Enterprise}{Software Engineer}{Mumbai, India}{Jun 2022 -- Sep 2022}
+        \resumeItemListStart
+            \resumeItem{Designed and deployed a \textbf{dynamic route optimization engine} (\textbf{VRP-based}) utilizing \textbf{real-time Mumbai traffic data}, reduced \textbf{vehicle idle time by 40 minutes per day} and optimized delivery sequences for \textbf{400+ daily orders}}
+            \resumeItem{Developed a \textbf{hyper-local demand forecasting model} using \textbf{XGBoost} for \textbf{FMCG products}, leveraging \textbf{Tally ERP data} and improving \textbf{forecast accuracy by 13\%} and \textbf{preventing stockouts}}
+            \resumeItem{Implemented an \textbf{MLOps pipeline} using \textbf{MLFlow} for \textbf{continuous integration and deployment} of the forecasting model, automating model retraining cycles and \textbf{reducing deployment time by 50\%}}
+            \resumeItem{Collaborated with stakeholders to \textbf{decrease excess inventory holding costs by 7\%} while maintaining a \textbf{99\% service level}}
+            \resumeItemListEnd
+  \resumeSubHeadingListEnd
+\vspace{-12pt}
 
 %-----------PROJECTS-----------
 \section{Projects} 
-    \vspace{-5pt}
+  \vspace{-5pt}
     \resumeSubHeadingListStart
-    \resumeProjectHeading
-            {\textbf{{Navi Drive}} $|$ \emph{\href{http://ijrar.org/viewfull.php?\&p_id=IJRAR21B1839}{Paper}}}{C++ $|$ Tensorflow $|$ Android}
-            \\[5mm]
-          \resumeItemListStart
-            \resumeItem{Crafted a real-time solution, fine-tuning \textbf{SSD mobilenet v2 keras} for vehicles, traffic signs, traffic lights for object  detection}
-            \resumeItem{Optimized and deployed tensorflow lite on edge device, reducing inference to \textbf{100ms \& 38 mAP} accuracy by \textbf{8 bit quantization}}
-          \resumeItemListEnd
- \vspace{-20pt}
- \resumeProjectHeading
-            {\textbf{{Foodie}} $|$ \emph{\href{https://github.com/dedsec995/Foodiee/}{Source Code}}}{Python $|$ LangGraph $|$ OpenAI}
-            \\[5mm]
-          \resumeItemListStart
-            \resumeItem{Orchestrated an \textbf{agentic workflow using LangGraph} to build an intelligent cooking assistant that automates recipe discovery, scales ingredients for different serving sizes, and manages user inventory}
-          \resumeItemListEnd
-\resumeSubHeadingListEnd
-\vspace{-20pt}
-%-----------LEADERSHIP-----------
-% \section{Leadership} 
-%     \vspace{-5pt}
-%     \resumeSubHeadingListStart
-%                    \resumeProjectHeading
-%             {\textbf{{SWErikCodes}} $|$\emph{{\href{https://www.tiktok.com/@swerikcodes?lang=en}{ TikTok $|$}\href{https://www.youtube.com/channel/UCgKFOz_KrMbmypWrawtzDQg}{ YouTube $|$}\href{https://www.instagram.com/swerikcodes/}{ Instagram}}}}{Jun 2023 -- Present}
-%             \\[5mm]
-%           \resumeItemListStart
-%             \resumeItem{Created educational coding content for \textbf{75,000+} developers, with \textbf{4,200,000+} impressions per month}
-%             \resumeItem{Produced coding tutorials on advanced topics such as \textbf{data structures}, \textbf{algorithms}, and \textbf{software design principles}}
-%           \resumeItemListEnd
-%           \resumeSubHeadingListEnd
-%  \vspace{-12pt}
-
+      \resumeProjectHeading{\textbf{{Navi Drive}} $|$ \emph{\href{http://ijrar.org/viewfull.php?\&p_id=IJRAR21B1839}{Paper}}}{C++ $|$ Tensorflow $|$ Android} \\[5mm]
+        \resumeItemListStart
+          \resumeItem{Crafted a real-time solution, fine-tuning \textbf{SSD mobilenet v2 keras} for vehicles, traffic signs, traffic lights for object  detection}
+          \resumeItem{Optimized and deployed tensorflow lite on edge device, reducing inference to \textbf{100ms \& 38 mAP} accuracy by \textbf{8 bit quantization}}
+        \resumeItemListEnd
+      \vspace{-20pt}
+      \resumeProjectHeading{\textbf{{Foodie}} $|$ \emph{\href{https://github.com/dedsec995/Foodiee/}{Source Code}}}{Python $|$ LangGraph $|$ OpenAI} \\[5mm]
+        \resumeItemListStart
+          \resumeItem{Orchestrated an \textbf{agentic workflow using LangGraph} to build an intelligent cooking assistant that automates recipe discovery, scales ingredients for different serving sizes, and manages user inventory}
+        \resumeItemListEnd
+    \resumeSubHeadingListEnd
+    \vspace{-20pt}
 \vspace{10pt}
 
 \vspace{-15pt}
