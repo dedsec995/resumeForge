@@ -1,6 +1,8 @@
 langchain
 langchain-groq
+langchain-google-genai
 langgraph
 python-dotenv
+texoutparse
 rich
 python-dotenv

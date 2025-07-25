@@ -1,11 +1,10 @@
-
-
-import os
+import os, re
 import subprocess
-import re
 from typing import TypedDict
 from langchain_groq import ChatGroq
+from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.graph import END, StateGraph
+from latex2pdf import compile_latex
 from dotenv import load_dotenv
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from utils import clean_the_text
@@ -13,6 +12,7 @@ from utils import clean_the_text
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 
 # Define the state for our graph
 class GraphState(TypedDict):
@@ -32,28 +32,56 @@ def tailor_resume(state):
     """
     print("---TAILORING RESUME---")
     chat = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # chat = ChatGoogleGenerativeAI(temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
 
     prompt = f"""
-            You are an expert resume writer and LaTeX editor. Your task is to tailor a given LaTeX resume to a specific job description.
-            Instructions:
-            1.  Analyze the resume's Work Experience, Projects, and Technical Skills sections.
-            2.  Compare these sections against the provided job description.
-            3.  Change the bullet points to better align to the job description. Make up the experience if needed, I'll handle it later. Only change if needed. Try to make it concise and emphazize on achievements
-            4.  Try to follow STAR, XYZ or CAR methodology with metrics where ever possible
-            5.  **Modify the resume content rules:**
-                -   Under the 'Technical Skills' section, add any relevant skills from the job description that are missing.
-                -   Remove the 'Technical Skills' that redundant and Do no create new Sub Headings inside it. Try to fit inside one of the existing categories
-                -   Rephrase bullet points in the work experience and projects to highlight skills and accomplishments relevant to the job description.
-                -   Always Integrate keywords from the job description naturally.
-                -   Bold the important keywords in the bullet points using \textbf{{}}
-                -   Feel Free to change all the points slightly if needed
-                -   Focus on impact, and ensure all changes are highly tailored to the job description  
-            6.  **Maintain LaTeX format:** You MUST output a valid LaTeX document. Do not change the structure or section commands of the resume. Only modify the content within the sections i.e. \resumeItem.
-            7.  Return only the full, modified LaTeX code for the resume with in ```latex ```. Do not include any explanations or introductory text.
-            8.  Again Don't forget. Do not include anything like explanation or any other text. Only give full LaTex code with the structure insdie ```latex ```as it is and only the content modified.
-            Here is the resume:\n\n{state["resume_tex"]}\n\nHere is the job description:\n\n{state["job_description"]}
-            Go through each points in the resume and decide if they need the change. Change it according to the above instructions.
-             """
+            You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description. You must follow all directives with precision.
+
+            ## Primary Goal
+            To meticulously rewrite and enhance the provided LaTeX resume, aligning its content—specifically the Work Experience, Projects, and Skills—with the requirements and keywords found in the provided Job Description.
+
+            ## Key Inputs
+            1.  **Original Resume**: A full LaTeX document.
+            2.  **Job Description**: The target job posting.
+
+            ## Core Directives
+
+            1.  **Analyze and Extract**: Deeply analyze the provided Job Description to extract key qualifications, required skills (e.g., Python, AWS, SQL), desired technologies (e.g., Kubernetes, Terraform), and action-oriented keywords (e.g., "developed," "optimized," "led," "managed").
+
+            2.  **Rewrite with Impact (STAR/XYZ)**: Rephrase all bullet points in the 'Work Experience' and 'Projects' sections to be achievement-oriented.
+                * Employ the **STAR** (Situation, Task, Action, Result) or **XYZ** (Accomplished [X] as measured by [Y], by doing [Z]) framework.
+                * **Quantify everything possible.** If the original resume lacks metrics, you must infer and add plausible, impressive metrics that align with the role's responsibilities.
+                * **Example Transformation**: Change a weak point like "Developed a new feature" into a strong one like "**Engineered** a user-facing **analytics dashboard** using **React** and **D3.js**, resulting in a **15% increase** in user engagement."
+                * **Aditional Points**: Do not add additional points or delete, make changes in the exisiting one if applicable.
+                
+            3.  **Keyword Integration**:
+                * Seamlessly and naturally integrate the extracted keywords and concepts throughout the resume's narrative.
+                * Use the `textbf{()}` command to bold the most critical keywords that directly match the job description only in 'Work Experience and 'Projects'.
+
+            4.  **Skills Section Optimization**:
+                * Add any crucial skills from the job description that are missing from the 'Technical Skills' section.
+                * Group new skills logically within the existing subheadings (e.g., Languages, Frameworks, Tools). **Do not create new subheadings.**
+                * Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
+
+            5.  **Preserve Core Truths**: While enhancing content, you must preserve the fundamental facts of the original resume (company names, job titles, and core duties). Your task is to reframe and quantify existing experience, not to invent a new career history.
+
+            ## Output Requirements
+
+            1.  **Strict LaTeX Integrity**: The output MUST be a complete and valid LaTeX document. You must not alter the resume's structural commands (`documentclass`, `section`, `subsection`, etc.) or layout. All modifications must be confined to the content within items (e.g., `resumeItem`) and the 'Technical Skills' list.
+
+            2.  **Code-Only Output**: Your entire response must be ONLY the final, modified LaTeX code. It must begin with `documentclass{...}` and end with `end{{document}}`.
+
+            3.  **No Explanations**: Do not include any introductory text, concluding summaries, apologies, or explanations. The response will be used programmatically.
+
+            4.  **Formatting**: Enclose the entire LaTeX output within a single ```latex ... ``` block.
+
+            ---
+            **Resume Input:**
+            ```latex
+            {state["resume_tex"]}```
+            **Job Description Input:**
+            {state["job_description"]}
+        """
 
     response = chat.invoke(prompt)
     filtered_tailored_resume_tex = clean_the_text(response.content)
@@ -68,16 +96,11 @@ def compile_resume(state):
     with open(file_path, "w") as f:
         f.write(state["tailored_resume_tex"])
     
-    process = subprocess.run(
-        ["pdflatex", "-output-directory=output", file_path],
-        capture_output=True,
-        text=True,
-    )
+    compile_latex(file_path, "/home/dedsec995/resumeForge/output")
+
     log_path = "/home/dedsec995/resumeForge/output/resume_tailored.log"
     pdf_path = "/home/dedsec995/resumeForge/output/resume_tailored.pdf"
     
-    if process.returncode != 0:
-        print(f"---PDFLATEX FAILED---{process.stderr}")
     return {"pdf_path": pdf_path, "log_path": log_path}
 
 def check_page_count(state):
@@ -110,7 +133,7 @@ def check_page_count(state):
 
 def shorten_resume(state):
     """
-    Shortens the resume based on the log file and other heuristics.
+    Shortens the resume using an LLM by looking at overfull boxes in the log.
     """
     print("---SHORTENING RESUME---")
     log_path = state["log_path"]
@@ -118,7 +141,7 @@ def shorten_resume(state):
         log_content = f.read()
 
     # Find overfull vbox warnings
-    overfull_vbox_pattern = re.compile(r"Overfull \\vbox \((.*?)pt too high\) has occurred while \\output is active")
+    overfull_vbox_pattern = re.compile(r"Overfull \\vbox ((.*?)pt too high) has occurred while \\output is active")
     matches = overfull_vbox_pattern.findall(log_content)
 
     if matches:
@@ -163,6 +186,8 @@ def decide_to_finish(state):
     """
     if state["page_count"] == 1:
         return "finish"
+    elif state["page_count"] == 999:
+        return "finish"
     else:
         return "shorten"
 
@@ -199,58 +224,70 @@ if __name__ == "__main__":
     with open("/home/dedsec995/resumeForge/template/resume.tex", "r") as f:
         resume_tex = f.read()    
         inputs = {"job_description": """
-                The Software Engineer will work as part of a team within the Advanced Computing & Analytics Laboratory (ACAL) under the Enterprise Data and Analytics Division (EDA) and the School of Applied Computational Sciences (SACS). An integral component of the EDA and the SACS, the ACAL is a recognized center of excellence on the Meharry Medical College campus which fosters a culture of innovation, learning, engagement, and personal growth in support of EDA business intelligence and SACS research and development mission statements which both seek to develop and deploy impactful and socially-responsible scientific knowledge and practical technologies that empower society to improve the quality of life. The Software Engineer will be critical in achieving this vision and strategy for solving complex business problems with cutting-edge solutions driven by the latest advancements in artificial intelligence and machine learning
-                Position Summary: 
+                
 
-                The Software Engineer will work as part of a team within the Advanced Computing & Analytics Laboratory (ACAL) under the Enterprise Data and Analytics Division (EDA) and the School of Applied Computational Sciences (SACS). An integral component of the EDA and the SACS, the ACAL is a recognized center of excellence on the Meharry Medical College campus which fosters a culture of innovation, learning, engagement, and personal growth in support of EDA business intelligence and SACS research and development mission statements which both seek to develop and deploy impactful and socially-responsible scientific knowledge and practical technologies that empower society to improve the quality of life. The Software Engineer will be critical in achieving this vision and strategy for solving complex business problems with cutting-edge solutions driven by the latest advancements in artificial intelligence and machine learning.
+                We’re seeking a Machine Learning Engineer with a strong foundation in Python, experience in retrieval-augmented generation (RAG) pipelines, and expertise in context engineering. In this role, you’ll build intelligent retrieval systems and scalable generation workflows using structured (e.g., PostgreSQL) and unstructured data sources, integrating with vector databases to support high-performance natural language applications.
 
-                Essential Functions:
 
-                Distill complex business problems into clear data science and machine learning projects.
-                Provide software engineering expertise and recommend data science approaches to meet various stakeholder needs.
-                Analyze complex “business” problems and execute use cases from existing data assets.
-                Work closely with product managers to identify and answer important product questions that help improve outcomes.
-                Interpret problems and provide solutions using appropriate data modeling techniques.
-                Develop prototypes for new data product ideas
-                Design large scale models using Logistic Regression, Decision Trees, Conjoint Analysis, Spatial models, Time-series models, and Machine Learning algorithms
-                Communicate findings to product managers and development groups
-                Drive the collection of new data and the refinement of existing data
-                Analyze and interpret the results of product experiments
-                Regularly invent new and novel approaches to problems; take initiative and break down barriers to solve problems; be recognized within team as the source of solutions
-                Manipulate and analyze complex, high-volume, high-dimensionality data from multiple sources
-                Bring a strong passion for empirical research and for answering hard questions with data
-                Communicate complex quantitative analysis in a clear, precise, and actionable manner
-                Provide software engineering training to various EDA and SACS clients.
-                Performs other related duties as assigned.
-                                                                                                                                                    
+                You’ll join a collaborative, forward-thinking team driving innovation at the intersection of NLP, LLMs, and data infrastructure.
 
-                Knowledge, Skills and Abilities:
 
-                Solid programming fundamentals with preferred emphasis on Python, R, Postgres and/or SQL-based technologies, and SAS, as well as other useful mainstream programming languages for data science including Java, Scala, Julia, MATLAB, JavaScript, TensorFlow, Go, Spark.
-                Experience leading end-to-end data science project implementation.
-                Experience working with cross-functional project teams and managing communications including in-person or virtual meetings is preferred.
-                Motivation to learn, lead, and contribute as a team player on a variety of data and software engineering projects.
-                Exceptional technical writing skills.
-                Ability to communicate ideas and execution plans clearly to both technical and non-technical teams.
-                Analytical and problem-solving skills.
-                Experience with machine learning and AI.
-                Familiarity with data management tools.
-                Ability to work independently and with team members from different backgrounds.
-                Excellent attention to detail.
-                Proficiency in statistics, data analysis, and research methods.
-                Ability to use independent judgment and to manage and impart confidential information.
-                Ability to develop and deliver presentations.
-                Ability to plan, assess, and evaluate programs.
-                Education and Experience:
+                ⸻
 
-                Master’s Degree in Software Engineering, Computer Science, Data Science, or a related field.
-                Minimum of two (2) years’ demonstrated experience applying software engineering methodologies to real-world data problems.
-                Environmental Conditions and Physical Demands
 
-                Work is normally performed in a typical interior/office work environment.
-                No or very limited physical effort required.
-                No or very limited exposure to physical risk.
-                May require extended work hours and/or travel.
+                Key Responsibilities
+
+                • Design and implement retrieval-augmented generation (RAG) pipelines that integrate structured (e.g., PostgreSQL) and unstructured data sources.
+
+                • Build and optimize vector search components using databases like FAISS, Pinecone, Weaviate, or pgvector (PostgreSQL extension).
+
+                • Develop and refine context engineering strategies, including chunking, semantic compression, and relevance filtering to improve retrieval accuracy and generation output.
+
+                • Work with prompt engineering and fine-tuning to improve LLM output relevance and consistency.
+
+                • Collaborate with data scientists, ML engineers, and product teams to design end-to-end solutions.
+
+                • Write maintainable, well-documented Python code and contribute to code reviews and architecture discussions.
+
+                • Deploy, monitor, and continuously improve ML pipelines in production environments.
+
+
+                ⸻
+
+
+                Required Qualifications
+
+                • 4–5 years of Python development experience focused on machine learning, NLP, or data engineering.
+
+                • Hands-on experience with RAG pipelines, including prompt design, document indexing, and retrieval tuning.
+
+                • Strong knowledge of PostgreSQL, including schema design, full-text search, and pgvector integration.
+
+                • Familiarity with vector databases and libraries such as FAISS, Pinecone, Weaviate, or pgvector.
+
+                • Practical experience with context engineering—optimizing context windows, dynamic retrieval, and relevance ranking.
+
+                • Experience with tools like LangChain, Haystack, and Transformers (Hugging Face).
+
+                • Solid understanding of REST APIs, Docker, and version control (Git).
+
+                • Strong communication skills and ability to work across disciplines.
+
+
+                ⸻
+
+
+                Preferred Qualifications
+
+                • Experience with cloud platforms (AWS, GCP, or Azure) and orchestration tools like Airflow or Prefect.
+
+                • Exposure to data pipelines involving both structured and unstructured data.
+
+                • Public Trust or other U.S. government clearance (or the ability to obtain it).
+
+                • Experience in deploying and monitoring LLMs in production environments.
+
+                • Familiarity with DevOps, observability, and CI/CD in ML workflows.
 
                 ""","resume_tex": resume_tex,}    
         app = workflow.compile()    
