@@ -2,6 +2,7 @@ import json, os, re
 from typing import TypedDict
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from langchain_groq import ChatGroq
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
@@ -11,7 +12,9 @@ from latex2pdf import compile_latex
 from utils import clean_the_text, extract_and_parse_json
 
 load_dotenv()
+
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY") 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 console = Console()
 
@@ -33,71 +36,21 @@ def get_resume_content(file_path="template/resume.tex"):
 
 def ask_job_description(state):
     console.print(Panel("Please paste the job description here:", title="Job Description", border_style="green"))
-    # job_description = console.input()
-    job_description = """Faire is an online wholesale marketplace built on the belief that the future is local — independent retailers around the globe are doing more revenue than Walmart and Amazon combined, but individually, they are small compared to these massive entities. At Faire, we're using the power of tech, data, and machine learning to connect this thriving community of entrepreneurs across the globe. Picture your favorite boutique in town — we help them discover the best products from around the world to sell in their stores. With the right tools and insights, we believe that we can level the playing field so that small businesses everywhere can compete with these big box and e-commerce giants.
-
-By supporting the growth of independent businesses, Faire is driving positive economic impact in local communities, globally. We’re looking for smart, resourceful and passionate people to join us as we power the shop local movement. If you believe in community, come join ours.
-
-About this role:
-
-Faire leverages the power of machine learning and data insights to revolutionize the wholesale industry, enabling local retailers to compete against giants like Amazon and big box stores. Our highly skilled team of data scientists and machine learning engineers specializes in developing algorithmic solutions related to discovery, ranking, search, recommendations, ads, logistics, underwriting, and more. Our ultimate goal is to empower local retail businesses with the tools they need to succeed.
-
-As a member of the Discovery Personalization team, you’ll be responsible for: 
-
-Personalization: Personalizing recommendations across surfaces of homepage, category page, brand page, and carousel recommendations, through retrieval embeddings models, near-real-time / streaming signals, Deep Learning or LLM-based ranking/recommendation models,  explore-exploit, and diversification
-Our team already includes experienced Data Scientists and Machine Learning Engineers from Uber, Airbnb, Square, Meta, LinkedIn and Pinterest. We're a lean, talented team with high opportunity for direct product impact and ownership. 
-
-You’re excited about this role because… 
-
-You’ll be able to work on cutting-edge personalization and recommendation problems by combining a wide variety of data about our retailers, brands, and products
-You want to use machine learning to help local retailers and independent brands succeed 
-You want to be a foundational team member of a fast-growing company
-You like to solve challenging problems related to a two-sided marketplace 
-Qualifications 
-
-1-3 years of relevant industry or research experience applying ML to real-world problems
-Familiarity or experience with personalization systems or recommendation algorithms
-Proficiency in Machine Learning / Deep Learning modeling and programming 
-An excitement and willingness to learn new tools and techniques 
-Strong communication skills and the ability to work with others in a closely collaborative team environment 
-Great to Haves:
-
-Master’s or PhD in Computer Science, Statistics, or related STEM fields 
-Experience implementing state-of-the-art ML algorithms from an academic paper
-Exposure to graph neural networks and/or language models
-Salary Range
-
-California & New York: the pay range for this role is $162,500 to $223,500 per year.
-
-This role will also be eligible for equity and benefits. Actual base pay will be determined based on permissible factors such as transferable skills, work experience, market demands, and primary work location. The base pay range provided is subject to change and may be modified in the future.
-
-Effective January 2025, Faire employees will be expected to go into the office 2 days per week on Tuesdays and Thursdays. Additionally, hybrid in-office roles will have the flexibility to work remotely up to 4 weeks per year. Specific Workplace and Information Technology positions may require onsite attendance 5 days per week as will be indicated in the job posting. 
-
-Applications for this position will be accepted for a minimum of 30 days from the posting date.
-
-Why you’ll love working at Faire
-
-We are entrepreneurs: Faire is being built for entrepreneurs, by entrepreneurs. We believe entrepreneurship is a calling and our mission is to empower entrepreneurs to chase their dreams. Every member of our team is taking part in the founding process.
-We are using technology and data to level the playing field: We are leveraging the power of product innovation and machine learning to connect brands and boutiques from all over the world, building a growing community of more than 350,000 small business owners.
-We build products our customers love: Everything we do is ultimately in the service of helping our customers grow their business because our goal is to grow the pie - not steal a piece from it. Running a small business is hard work, but using Faire makes it easy.
-We are curious and resourceful: Inquisitive by default, we explore every possibility, test every assumption, and develop creative solutions to the challenges at hand. We lead with curiosity and data in our decision making, and reason from a first principles mentality.
-Faire was founded in 2017 by a team of early product and engineering leads from Square. We’re backed by some of the top investors in retail and tech including: Y Combinator, Lightspeed Venture Partners, Forerunner Ventures, Khosla Ventures, Sequoia Capital, Founders Fund, and DST Global. We have headquarters in San Francisco and Kitchener-Waterloo, and a global employee presence across offices in Toronto, London, and New York. To learn more about Faire and our customers, you can read more on our blog.
-
-Faire provides equal employment opportunities (EEO) to all employees and applicants for employment without regard to race, color, religion, sex, national origin, age, disability, genetics, sexual orientation, gender identity or gender expression.
-
-Faire is committed to providing access, equal opportunity and reasonable accommodation for individuals with disabilities in employment, its services, programs, and activities. Accommodations are available throughout the recruitment process and applicants with a disability may request to be accommodated throughout the recruitment process. We will work with all applicants to accommodate their individual accessibility needs.  To request reasonable accommodation, please fill out our Accommodation Request Form (https://bit.ly/faire-form)"""
+    job_description = console.input()
     return {"job_description": job_description, "resume": get_resume_content()}
 
 def extract_info(state):
     console.print(Panel("Extracting Company and Position...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    endpoint = HuggingFaceEndpoint(temperature=0, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=512)
+    llm = ChatHuggingFace(llm=endpoint)
     
     prompt = f"""From the following job description, extract the company name and the position title.
-Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
+                Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
 
-Job Description:
-{state['job_description']}
-"""
+                Job Description:
+                {state['job_description']}
+            """
     response = llm.invoke(prompt)    
     try:
         data = json.loads(response.content)
@@ -108,12 +61,13 @@ Job Description:
         company = "Not Found"
         position = "Not Found"
 
-    # Initialize tailored_resume with the original resume content
     return {"company_name": company, "position": position, "tailored_resume": state['resume']}
 
 def edit_technical_skills(state):
     console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
@@ -126,36 +80,36 @@ def edit_technical_skills(state):
     feedback_context = ""
     if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
         feedback_context = f"""
-**Previous Feedback and Context:**
-- **Feedback from previous iteration:** {state.get("feedback", "")}
-- **Identified downsides to address:** {state.get("downsides", "")}
-- **Current iteration:** {state.get("iteration_count", 0)}
+                    **Previous Feedback and Context:**
+                    - **Feedback from previous iteration:** {state.get("feedback", "")}
+                    - **Identified downsides to address:** {state.get("downsides", "")}
+                    - **Current iteration:** {state.get("iteration_count", 0)}
 
-Please specifically address the feedback and downsides mentioned above while making improvements to the Technical Skills section.
-"""
+                    Please specifically address the feedback and downsides mentioned above while making improvements to the Technical Skills section.
+                """
 
     prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
 
-{feedback_context}
+            {feedback_context}
 
-Rewrite the 'Technical Skills' section below to align with the job description. Follow these rules:
-- Add any crucial skills from the job description that are missing.
-- Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
-- Do NOT use the `textbf{{}}` command to bold any skills in this section.
-- Make sure to not directly copy the job description skills to the resume.
+            Rewrite the 'Technical Skills' section below to align with the job description. Follow these rules:
+            - Add any crucial skills from the job description that are missing.
+            - Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
+            - Do NOT use the `textbf{{}}` command to bold any skills in this section.
+            - Make sure to not directly copy the job description skills to the resume.
 
-Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
+            Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
-**Job Description:**
----
-{state['job_description']}
----
+            **Job Description:**
+            ---
+            {state['job_description']}
+            ---
 
-**Original LaTeX 'Technical Skills' Section:**
----
-{original_skills_section}
----
-"""
+            **Original LaTeX 'Technical Skills' Section:**
+            ---
+            {original_skills_section}
+            ---
+        """
     
     response = llm.invoke(prompt)
     new_skills_section = clean_the_text(response.content)
@@ -169,7 +123,9 @@ Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' secti
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     experience_section_regex = r"(\\section{Work Experience}.*?\\vspace{-12pt})"
@@ -182,38 +138,38 @@ def edit_experience(state):
     feedback_context = ""
     if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
         feedback_context = f"""
-**Previous Feedback and Context:**
-- **Feedback from previous iteration:** {state.get("feedback", "")}
-- **Identified downsides to address:** {state.get("downsides", "")}
-- **Current iteration:** {state.get("iteration_count", 0)}
+            **Previous Feedback and Context:**
+            - **Feedback from previous iteration:** {state.get("feedback", "")}
+            - **Identified downsides to address:** {state.get("downsides", "")}
+            - **Current iteration:** {state.get("iteration_count", 0)}
 
-Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
-"""
+            Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
+        """
 
     prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
 
-{feedback_context}
+        {feedback_context}
 
-Rewrite the bullet points in the LaTeX 'Work Experience' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-- Quantify everything possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
-- Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
-- Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
-- You can add more details and points if needed to make the experience more relevant to the job description but make sense and be cohesive.
-- Don't make the experience too long or too short.
-- Also don't make it sound like it has been written by a robot.
+        Rewrite the bullet points in the LaTeX 'Work Experience' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
+        - Quantify everything possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+        - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
+        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
+        - You can add more details and points if needed to make the experience more relevant to the job description but make sense and be cohesive.
+        - Don't make the experience too long or too short.
+        - Also don't make it sound like it has been written by a robot.
 
-Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
+        Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
-**Job Description:**
----
-{state['job_description']}
----
+        **Job Description:**
+        ---
+        {state['job_description']}
+        ---
 
-**Original LaTeX 'Work Experience' Section:**
----
-{original_experience_section}
----
-"""
+        **Original LaTeX 'Work Experience' Section:**
+        ---
+        {original_experience_section}
+        ---
+    """
     
     response = llm.invoke(prompt)
     new_experience_section = clean_the_text(response.content)
@@ -227,7 +183,9 @@ Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' sectio
 
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     projects_section_regex = r"(\\section{Projects}.*?\\resumeSubHeadingListEnd\s*\\vspace{-20pt})"
@@ -240,37 +198,37 @@ def edit_projects(state):
     feedback_context = ""
     if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
         feedback_context = f"""
-**Previous Feedback and Context:**
-- **Feedback from previous iteration:** {state.get("feedback", "")}
-- **Identified downsides to address:** {state.get("downsides", "")}
-- **Current iteration:** {state.get("iteration_count", 0)}
+            **Previous Feedback and Context:**
+            - **Feedback from previous iteration:** {state.get("feedback", "")}
+            - **Identified downsides to address:** {state.get("downsides", "")}
+            - **Current iteration:** {state.get("iteration_count", 0)}
 
-Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
-"""
+            Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
+        """
 
     prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
 
-{feedback_context}
+        {feedback_context}
 
-Rewrite the bullet points in the LaTeX 'Projects' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-- Quantify everything possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
-- Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
-- You can add more details and points if needed to make the project more relevant to the job description.
-- Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
-- You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
+        Rewrite the bullet points in the LaTeX 'Projects' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
+        - Quantify everything possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+        - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
+        - You can add more details and points if needed to make the project more relevant to the job description.
+        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
+        - You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
 
-Your output MUST be ONLY the updated LaTeX code for the 'Projects' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
+        Your output MUST be ONLY the updated LaTeX code for the 'Projects' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
-**Job Description:**
----
-{state['job_description']}
----
+        **Job Description:**
+        ---
+        {state['job_description']}
+        ---
 
-**Original LaTeX 'Projects' Section:**
----
-{original_projects_section}
----
-"""
+        **Original LaTeX 'Projects' Section:**
+        ---
+        {original_projects_section}
+        ---
+    """
     
     response = llm.invoke(prompt)
     new_projects_section = clean_the_text(response.content)
@@ -314,12 +272,12 @@ def compile_resume(state):
 
 def judge_resume_quality(state):
     console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
-    llm = ChatGoogleGenerativeAI(temperature=0.1, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    llm = ChatGoogleGenerativeAI(temperature=0.15, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
     iteration_count = state.get("iteration_count", 0) + 1
 
     prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided LaTeX resume is tailored to the given job description. Assign a score from 0 to 100, where 100% is perfectly tailored.
                 Consider the following:
-                - Relevance of skills and experience to the job description.
+                - Relevance of experience and projects only to the job description.
                 - Use of keywords from the job description.
                 - Quantification of achievements (STAR/XYZ method).
                 - Overall impact and alignment with the job requirements.

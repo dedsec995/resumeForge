@@ -1,5 +1,7 @@
 langchain
 langchain-groq
+langchain-huggingface
+huggingface_hub
 langchain-google-genai
 langgraph
 python-dotenv
