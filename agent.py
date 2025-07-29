@@ -1,301 +1,345 @@
-import os, re
-import subprocess
-from typing import TypedDict
-from langchain_groq import ChatGroq
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import END, StateGraph
-from latex2pdf import compile_latex
-from dotenv import load_dotenv
+import os
+import re
+from typing import TypedDict, Annotated, Sequence
+from langchain_core.messages import BaseMessage, HumanMessage
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
+from langchain_groq import ChatGroq
+from langgraph.graph import StateGraph, END
+from rich.console import Console
+from rich.panel import Panel
+from dotenv import load_dotenv
+import PyPDF2
+import json
+from latex2pdf import compile_latex
 from utils import clean_the_text
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+console = Console()
 
-# Define the state for our graph
-class GraphState(TypedDict):
+class AgentState(TypedDict):
+    resume: str
     job_description: str
-    resume_tex: str
-    tailored_resume_tex: str
+    company_name: str
+    position: str
+    tailored_resume: str
     pdf_path: str
-    log_path: str
     page_count: int
-    shortening_attempts: int
 
-# Define the nodes of the graph
+def get_resume_content(file_path="template/resume.tex"):
+    with open(file_path, "r") as f:
+        return f.read()
 
-def tailor_resume(state):
-    """
-    Tailors the resume to the job description using an LLM.
-    """
-    print("---TAILORING RESUME---")
-    chat = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    # chat = ChatGoogleGenerativeAI(temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+def ask_job_description(state):
+    console.print(Panel("Please paste the job description here:", title="Job Description", border_style="green"))
+    # job_description = console.input()
+    job_description = """Faire is an online wholesale marketplace built on the belief that the future is local — independent retailers around the globe are doing more revenue than Walmart and Amazon combined, but individually, they are small compared to these massive entities. At Faire, we're using the power of tech, data, and machine learning to connect this thriving community of entrepreneurs across the globe. Picture your favorite boutique in town — we help them discover the best products from around the world to sell in their stores. With the right tools and insights, we believe that we can level the playing field so that small businesses everywhere can compete with these big box and e-commerce giants.
 
-    prompt = f"""
-            You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description. You must follow all directives with precision.
+By supporting the growth of independent businesses, Faire is driving positive economic impact in local communities, globally. We’re looking for smart, resourceful and passionate people to join us as we power the shop local movement. If you believe in community, come join ours.
 
-            ## Primary Goal
-            To meticulously rewrite and enhance the provided LaTeX resume, aligning its content—specifically the Work Experience, Projects, and Skills—with the requirements and keywords found in the provided Job Description.
+About this role:
 
-            ## Key Inputs
-            1.  **Original Resume**: A full LaTeX document.
-            2.  **Job Description**: The target job posting.
+Faire leverages the power of machine learning and data insights to revolutionize the wholesale industry, enabling local retailers to compete against giants like Amazon and big box stores. Our highly skilled team of data scientists and machine learning engineers specializes in developing algorithmic solutions related to discovery, ranking, search, recommendations, ads, logistics, underwriting, and more. Our ultimate goal is to empower local retail businesses with the tools they need to succeed.
 
-            ## Core Directives
+As a member of the Discovery Personalization team, you’ll be responsible for: 
 
-            1.  **Analyze and Extract**: Deeply analyze the provided Job Description to extract key qualifications, required skills (e.g., Python, AWS, SQL), desired technologies (e.g., Kubernetes, Terraform), and action-oriented keywords (e.g., "developed," "optimized," "led," "managed").
+Personalization: Personalizing recommendations across surfaces of homepage, category page, brand page, and carousel recommendations, through retrieval embeddings models, near-real-time / streaming signals, Deep Learning or LLM-based ranking/recommendation models,  explore-exploit, and diversification
+Our team already includes experienced Data Scientists and Machine Learning Engineers from Uber, Airbnb, Square, Meta, LinkedIn and Pinterest. We're a lean, talented team with high opportunity for direct product impact and ownership. 
 
-            2.  **Rewrite with Impact (STAR/XYZ)**: Rephrase all bullet points in the 'Work Experience' and 'Projects' sections to be achievement-oriented.
-                * Employ the **STAR** (Situation, Task, Action, Result) or **XYZ** (Accomplished [X] as measured by [Y], by doing [Z]) framework.
-                * **Quantify everything possible.** If the original resume lacks metrics, you must infer and add plausible, impressive metrics that align with the role's responsibilities.
-                * **Example Transformation**: Change a weak point like "Developed a new feature" into a strong one like "**Engineered** a user-facing **analytics dashboard** using **React** and **D3.js**, resulting in a **15% increase** in user engagement."
-                * **Aditional Points**: Do not add additional points or delete, make changes in the exisiting one if applicable.
-                
-            3.  **Keyword Integration**:
-                * Seamlessly and naturally integrate the extracted keywords and concepts throughout the resume's narrative.
-                * Use the `textbf{()}` command to bold the most critical keywords that directly match the job description only in 'Work Experience and 'Projects'.
+You’re excited about this role because… 
 
-            4.  **Skills Section Optimization**:
-                * Add any crucial skills from the job description that are missing from the 'Technical Skills' section.
-                * Group new skills logically within the existing subheadings (e.g., Languages, Frameworks, Tools). **Do not create new subheadings.**
-                * Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
+You’ll be able to work on cutting-edge personalization and recommendation problems by combining a wide variety of data about our retailers, brands, and products
+You want to use machine learning to help local retailers and independent brands succeed 
+You want to be a foundational team member of a fast-growing company
+You like to solve challenging problems related to a two-sided marketplace 
+Qualifications 
 
-            5.  **Preserve Core Truths**: While enhancing content, you must preserve the fundamental facts of the original resume (company names, job titles, and core duties). Your task is to reframe and quantify existing experience, not to invent a new career history.
+1-3 years of relevant industry or research experience applying ML to real-world problems
+Familiarity or experience with personalization systems or recommendation algorithms
+Proficiency in Machine Learning / Deep Learning modeling and programming 
+An excitement and willingness to learn new tools and techniques 
+Strong communication skills and the ability to work with others in a closely collaborative team environment 
+Great to Haves:
 
-            ## Output Requirements
+Master’s or PhD in Computer Science, Statistics, or related STEM fields 
+Experience implementing state-of-the-art ML algorithms from an academic paper
+Exposure to graph neural networks and/or language models
+Salary Range
 
-            1.  **Strict LaTeX Integrity**: The output MUST be a complete and valid LaTeX document. You must not alter the resume's structural commands (`documentclass`, `section`, `subsection`, etc.) or layout. All modifications must be confined to the content within items (e.g., `resumeItem`) and the 'Technical Skills' list.
+California & New York: the pay range for this role is $162,500 to $223,500 per year.
 
-            2.  **Code-Only Output**: Your entire response must be ONLY the final, modified LaTeX code. It must begin with `documentclass{...}` and end with `end{{document}}`.
+This role will also be eligible for equity and benefits. Actual base pay will be determined based on permissible factors such as transferable skills, work experience, market demands, and primary work location. The base pay range provided is subject to change and may be modified in the future.
 
-            3.  **No Explanations**: Do not include any introductory text, concluding summaries, apologies, or explanations. The response will be used programmatically.
+Effective January 2025, Faire employees will be expected to go into the office 2 days per week on Tuesdays and Thursdays. Additionally, hybrid in-office roles will have the flexibility to work remotely up to 4 weeks per year. Specific Workplace and Information Technology positions may require onsite attendance 5 days per week as will be indicated in the job posting. 
 
-            4.  **Formatting**: Enclose the entire LaTeX output within a single ```latex ... ``` block.
+Applications for this position will be accepted for a minimum of 30 days from the posting date.
 
-            ---
-            **Resume Input:**
-            ```latex
-            {state["resume_tex"]}```
-            **Job Description Input:**
-            {state["job_description"]}
-        """
+Why you’ll love working at Faire
 
-    response = chat.invoke(prompt)
-    filtered_tailored_resume_tex = clean_the_text(response.content)
-    return {"tailored_resume_tex": filtered_tailored_resume_tex, "shortening_attempts": 0}
+We are entrepreneurs: Faire is being built for entrepreneurs, by entrepreneurs. We believe entrepreneurship is a calling and our mission is to empower entrepreneurs to chase their dreams. Every member of our team is taking part in the founding process.
+We are using technology and data to level the playing field: We are leveraging the power of product innovation and machine learning to connect brands and boutiques from all over the world, building a growing community of more than 350,000 small business owners.
+We build products our customers love: Everything we do is ultimately in the service of helping our customers grow their business because our goal is to grow the pie - not steal a piece from it. Running a small business is hard work, but using Faire makes it easy.
+We are curious and resourceful: Inquisitive by default, we explore every possibility, test every assumption, and develop creative solutions to the challenges at hand. We lead with curiosity and data in our decision making, and reason from a first principles mentality.
+Faire was founded in 2017 by a team of early product and engineering leads from Square. We’re backed by some of the top investors in retail and tech including: Y Combinator, Lightspeed Venture Partners, Forerunner Ventures, Khosla Ventures, Sequoia Capital, Founders Fund, and DST Global. We have headquarters in San Francisco and Kitchener-Waterloo, and a global employee presence across offices in Toronto, London, and New York. To learn more about Faire and our customers, you can read more on our blog.
+
+Faire provides equal employment opportunities (EEO) to all employees and applicants for employment without regard to race, color, religion, sex, national origin, age, disability, genetics, sexual orientation, gender identity or gender expression.
+
+Faire is committed to providing access, equal opportunity and reasonable accommodation for individuals with disabilities in employment, its services, programs, and activities. Accommodations are available throughout the recruitment process and applicants with a disability may request to be accommodated throughout the recruitment process. We will work with all applicants to accommodate their individual accessibility needs.  To request reasonable accommodation, please fill out our Accommodation Request Form (https://bit.ly/faire-form)"""
+    return {"job_description": job_description, "resume": get_resume_content()}
+
+def extract_info(state):
+    console.print(Panel("Extracting Company and Position...", title="Progress", border_style="blue"))
+    llm = ChatGroq(temperature=0, model_name="llama3-70b-8192")
+    
+    prompt = f"""From the following job description, extract the company name and the position title.
+Return the output as a JSON object with two keys: "company" and "position".
+
+Job Description:
+{state['job_description']}
+"""
+    
+    response = llm.invoke(prompt)
+    
+    try:
+        match = re.search(r'```json\n(.*?)\n```', response.content, re.DOTALL)
+        json_str = match.group(1) if match else response.content
+        data = json.loads(json_str)
+        company = data["company"]
+        position = data["position"]
+    except (json.JSONDecodeError, KeyError):
+        parts = response.content.split(',')
+        company = parts[0].strip()
+        position = ", ".join(parts[1:]).strip() if len(parts) > 1 else "Not Found"
+
+    # Initialize tailored_resume with the original resume content
+    return {"company_name": company, "position": position, "tailored_resume": state['resume']}
+
+def edit_technical_skills(state):
+    console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
+    llm = ChatGroq(temperature=0.1, model_name="llama3-70b-8192")
+    resume_content = state["tailored_resume"]
+
+    skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
+    match = re.search(skills_section_regex, resume_content, re.DOTALL)
+    if not match:
+        console.print("[bold red]Error: Could not find the Technical Skills section.[/bold red]")
+        return {"tailored_resume": resume_content}
+    original_skills_section = match.group(1)
+
+    # 2. Update the prompt to ask for a LaTeX markdown block
+    prompt = f"""You are a LaTeX expert. Rewrite the 'Technical Skills' section below to align with the job description.
+Incorporate relevant keywords from the job description.
+Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+
+**Job Description:**
+---
+{state['job_description']}
+---
+
+**Original LaTeX 'Technical Skills' Section:**
+---
+{original_skills_section}
+---
+"""
+    
+    response = llm.invoke(prompt)
+    # 3. Use the utility function to extract the LaTeX code
+    new_skills_section = clean_the_text(response.content)
+
+    # 4. Handle potential parsing failure and replace the old section
+    if new_skills_section:
+        updated_resume = re.sub(skills_section_regex, lambda m: new_skills_section, resume_content, flags=re.DOTALL)
+        return {"tailored_resume": updated_resume}
+    else:
+        console.print("[bold yellow]Warning: Failed to extract LaTeX from LLM response for Technical Skills. Skipping update.[/bold yellow]")
+        return {"tailored_resume": resume_content}
+
+def edit_experience(state):
+    console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
+    llm = ChatGroq(temperature=0.2, model_name="llama3-70b-8192")
+    resume_content = state["tailored_resume"]
+
+    experience_section_regex = r"(\\section{Work Experience}.*?\\vspace{-12pt})"
+    match = re.search(experience_section_regex, resume_content, re.DOTALL)
+    if not match:
+        console.print("[bold red]Error: Could not find the Work Experience section.[/bold red]")
+        return {"tailored_resume": resume_content}
+    original_experience_section = match.group(1)
+    
+    # 2. Update the prompt
+    prompt = f"""You are an expert resume writer. Rewrite the bullet points in the LaTeX 'Work Experience' section below to highlight skills from the job description. Use action verbs and quantify results.
+Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+
+**Job Description:**
+---
+{state['job_description']}
+---
+
+**Original LaTeX 'Work Experience' Section:**
+---
+{original_experience_section}
+---
+"""
+    
+    response = llm.invoke(prompt)
+    # 3. Use the utility function
+    new_experience_section = clean_the_text(response.content)
+    
+    # 4. Handle failure and replace
+    if new_experience_section:
+        updated_resume = re.sub(experience_section_regex, lambda m: new_experience_section, resume_content, flags=re.DOTALL)
+        return {"tailored_resume": updated_resume}
+    else:
+        console.print("[bold yellow]Warning: Failed to extract LaTeX from LLM response for Work Experience. Skipping update.[/bold yellow]")
+        return {"tailored_resume": resume_content}
+
+def edit_projects(state):
+    console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
+    llm = ChatGroq(temperature=0.2, model_name="llama3-70b-8192")
+    resume_content = state["tailored_resume"]
+
+    projects_section_regex = r"(\\section{Projects}.*?\\resumeSubHeadingListEnd\s*\\vspace{-20pt})"
+    match = re.search(projects_section_regex, resume_content, re.DOTALL)
+    if not match:
+        console.print("[bold red]Error: Could not find the Projects section.[/bold red]")
+        return {"tailored_resume": resume_content}
+    original_projects_section = match.group(1)
+    
+    # 2. Update the prompt
+    prompt = f"""You are an expert resume writer. Rewrite the LaTeX 'Projects' section below to highlight aspects relevant to the job description.
+Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+
+**Job Description:**
+---
+{state['job_description']}
+---
+
+**Original LaTeX 'Projects' Section:**
+---
+{original_projects_section}
+---
+"""
+    
+    response = llm.invoke(prompt)
+    # 3. Use the utility function
+    new_projects_section = clean_the_text(response.content)
+    
+    # 4. Handle failure and replace
+    if new_projects_section:
+        updated_resume = re.sub(projects_section_regex, lambda m: new_projects_section, resume_content, flags=re.DOTALL)
+        return {"tailored_resume": updated_resume}
+    else:
+        console.print("[bold yellow]Warning: Failed to extract LaTeX from LLM response for Projects. Skipping update.[/bold yellow]")
+        return {"tailored_resume": resume_content}
 
 def compile_resume(state):
-    """
-    Compiles the LaTeX resume to a PDF.
-    """
-    print("---COMPILING RESUME---")
-    file_path = "/home/dedsec995/resumeForge/output/resume_tailored.tex"
-    with open(file_path, "w") as f:
-        f.write(state["tailored_resume_tex"])
+    console.print(Panel("Compiling Resume...", title="Progress", border_style="blue"))
+    resume_content = state["tailored_resume"]
+    # Sanitize company and position names for file paths
+    company_name = re.sub(r'[\\/*?:"<>|]', "", state["company_name"])
+    position = re.sub(r'[\\/*?:"<>|]', "", state["position"])
     
-    compile_latex(file_path, "/home/dedsec995/resumeForge/output")
+    output_dir = "output"
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
 
-    log_path = "/home/dedsec995/resumeForge/output/resume_tailored.log"
-    pdf_path = "/home/dedsec995/resumeForge/output/resume_tailored.pdf"
+    base_name = f"{company_name}_{position}_resume".replace(" ", "_")
+    tex_path = os.path.join(output_dir, f"{base_name}.tex")
+    pdf_path = os.path.join(output_dir, f"{base_name}.pdf")
+
+    with open(tex_path, "w", encoding='utf-8') as f:
+        f.write(resume_content)
     
-    return {"pdf_path": pdf_path, "log_path": log_path}
+    try:
+        # The latex2pdf library can be finicky. Ensure it uses a temporary build directory.
+        parsed_log = compile_latex(tex_path, output_dir)
+        # Check if compilation was successful
+        if parsed_log and parsed_log.errors == []:
+            console.print(f"[green]Successfully compiled resume to: {pdf_path}[/green]")
+        else:
+             console.print("[bold red]Error: PDF compilation failed. Check the .log file in the output directory.[/bold red]")
+             pdf_path = None # Indicate failure
+    except Exception as e:
+        console.print(f"[bold red]An exception occurred during PDF compilation: {e}[/bold red]")
+        pdf_path = None
 
-def check_page_count(state):
-    """
-    Checks the number of pages in the PDF.
-    """
-    print("---CHECKING PAGE COUNT---")
+    return {"pdf_path": pdf_path}
+
+def check_pdf_length(state):
+    console.print(Panel("Checking PDF Length...", title="Progress", border_style="blue"))
     pdf_path = state["pdf_path"]
-    if not os.path.exists(pdf_path):
-        # This can happen if pdflatex failed
-        return {"page_count": 999} # Return a high number to force shortening
-
-    process = subprocess.run(
-        ["pdfinfo", pdf_path],
-        capture_output=True,
-        text=True,
-    )
     
-    if process.returncode != 0:
-        print(f"---PDFINFO FAILED---{process.stderr}")
-        return {"page_count": 999} # Return a high number to force shortening
+    if not pdf_path or not os.path.exists(pdf_path):
+        console.print("[bold red]Skipping PDF length check because compilation failed.[/bold red]")
+        # Decide how to handle failure. Maybe go to a new "fix_latex" node or end.
+        # For now, we'll just end the process.
+        return {"page_count": 99} # Use a high number to signal an issue or stop
 
-    for line in process.stdout.split("\n"):
-        if line.startswith("Pages:"):
-            page_count = int(line.split()[-1])
-            print(f"Page count: {page_count}")
-            return {"page_count": page_count}
+    with open(pdf_path, "rb") as f:
+        reader = PyPDF2.PdfReader(f)
+        page_count = len(reader.pages)
     
-    return {"page_count": 999} # Should not be reached
+    console.print(f"Resume is {page_count} page(s) long.")
+    return {"page_count": page_count}
 
 def shorten_resume(state):
-    """
-    Shortens the resume using an LLM by looking at overfull boxes in the log.
-    """
-    print("---SHORTENING RESUME---")
-    log_path = state["log_path"]
-    with open(log_path, "r") as f:
-        log_content = f.read()
+    # This is a placeholder. A real implementation would be a complex LLM call
+    # to summarize bullet points or reduce content, similar to the editing nodes.
+    console.print(Panel("Resume is longer than one page. This is a placeholder for a shortening step.", title="Notice", border_style="yellow"))
+    return {"tailored_resume": state["tailored_resume"]}
 
-    # Find overfull vbox warnings
-    overfull_vbox_pattern = re.compile(r"Overfull \\vbox ((.*?)pt too high) has occurred while \\output is active")
-    matches = overfull_vbox_pattern.findall(log_content)
+# --- Graph Definition (No Changes Needed Here) ---
 
-    if matches:
-        print("---FOUND OVERFULL VBOX---")
-        # For now, we'll just take the first match
-        overflow_amount = float(matches[0])
-        # In a real implementation, we would use an LLM to shorten the content
-        # that is causing the overflow. For now, we'll just remove the last
-        # \resumeItem from the tailored resume.
-        tailored_resume_tex = state["tailored_resume_tex"]
-        lines = tailored_resume_tex.split("\n")
-        for i in range(len(lines) - 1, -1, -1):
-            if "\\resumeItem" in lines[i]:
-                lines.pop(i)
-                break
-        new_tailored_resume_tex = "\n".join(lines)
-    else:
-        print("---NO OVERFULL VBOX FOUND---")
-        # If no overfull vbox, find the longest itemize section and shorten it
-        tailored_resume_tex = state["tailored_resume_tex"]
-        itemize_pattern = re.compile(r"\\begin{itemize}(.*?)\\end{itemize}", re.DOTALL)
-        itemizes = itemize_pattern.findall(tailored_resume_tex)
-        if itemizes:
-            longest_itemize = max(itemizes, key=len)
-            # In a real implementation, we would use an LLM to shorten this.
-            # For now, we'll just remove the last \resumeItem.
-            lines = longest_itemize.split("\n")
-            for i in range(len(lines) - 1, -1, -1):
-                if "\\resumeItem" in lines[i]:
-                    lines.pop(i)
-                    break
-            new_itemize = "\n".join(lines)
-            new_tailored_resume_tex = tailored_resume_tex.replace(longest_itemize, new_itemize)
-        else:
-            new_tailored_resume_tex = tailored_resume_tex
+workflow = StateGraph(AgentState)
 
-    return {"tailored_resume_tex": new_tailored_resume_tex, "shortening_attempts": state["shortening_attempts"] + 1}
-
-def decide_to_finish(state):
-    """
-    Decides whether to finish or continue shortening.
-    """
-    if state["page_count"] == 1:
-        return "finish"
-    elif state["page_count"] == 999:
-        return "finish"
-    else:
-        return "shorten"
-
-# Create the graph
-workflow = StateGraph(GraphState)
-
-# Add the nodes
-workflow.add_node("tailor_resume", tailor_resume)
+workflow.add_node("ask_job_description", ask_job_description)
+workflow.add_node("extract_info", extract_info)
+workflow.add_node("edit_technical_skills", edit_technical_skills)
+workflow.add_node("edit_experience", edit_experience)
+workflow.add_node("edit_projects", edit_projects)
 workflow.add_node("compile_resume", compile_resume)
-workflow.add_node("check_page_count", check_page_count)
+workflow.add_node("check_pdf_length", check_pdf_length)
 workflow.add_node("shorten_resume", shorten_resume)
 
-# Set the entrypoint
-workflow.set_entry_point("tailor_resume")
 
-# Add the edges
-workflow.add_edge("tailor_resume", "compile_resume")
-workflow.add_edge("compile_resume", "check_page_count")
+workflow.set_entry_point("ask_job_description")
+workflow.add_edge("ask_job_description", "extract_info")
+workflow.add_edge("extract_info", "edit_technical_skills")
+workflow.add_edge("edit_technical_skills", "edit_experience")
+workflow.add_edge("edit_experience", "edit_projects")
+workflow.add_edge("edit_projects", "compile_resume")
+
+# Conditional edge to handle PDF length
+def decide_what_to_do(state):
+    if state["page_count"] > 1:
+        # In a real scenario, you might loop back to a "shorten_and_recompile" flow.
+        # Here we just go to the placeholder node and then compile again.
+        return "shorten_resume"
+    else:
+        # If the resume is one page, we are done.
+        return END
+
 workflow.add_conditional_edges(
-    "check_page_count",
-    decide_to_finish,
-    {
-        "finish": END,
-        "shorten": "shorten_resume",
-    },
+    "check_pdf_length",
+    decide_what_to_do,
+    {"shorten_resume": "shorten_resume", END: END}
 )
+
+# After shortening, re-compile the resume
 workflow.add_edge("shorten_resume", "compile_resume")
 
-
-# Compile the graph
 app = workflow.compile()
 
-if __name__ == "__main__":    
-    with open("/home/dedsec995/resumeForge/template/resume.tex", "r") as f:
-        resume_tex = f.read()    
-        inputs = {"job_description": """
-                
-
-                We’re seeking a Machine Learning Engineer with a strong foundation in Python, experience in retrieval-augmented generation (RAG) pipelines, and expertise in context engineering. In this role, you’ll build intelligent retrieval systems and scalable generation workflows using structured (e.g., PostgreSQL) and unstructured data sources, integrating with vector databases to support high-performance natural language applications.
-
-
-                You’ll join a collaborative, forward-thinking team driving innovation at the intersection of NLP, LLMs, and data infrastructure.
-
-
-                ⸻
-
-
-                Key Responsibilities
-
-                • Design and implement retrieval-augmented generation (RAG) pipelines that integrate structured (e.g., PostgreSQL) and unstructured data sources.
-
-                • Build and optimize vector search components using databases like FAISS, Pinecone, Weaviate, or pgvector (PostgreSQL extension).
-
-                • Develop and refine context engineering strategies, including chunking, semantic compression, and relevance filtering to improve retrieval accuracy and generation output.
-
-                • Work with prompt engineering and fine-tuning to improve LLM output relevance and consistency.
-
-                • Collaborate with data scientists, ML engineers, and product teams to design end-to-end solutions.
-
-                • Write maintainable, well-documented Python code and contribute to code reviews and architecture discussions.
-
-                • Deploy, monitor, and continuously improve ML pipelines in production environments.
-
-
-                ⸻
-
-
-                Required Qualifications
-
-                • 4–5 years of Python development experience focused on machine learning, NLP, or data engineering.
-
-                • Hands-on experience with RAG pipelines, including prompt design, document indexing, and retrieval tuning.
-
-                • Strong knowledge of PostgreSQL, including schema design, full-text search, and pgvector integration.
-
-                • Familiarity with vector databases and libraries such as FAISS, Pinecone, Weaviate, or pgvector.
-
-                • Practical experience with context engineering—optimizing context windows, dynamic retrieval, and relevance ranking.
-
-                • Experience with tools like LangChain, Haystack, and Transformers (Hugging Face).
-
-                • Solid understanding of REST APIs, Docker, and version control (Git).
-
-                • Strong communication skills and ability to work across disciplines.
-
-
-                ⸻
-
-
-                Preferred Qualifications
-
-                • Experience with cloud platforms (AWS, GCP, or Azure) and orchestration tools like Airflow or Prefect.
-
-                • Exposure to data pipelines involving both structured and unstructured data.
-
-                • Public Trust or other U.S. government clearance (or the ability to obtain it).
-
-                • Experience in deploying and monitoring LLMs in production environments.
-
-                • Familiarity with DevOps, observability, and CI/CD in ML workflows.
-
-                ""","resume_tex": resume_tex,}    
-        app = workflow.compile()    
+if __name__ == "__main__":
+    inputs = {}
+    try:
         mermaid_code = app.get_graph().draw_mermaid()
         draw_mermaid_png(mermaid_syntax=mermaid_code, output_file_path="graph.png")
-        for output in app.stream(inputs):        
-            for key, value in output.items():            
-                print(f"Output from node '{key}':")            
-                print("---")            
-                print(value)        
-                print("\n---\n")
+    except Exception as e:
+        print(f"Could not draw graph: {e}")
+
+    for event in app.stream(inputs):
+        for k, v in event.items():
+            if k != "__end__":
+                console.print(f"----- {k} -----")
+                console.print(v)

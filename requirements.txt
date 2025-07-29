@@ -4,5 +4,6 @@ langchain-google-genai
 langgraph
 python-dotenv
 texoutparse
+pymupdf
 rich
-python-dotenv
+PyPdf2
