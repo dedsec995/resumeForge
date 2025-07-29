@@ -1,20 +1,18 @@
-import os
-import re
-from typing import TypedDict, Annotated, Sequence
-from langchain_core.messages import BaseMessage, HumanMessage
+import json, os, re
+from typing import TypedDict
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, END
+from langchain_google_genai import ChatGoogleGenerativeAI
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
-import PyPDF2
-import json
 from latex2pdf import compile_latex
-from utils import clean_the_text
+from utils import clean_the_text, extract_and_parse_json
 
 load_dotenv()
-
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 console = Console()
 
 class AgentState(TypedDict):
@@ -24,7 +22,10 @@ class AgentState(TypedDict):
     position: str
     tailored_resume: str
     pdf_path: str
-    page_count: int
+    score: float
+    feedback: str
+    downsides: str
+    iteration_count: int
 
 def get_resume_content(file_path="template/resume.tex"):
     with open(file_path, "r") as f:
@@ -89,34 +90,30 @@ Faire is committed to providing access, equal opportunity and reasonable accommo
 
 def extract_info(state):
     console.print(Panel("Extracting Company and Position...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0, model_name="llama3-70b-8192")
+    llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     
     prompt = f"""From the following job description, extract the company name and the position title.
-Return the output as a JSON object with two keys: "company" and "position".
+Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
 
 Job Description:
 {state['job_description']}
 """
-    
-    response = llm.invoke(prompt)
-    
+    response = llm.invoke(prompt)    
     try:
-        match = re.search(r'```json\n(.*?)\n```', response.content, re.DOTALL)
-        json_str = match.group(1) if match else response.content
-        data = json.loads(json_str)
+        data = json.loads(response.content)
         company = data["company"]
         position = data["position"]
     except (json.JSONDecodeError, KeyError):
-        parts = response.content.split(',')
-        company = parts[0].strip()
-        position = ", ".join(parts[1:]).strip() if len(parts) > 1 else "Not Found"
+        console.print("[bold red]Error: Could not extract company and position in expected JSON format. Setting to 'Not Found'.[/bold red]")
+        company = "Not Found"
+        position = "Not Found"
 
     # Initialize tailored_resume with the original resume content
     return {"company_name": company, "position": position, "tailored_resume": state['resume']}
 
 def edit_technical_skills(state):
     console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.1, model_name="llama3-70b-8192")
+    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     resume_content = state["tailored_resume"]
 
     skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
@@ -126,10 +123,28 @@ def edit_technical_skills(state):
         return {"tailored_resume": resume_content}
     original_skills_section = match.group(1)
 
-    # 2. Update the prompt to ask for a LaTeX markdown block
-    prompt = f"""You are a LaTeX expert. Rewrite the 'Technical Skills' section below to align with the job description.
-Incorporate relevant keywords from the job description.
-Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+    feedback_context = ""
+    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+        feedback_context = f"""
+**Previous Feedback and Context:**
+- **Feedback from previous iteration:** {state.get("feedback", "")}
+- **Identified downsides to address:** {state.get("downsides", "")}
+- **Current iteration:** {state.get("iteration_count", 0)}
+
+Please specifically address the feedback and downsides mentioned above while making improvements to the Technical Skills section.
+"""
+
+    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
+
+{feedback_context}
+
+Rewrite the 'Technical Skills' section below to align with the job description. Follow these rules:
+- Add any crucial skills from the job description that are missing.
+- Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
+- Do NOT use the `textbf{{}}` command to bold any skills in this section.
+- Make sure to not directly copy the job description skills to the resume.
+
+Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
 **Job Description:**
 ---
@@ -143,10 +158,8 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 """
     
     response = llm.invoke(prompt)
-    # 3. Use the utility function to extract the LaTeX code
     new_skills_section = clean_the_text(response.content)
 
-    # 4. Handle potential parsing failure and replace the old section
     if new_skills_section:
         updated_resume = re.sub(skills_section_regex, lambda m: new_skills_section, resume_content, flags=re.DOTALL)
         return {"tailored_resume": updated_resume}
@@ -156,7 +169,7 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.2, model_name="llama3-70b-8192")
+    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     resume_content = state["tailored_resume"]
 
     experience_section_regex = r"(\\section{Work Experience}.*?\\vspace{-12pt})"
@@ -166,9 +179,30 @@ def edit_experience(state):
         return {"tailored_resume": resume_content}
     original_experience_section = match.group(1)
     
-    # 2. Update the prompt
-    prompt = f"""You are an expert resume writer. Rewrite the bullet points in the LaTeX 'Work Experience' section below to highlight skills from the job description. Use action verbs and quantify results.
-Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+    feedback_context = ""
+    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+        feedback_context = f"""
+**Previous Feedback and Context:**
+- **Feedback from previous iteration:** {state.get("feedback", "")}
+- **Identified downsides to address:** {state.get("downsides", "")}
+- **Current iteration:** {state.get("iteration_count", 0)}
+
+Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
+"""
+
+    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
+
+{feedback_context}
+
+Rewrite the bullet points in the LaTeX 'Work Experience' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
+- Quantify everything possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+- Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
+- Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
+- You can add more details and points if needed to make the experience more relevant to the job description but make sense and be cohesive.
+- Don't make the experience too long or too short.
+- Also don't make it sound like it has been written by a robot.
+
+Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
 **Job Description:**
 ---
@@ -182,10 +216,8 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 """
     
     response = llm.invoke(prompt)
-    # 3. Use the utility function
     new_experience_section = clean_the_text(response.content)
     
-    # 4. Handle failure and replace
     if new_experience_section:
         updated_resume = re.sub(experience_section_regex, lambda m: new_experience_section, resume_content, flags=re.DOTALL)
         return {"tailored_resume": updated_resume}
@@ -195,7 +227,7 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.2, model_name="llama3-70b-8192")
+    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     resume_content = state["tailored_resume"]
 
     projects_section_regex = r"(\\section{Projects}.*?\\resumeSubHeadingListEnd\s*\\vspace{-20pt})"
@@ -205,9 +237,29 @@ def edit_projects(state):
         return {"tailored_resume": resume_content}
     original_projects_section = match.group(1)
     
-    # 2. Update the prompt
-    prompt = f"""You are an expert resume writer. Rewrite the LaTeX 'Projects' section below to highlight aspects relevant to the job description.
-Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown block like this: ```latex [your code here] ```.
+    feedback_context = ""
+    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+        feedback_context = f"""
+**Previous Feedback and Context:**
+- **Feedback from previous iteration:** {state.get("feedback", "")}
+- **Identified downsides to address:** {state.get("downsides", "")}
+- **Current iteration:** {state.get("iteration_count", 0)}
+
+Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
+"""
+
+    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
+
+{feedback_context}
+
+Rewrite the bullet points in the LaTeX 'Projects' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
+- Quantify everything possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+- Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
+- You can add more details and points if needed to make the project more relevant to the job description.
+- Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
+- You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
+
+Your output MUST be ONLY the updated LaTeX code for the 'Projects' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
 **Job Description:**
 ---
@@ -221,10 +273,8 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 """
     
     response = llm.invoke(prompt)
-    # 3. Use the utility function
     new_projects_section = clean_the_text(response.content)
     
-    # 4. Handle failure and replace
     if new_projects_section:
         updated_resume = re.sub(projects_section_regex, lambda m: new_projects_section, resume_content, flags=re.DOTALL)
         return {"tailored_resume": updated_resume}
@@ -235,7 +285,6 @@ Your output MUST be ONLY the updated LaTeX code, wrapped in a single markdown bl
 def compile_resume(state):
     console.print(Panel("Compiling Resume...", title="Progress", border_style="blue"))
     resume_content = state["tailored_resume"]
-    # Sanitize company and position names for file paths
     company_name = re.sub(r'[\\/*?:"<>|]', "", state["company_name"])
     position = re.sub(r'[\\/*?:"<>|]', "", state["position"])
     
@@ -251,44 +300,73 @@ def compile_resume(state):
         f.write(resume_content)
     
     try:
-        # The latex2pdf library can be finicky. Ensure it uses a temporary build directory.
         parsed_log = compile_latex(tex_path, output_dir)
-        # Check if compilation was successful
         if parsed_log and parsed_log.errors == []:
             console.print(f"[green]Successfully compiled resume to: {pdf_path}[/green]")
         else:
              console.print("[bold red]Error: PDF compilation failed. Check the .log file in the output directory.[/bold red]")
-             pdf_path = None # Indicate failure
+             pdf_path = None
     except Exception as e:
         console.print(f"[bold red]An exception occurred during PDF compilation: {e}[/bold red]")
         pdf_path = None
 
     return {"pdf_path": pdf_path}
 
-def check_pdf_length(state):
-    console.print(Panel("Checking PDF Length...", title="Progress", border_style="blue"))
-    pdf_path = state["pdf_path"]
-    
-    if not pdf_path or not os.path.exists(pdf_path):
-        console.print("[bold red]Skipping PDF length check because compilation failed.[/bold red]")
-        # Decide how to handle failure. Maybe go to a new "fix_latex" node or end.
-        # For now, we'll just end the process.
-        return {"page_count": 99} # Use a high number to signal an issue or stop
+def judge_resume_quality(state):
+    console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
+    llm = ChatGoogleGenerativeAI(temperature=0.1, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    iteration_count = state.get("iteration_count", 0) + 1
 
-    with open(pdf_path, "rb") as f:
-        reader = PyPDF2.PdfReader(f)
-        page_count = len(reader.pages)
-    
-    console.print(f"Resume is {page_count} page(s) long.")
-    return {"page_count": page_count}
+    prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided LaTeX resume is tailored to the given job description. Assign a score from 0 to 100, where 100% is perfectly tailored.
+                Consider the following:
+                - Relevance of skills and experience to the job description.
+                - Use of keywords from the job description.
+                - Quantification of achievements (STAR/XYZ method).
+                - Overall impact and alignment with the job requirements.
+                - Judge the overall narrative of the resume and the flow of the resume.
+                - Specify the downsides or drawbacks of the resume and specifically the resume section that can be better aligned with the job description.
+                - Be genuine and honest in your evaluation.
 
-def shorten_resume(state):
-    # This is a placeholder. A real implementation would be a complex LLM call
-    # to summarize bullet points or reduce content, similar to the editing nodes.
-    console.print(Panel("Resume is longer than one page. This is a placeholder for a shortening step.", title="Notice", border_style="yellow"))
-    return {"tailored_resume": state["tailored_resume"]}
+                Provide your evaluation and score in a JSON object with three keys: "score" (float), "feedback" (string), and "downsides" (string).
 
-# --- Graph Definition (No Changes Needed Here) ---
+                **Job Description:**
+                ---
+                {state['job_description']}
+                ---
+
+                **Tailored LaTeX Resume (excerpt):**
+                ---
+                {state['tailored_resume']}
+                ---
+            """
+
+    response = llm.invoke(prompt)
+    console.print(f"[bold green] Raw LLM Response: {response.content}[/bold green]")
+    data = extract_and_parse_json(response.content)
+
+    if data:
+        score = data.get("score", 0.0)
+        feedback = data.get("feedback", "No specific feedback provided.")
+        downsides = data.get("downsides", "No specific downsides provided.")
+    else:
+        console.print("[bold red]Error: Could not parse LLM feedback. Defaulting score to 0 and providing generic feedback.[/bold red]")
+        score = 0.0
+        feedback = "LLM feedback parsing failed. Please check the LLM response format."
+        downsides = "Failed to parse LLM feedback."
+
+    console.print(f"[bold green]Resume Quality Score: {score}/100[/bold green]")
+    console.print(f"[bold yellow]Feedback: {feedback}[/bold yellow]")
+    console.print(f"[bold red]Downsides: {downsides}[/bold red]")
+
+    return {"score": score, "feedback": feedback, "iteration_count": iteration_count, "downsides": downsides}
+
+def decide_after_judging(state):
+    if state["score"] < 90 and state["iteration_count"] < 3:
+        console.print(Panel(f"Score {state['score']}/100 is below threshold. Re-editing experience. Iteration: {state['iteration_count']}", title="Decision", border_style="red"))
+        return "edit_experience"
+    else:
+        console.print(Panel(f"Score {state['score']}/100 is sufficient or max iterations reached. Proceeding to compile. Iteration: {state['iteration_count']}", title="Decision", border_style="green"))
+        return "compile_resume"
 
 workflow = StateGraph(AgentState)
 
@@ -298,35 +376,25 @@ workflow.add_node("edit_technical_skills", edit_technical_skills)
 workflow.add_node("edit_experience", edit_experience)
 workflow.add_node("edit_projects", edit_projects)
 workflow.add_node("compile_resume", compile_resume)
-workflow.add_node("check_pdf_length", check_pdf_length)
-workflow.add_node("shorten_resume", shorten_resume)
-
+workflow.add_node("judge_resume_quality", judge_resume_quality)
 
 workflow.set_entry_point("ask_job_description")
 workflow.add_edge("ask_job_description", "extract_info")
 workflow.add_edge("extract_info", "edit_technical_skills")
 workflow.add_edge("edit_technical_skills", "edit_experience")
 workflow.add_edge("edit_experience", "edit_projects")
-workflow.add_edge("edit_projects", "compile_resume")
-
-# Conditional edge to handle PDF length
-def decide_what_to_do(state):
-    if state["page_count"] > 1:
-        # In a real scenario, you might loop back to a "shorten_and_recompile" flow.
-        # Here we just go to the placeholder node and then compile again.
-        return "shorten_resume"
-    else:
-        # If the resume is one page, we are done.
-        return END
+workflow.add_edge("edit_projects", "judge_resume_quality")
 
 workflow.add_conditional_edges(
-    "check_pdf_length",
-    decide_what_to_do,
-    {"shorten_resume": "shorten_resume", END: END}
+    "judge_resume_quality",
+    decide_after_judging,
+    {
+        "edit_experience": "edit_experience",
+        "compile_resume": "compile_resume",
+    }
 )
 
-# After shortening, re-compile the resume
-workflow.add_edge("shorten_resume", "compile_resume")
+workflow.add_edge("compile_resume", END)
 
 app = workflow.compile()
 
@@ -337,9 +405,4 @@ if __name__ == "__main__":
         draw_mermaid_png(mermaid_syntax=mermaid_code, output_file_path="graph.png")
     except Exception as e:
         print(f"Could not draw graph: {e}")
-
-    for event in app.stream(inputs):
-        for k, v in event.items():
-            if k != "__end__":
-                console.print(f"----- {k} -----")
-                console.print(v)
+    app.invoke(inputs)
