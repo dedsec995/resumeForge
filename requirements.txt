@@ -9,3 +9,4 @@ texoutparse
 pymupdf
 rich
 PyPdf2
+pyperclip

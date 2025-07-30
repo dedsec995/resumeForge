@@ -10,6 +10,7 @@ from rich.panel import Panel
 from dotenv import load_dotenv
 from latex2pdf import compile_latex
 from utils import clean_the_text, extract_and_parse_json
+import pyperclip
 
 load_dotenv()
 
@@ -34,9 +35,54 @@ def get_resume_content(file_path="template/resume.tex"):
     with open(file_path, "r") as f:
         return f.read()
 
-def ask_job_description(state):
-    console.print(Panel("Please paste the job description here:", title="Job Description", border_style="green"))
-    job_description = console.input()
+def get_job_description(state):
+    console.print(Panel("Please copy the job description to your clipboard", title="Job Description", border_style="green"))
+    console.print("[bold cyan]1. Copy the job description from the website/document[/bold cyan]")
+    console.print("[bold cyan]2. Press Enter when ready...[/bold cyan]")
+    
+    # Wait for user to press Enter
+    input()
+    
+    try:
+        # Read from clipboard
+        job_description = pyperclip.paste().strip()
+        
+        # Debug: Show first 50 chars of what was copied
+        debug_preview = job_description[:50] + "..." if len(job_description) > 50 else job_description
+        console.print(f"[dim]Debug - Clipboard content (first 50 chars): {repr(debug_preview)}[/dim]")
+        
+        # Check if it's empty or contains error messages
+        if not job_description or "Clipboard is empty" in job_description or "Error" in job_description:
+            console.print("[bold red]Issue detected with clipboard content![/bold red]")
+            console.print("[bold yellow]Please copy the job description again using Ctrl+C and press Enter...[/bold yellow]")
+            console.print("[dim]Make sure you're copying from the actual job posting, not from this terminal[/dim]")
+            input()
+            job_description = pyperclip.paste().strip()
+        
+        # Validate minimum length (job descriptions should be substantial)
+        if len(job_description) < 100:
+            console.print(f"[bold yellow]Warning: Clipboard content is quite short ({len(job_description)} chars).[/bold yellow]")
+            console.print("Is this the complete job description? (y/n): ", end="")
+            confirmation = input().lower().strip()
+            if confirmation not in ['y', 'yes']:
+                console.print("Please copy the complete job description and press Enter...")
+                input()
+                job_description = pyperclip.paste().strip()
+        
+        if job_description:
+            # Show a preview of what was copied
+            preview = job_description[:300] + "..." if len(job_description) > 300 else job_description
+            console.print(Panel(f"[bold green]Job description copied successfully![/bold green]\n\n[bold]Length:[/bold] {len(job_description)} characters\n\n[bold]Preview:[/bold]\n{preview}", 
+                               title="Success", border_style="green"))
+        else:
+            console.print("[bold red]Still no valid content in clipboard. Please check and try again.[/bold red]")
+            return {"job_description": "", "resume": get_resume_content()}
+        
+    except Exception as e:
+        console.print(f"[bold red]Error accessing clipboard: {e}[/bold red]")
+        console.print("Please ensure you're running in a proper terminal environment.")
+        return {"job_description": "", "resume": get_resume_content()}
+    
     return {"job_description": job_description, "resume": get_resume_content()}
 
 def extract_info(state):
@@ -65,9 +111,9 @@ def extract_info(state):
 
 def edit_technical_skills(state):
     console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
-    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
-    llm = ChatHuggingFace(llm=endpoint)
+    llm = ChatGroq(temperature=0.6, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    # llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
@@ -93,10 +139,11 @@ def edit_technical_skills(state):
             {feedback_context}
 
             Rewrite the 'Technical Skills' section below to align with the job description. Follow these rules:
+            - Make sure to not directly copy the job description skills to the resume. You can use the skills from the job description as a reference to add more skills to the resume.
             - Add any crucial skills from the job description that are missing.
             - Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
             - Do NOT use the `textbf{{}}` command to bold any skills in this section.
-            - Make sure to not directly copy the job description skills to the resume.
+            - Do not change certfications, leave them as they are.
 
             Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
@@ -124,7 +171,7 @@ def edit_technical_skills(state):
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
     # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    endpoint = HuggingFaceEndpoint(temperature=0.3, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
     llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
@@ -146,17 +193,21 @@ def edit_experience(state):
             Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
         """
 
-    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
+    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a LaTeX resume into a highly targeted application for a specific job description.
 
         {feedback_context}
 
         Rewrite the bullet points in the LaTeX 'Work Experience' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
         - Quantify everything possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
         - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
-        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
-        - You can add more details and points if needed to make the experience more relevant to the job description but make sense and be cohesive.
+        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description.
+        - This is LaTeX code. Use ONLY `\\textbf{{keyword}}` to bold keywords. NEVER use **keyword** or __keyword__ markdown formatting.
+        - Critical: Only make the change if it makes sense technically or logically.
+        - You can add more details and points if needed to make the experience more relevant to the job description.
+        - If change is needed in the experience to convey the narrative better, then change the entire experience point except the company name and the position title.
+        - Do not make it sound like it has been written by a robot.
+        - Do not overuse the keywords from the job description.
         - Don't make the experience too long or too short.
-        - Also don't make it sound like it has been written by a robot.
 
         Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
@@ -183,9 +234,9 @@ def edit_experience(state):
 
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
-    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
-    llm = ChatHuggingFace(llm=endpoint)
+    llm = ChatGroq(temperature=0.3, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    # llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     projects_section_regex = r"(\\section{Projects}.*?\\resumeSubHeadingListEnd\s*\\vspace{-20pt})"
@@ -206,16 +257,19 @@ def edit_projects(state):
             Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
         """
 
-    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a generic LaTeX resume into a highly targeted application for a specific job description.
+    prompt = f"""You are an elite Resume Architect and LaTeX specialist. Your sole function is to transform a LaTeX resume into a highly targeted application for a specific job description.
 
         {feedback_context}
 
         Rewrite the bullet points in the LaTeX 'Projects' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
         - Quantify everything possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
         - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
+        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description.
+        - This is LaTeX code. Use ONLY `\\textbf{{keyword}}` to bold keywords. NEVER use **keyword** or __keyword__ markdown formatting.
         - You can add more details and points if needed to make the project more relevant to the job description.
-        - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description. Do not using **i** or __i__ to bold the keywords.
         - You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
+        - You cannot change the project title, only the bullet points.
+        - Do not overuse the keywords from the job description.
 
         Your output MUST be ONLY the updated LaTeX code for the 'Projects' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
@@ -320,15 +374,15 @@ def judge_resume_quality(state):
 
 def decide_after_judging(state):
     if state["score"] < 90 and state["iteration_count"] < 3:
-        console.print(Panel(f"Score {state['score']}/100 is below threshold. Re-editing experience. Iteration: {state['iteration_count']}", title="Decision", border_style="red"))
-        return "edit_experience"
+        console.print(Panel(f"Score {state['score']}/100 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}", title="Decision", border_style="red"))
+        return "edit_technical_skills"
     else:
         console.print(Panel(f"Score {state['score']}/100 is sufficient or max iterations reached. Proceeding to compile. Iteration: {state['iteration_count']}", title="Decision", border_style="green"))
         return "compile_resume"
 
 workflow = StateGraph(AgentState)
 
-workflow.add_node("ask_job_description", ask_job_description)
+workflow.add_node("get_job_description", get_job_description)
 workflow.add_node("extract_info", extract_info)
 workflow.add_node("edit_technical_skills", edit_technical_skills)
 workflow.add_node("edit_experience", edit_experience)
@@ -336,8 +390,8 @@ workflow.add_node("edit_projects", edit_projects)
 workflow.add_node("compile_resume", compile_resume)
 workflow.add_node("judge_resume_quality", judge_resume_quality)
 
-workflow.set_entry_point("ask_job_description")
-workflow.add_edge("ask_job_description", "extract_info")
+workflow.set_entry_point("get_job_description")
+workflow.add_edge("get_job_description", "extract_info")
 workflow.add_edge("extract_info", "edit_technical_skills")
 workflow.add_edge("edit_technical_skills", "edit_experience")
 workflow.add_edge("edit_experience", "edit_projects")
@@ -347,7 +401,7 @@ workflow.add_conditional_edges(
     "judge_resume_quality",
     decide_after_judging,
     {
-        "edit_experience": "edit_experience",
+        "edit_technical_skills": "edit_technical_skills",
         "compile_resume": "compile_resume",
     }
 )
