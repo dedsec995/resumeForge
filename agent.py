@@ -5,6 +5,7 @@ from langchain_groq import ChatGroq
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
+from openrouter import ChatOpenRouter
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
@@ -72,8 +73,7 @@ def get_job_description(state):
         if job_description:
             # Show a preview of what was copied
             preview = job_description[:300] + "..." if len(job_description) > 300 else job_description
-            console.print(Panel(f"[bold green]Job description copied successfully![/bold green]\n\n[bold]Length:[/bold] {len(job_description)} characters\n\n[bold]Preview:[/bold]\n{preview}", 
-                               title="Success", border_style="green"))
+            console.print(Panel(f"[bold green]Job description copied successfully![/bold green]\n\n[bold]Length:[/bold] {len(job_description)} characters\n\n[bold]Preview:[/bold]\n{preview}", title="Success", border_style="green"))
         else:
             console.print("[bold red]Still no valid content in clipboard. Please check and try again.[/bold red]")
             return {"job_description": "", "resume": get_resume_content()}
@@ -88,18 +88,19 @@ def get_job_description(state):
 def extract_info(state):
     console.print(Panel("Extracting Company and Position...", title="Progress", border_style="blue"))
     # llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    endpoint = HuggingFaceEndpoint(temperature=0, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=512)
-    llm = ChatHuggingFace(llm=endpoint)
-    
+    # endpoint = HuggingFaceEndpoint(temperature=0, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=512)
+    # llm = ChatHuggingFace(llm=endpoint)
+    llm = ChatGoogleGenerativeAI(temperature=0, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+
     prompt = f"""From the following job description, extract the company name and the position title.
                 Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
 
                 Job Description:
                 {state['job_description']}
             """
-    response = llm.invoke(prompt)    
+    response = llm.invoke(prompt)
     try:
-        data = json.loads(response.content)
+        data = extract_and_parse_json(response.content)
         company = data["company"]
         position = data["position"]
     except (json.JSONDecodeError, KeyError):
@@ -111,9 +112,10 @@ def extract_info(state):
 
 def edit_technical_skills(state):
     console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.6, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.6, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
     # llm = ChatHuggingFace(llm=endpoint)
+    llm = ChatGoogleGenerativeAI(temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
     resume_content = state["tailored_resume"]
 
     skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
@@ -139,10 +141,10 @@ def edit_technical_skills(state):
             {feedback_context}
 
             Rewrite the 'Technical Skills' section below to align with the job description. Follow these rules:
-            - Make sure to not directly copy the job description skills to the resume. You can use the skills from the job description as a reference to add more skills to the resume.
+            - You can use the skills from the job description as a reference to add more skills to the resume.
             - Add any crucial skills from the job description that are missing.
             - Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
-            - Do NOT use the `textbf{{}}` command to bold any skills in this section.
+            - Do NOT use `the textbf{{}}` command to bold any skills in this section. Do not remove exisiting `textbf{{}}`
             - Do not change certfications, leave them as they are.
 
             Your output MUST be ONLY the updated LaTeX code for the 'Technical Skills' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
@@ -157,7 +159,7 @@ def edit_technical_skills(state):
             {original_skills_section}
             ---
         """
-    
+
     response = llm.invoke(prompt)
     new_skills_section = clean_the_text(response.content)
 
@@ -170,9 +172,9 @@ def edit_technical_skills(state):
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
-    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
-    endpoint = HuggingFaceEndpoint(temperature=0.3, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
-    llm = ChatHuggingFace(llm=endpoint)
+    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # endpoint = HuggingFaceEndpoint(temperature=0.3, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
+    # llm = ChatHuggingFace(llm=endpoint)
     resume_content = state["tailored_resume"]
 
     experience_section_regex = r"(\\section{Work Experience}.*?\\vspace{-12pt})"
@@ -181,7 +183,7 @@ def edit_experience(state):
         console.print("[bold red]Error: Could not find the Work Experience section.[/bold red]")
         return {"tailored_resume": resume_content}
     original_experience_section = match.group(1)
-    
+
     feedback_context = ""
     if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
         feedback_context = f"""
@@ -189,6 +191,9 @@ def edit_experience(state):
             - **Feedback from previous iteration:** {state.get("feedback", "")}
             - **Identified downsides to address:** {state.get("downsides", "")}
             - **Current iteration:** {state.get("iteration_count", 0)}
+            
+            **Here is entire resume for your reference:** 
+            {state["tailored_resume"]}
 
             Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
         """
@@ -198,7 +203,7 @@ def edit_experience(state):
         {feedback_context}
 
         Rewrite the bullet points in the LaTeX 'Work Experience' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-        - Quantify everything possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+        - Quantify where ever or when ever possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
         - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
         - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description.
         - This is LaTeX code. Use ONLY `\\textbf{{keyword}}` to bold keywords. NEVER use **keyword** or __keyword__ markdown formatting.
@@ -221,10 +226,10 @@ def edit_experience(state):
         {original_experience_section}
         ---
     """
-    
+
     response = llm.invoke(prompt)
     new_experience_section = clean_the_text(response.content)
-    
+
     if new_experience_section:
         updated_resume = re.sub(experience_section_regex, lambda m: new_experience_section, resume_content, flags=re.DOTALL)
         return {"tailored_resume": updated_resume}
@@ -254,6 +259,8 @@ def edit_projects(state):
             - **Identified downsides to address:** {state.get("downsides", "")}
             - **Current iteration:** {state.get("iteration_count", 0)}
 
+            **Here is entire resume for your reference:** 
+            {state["tailored_resume"]}
             Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
         """
 
@@ -262,7 +269,7 @@ def edit_projects(state):
         {feedback_context}
 
         Rewrite the bullet points in the LaTeX 'Projects' section below to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-        - Quantify everything possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
+        - Quantify where ever or when ever possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
         - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
         - Use the `textbf{{}}` command to bold the most critical keywords that directly match the job description.
         - This is LaTeX code. Use ONLY `\\textbf{{keyword}}` to bold keywords. NEVER use **keyword** or __keyword__ markdown formatting.
@@ -316,8 +323,8 @@ def compile_resume(state):
         if parsed_log and parsed_log.errors == []:
             console.print(f"[green]Successfully compiled resume to: {pdf_path}[/green]")
         else:
-             console.print("[bold red]Error: PDF compilation failed. Check the .log file in the output directory.[/bold red]")
-             pdf_path = None
+            console.print("[bold red]Error: PDF compilation failed. Check the .log file in the output directory.[/bold red]")
+            pdf_path = None
     except Exception as e:
         console.print(f"[bold red]An exception occurred during PDF compilation: {e}[/bold red]")
         pdf_path = None
@@ -326,7 +333,7 @@ def compile_resume(state):
 
 def judge_resume_quality(state):
     console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
-    llm = ChatGoogleGenerativeAI(temperature=0.15, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
     iteration_count = state.get("iteration_count", 0) + 1
 
     prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided LaTeX resume is tailored to the given job description. Assign a score from 0 to 100, where 100% is perfectly tailored.

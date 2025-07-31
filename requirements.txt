@@ -2,7 +2,9 @@ langchain
 langchain-groq
 langchain-huggingface
 huggingface_hub
+langchain-openai
 langchain-google-genai
+langchain-openrouter
 langgraph
 python-dotenv
 texoutparse
