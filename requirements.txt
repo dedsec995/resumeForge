@@ -12,3 +12,7 @@ pymupdf
 rich
 PyPdf2
 pyperclip
+fastapi
+uvicorn[standard]
+python-multipart
+pydantic

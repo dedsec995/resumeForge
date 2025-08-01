@@ -5,6 +5,7 @@ from langchain_groq import ChatGroq
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
 from openrouter import ChatOpenRouter
 from rich.console import Console
 from rich.panel import Panel
@@ -18,6 +19,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY") 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 console = Console()
 
 class AgentState(TypedDict):
@@ -90,7 +92,9 @@ def extract_info(state):
     # llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=512)
     # llm = ChatHuggingFace(llm=endpoint)
-    llm = ChatGoogleGenerativeAI(temperature=0, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    # llm = ChatGoogleGenerativeAI(temperature=0, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    
+    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
 
     prompt = f"""From the following job description, extract the company name and the position title.
                 Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
@@ -115,7 +119,9 @@ def edit_technical_skills(state):
     # llm = ChatGroq(temperature=0.6, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
     # llm = ChatHuggingFace(llm=endpoint)
-    llm = ChatGoogleGenerativeAI(temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    # llm = ChatGoogleGenerativeAI(temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY)
+    
+    llm = ChatOpenAI(temperature=0.6, model="gpt-4", api_key=OPENAI_API_KEY)
     resume_content = state["tailored_resume"]
 
     skills_section_regex = r"(\\section{Technical Skills}.*?\\vspace{-13pt})"
@@ -172,9 +178,11 @@ def edit_technical_skills(state):
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.7, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0.3, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
     # llm = ChatHuggingFace(llm=endpoint)
+    
+    llm = ChatOpenAI(temperature=0.7, model="gpt-4", api_key=OPENAI_API_KEY)
     resume_content = state["tailored_resume"]
 
     experience_section_regex = r"(\\section{Work Experience}.*?\\vspace{-12pt})"
@@ -239,9 +247,11 @@ def edit_experience(state):
 
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
-    llm = ChatGroq(temperature=0.3, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
+    # llm = ChatGroq(temperature=0.3, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0.7, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=1024)
     # llm = ChatHuggingFace(llm=endpoint)
+    
+    llm = ChatOpenAI(temperature=0.3, model="gpt-4", api_key=OPENAI_API_KEY)
     resume_content = state["tailored_resume"]
 
     projects_section_regex = r"(\\section{Projects}.*?\\resumeSubHeadingListEnd\s*\\vspace{-20pt})"
@@ -333,7 +343,9 @@ def compile_resume(state):
 
 def judge_resume_quality(state):
     console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
-    llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
+    # llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
+    
+    llm = ChatOpenAI(temperature=0.1, model="gpt-4", api_key=OPENAI_API_KEY)
     iteration_count = state.get("iteration_count", 0) + 1
 
     prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided LaTeX resume is tailored to the given job description. Assign a score from 0 to 100, where 100% is perfectly tailored.

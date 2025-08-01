@@ -1,0 +1,217 @@
+\documentclass[letterpaper,10pt]{article}
+\usepackage{latexsym}
+\usepackage{titlesec}
+\usepackage{marvosym}
+\usepackage[usenames,dvipsnames]{color}
+\usepackage{verbatim}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+\usepackage[english]{babel}
+\usepackage{tabularx}
+\usepackage{fontawesome5}
+\usepackage{multicol}
+\setlength{\multicolsep}{-3.0pt}
+\setlength{\columnsep}{-1pt}
+\input{glyphtounicode}
+\usepackage[left=1.5cm, right=1.5cm, top=1.2cm, bottom=1.2cm]{geometry}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{charter}
+
+\pagestyle{fancy}
+\fancyhf{}
+\fancyfoot{}
+\renewcommand{\headrulewidth}{0pt}
+\renewcommand{\footrulewidth}{0pt}
+
+% Adjust margins
+\addtolength{\oddsidemargin}{-0.2in}
+\addtolength{\textwidth}{0.35in}
+
+\urlstyle{same}
+
+\raggedbottom
+\raggedright
+\setlength{\tabcolsep}{0in}
+
+% Sections formatting
+\titleformat{\section}{
+  \vspace{-4pt}\scshape\raggedright\large\bfseries
+}{}{0em}{}[\color{black}\titlerule \vspace{-5pt}]
+
+% Ensure that generate pdf is machine readable/ATS parsable
+\pdfgentounicode=1
+
+%-------------------------
+% Custom commands
+\newcommand{\resumeItem}[1]{
+  \item\small{
+    {#1 \vspace{0pt}}
+  }
+}
+
+\newcommand{\classesList}[4]{
+  \item\small{
+    {#1 #2 #3 #4 \vspace{-2pt}}
+  }
+}
+
+\newcommand{\resumeSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{l@{\extracolsep{\fill}}r}
+      \textbf{#1} & \textbf{\small #2} \\
+      \textit{\small#3} & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\workExSubheading}[4]{
+  \vspace{-2pt}\item
+    \begin{tabular*}{1.0\textwidth}[t]{@{\extracolsep{\fill}}l r}
+      \textbf{#1}, \textit{#2} $\vert$ #3 & \textit{\small #4} \\
+    \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubSubheading}[2]{
+  \item
+  \begin{tabular*}{0.97\textwidth}{l@{\extracolsep{\fill}}r}
+    \textit{\small#1} & \textit{\small #2} \\
+  \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeProjectHeading}[2]{
+  \item
+  \begin{tabular*}{1.001\textwidth}{l@{\extracolsep{\fill}}r}
+    \small#1 & \textbf{\small #2}\\
+  \end{tabular*}\vspace{-7pt}
+}
+
+\newcommand{\resumeSubItem}[1]{\resumeItem{#1}\vspace{-4pt}}
+
+\renewcommand\labelitemi{$\vcenter{\hbox{\tiny$\bullet$}}$}
+\renewcommand\labelitemii{$\vcenter{\hbox{\tiny$\bullet$}}$}
+
+\newcommand{\resumeSubHeadingListStart}{\begin{itemize}[leftmargin=0.0in, label={}]}
+\newcommand{\resumeSubHeadingListEnd}{\end{itemize}}\vspace{0pt}
+\newcommand{\resumeItemListStart}{\begin{itemize}[leftmargin=0.15in]}
+\newcommand{\resumeItemListEnd}{\end{itemize}\vspace{-5pt}}
+
+
+
+\begin{document}
+
+%----------HEADING----------
+\begin{center}
+    {\huge \scshape Utsav V Chaudhary} \\[2mm]
+    \small \raisebox{-0.1\height}
+    \faPhone\ \underline{(607) 296-9583} ~ 
+    {\faEnvelope\  \underline{\href{mailto:utsavmaan28@gmail.com}{utsavmaan28@gmail.com}}} ~ 
+    {\faLinkedin\ \underline{\href{https://www.linkedin.com/in/utsavmaan28}{linkedin.com/in/utsavmaan28}}}  ~
+    {\faGithub\ \underline{\href{https://github.com/UttU28}{github.com/UttU28}}} ~
+    {\faBriefcase\ \underline{\href{https://thatinsaneguy.com/}{thatinsaneguy.com}}}
+    \vspace{-5pt}
+\end{center}
+
+%-----------TECHNICAL SKILLS-----------
+\section{Technical Skills}
+  \begin{itemize}[leftmargin=0.0in, label={}]
+      \small{\item{   
+      \textbf{Languages}{: Python, JavaScript, Java, TypeScript, C++, C\#, Rust, Bash, PowerShell, R, Go, Ruby, Swift} \\[1mm]
+      \textbf{Frameworks \& Libraries}{: React.js, Next.js, Redux, TailwindCSS, Chakra UI, D3.js, Chart.js, HTML5, CSS3, SCSS, Jinja} \\[1mm]
+      \textbf{Web Technologies}{: Flask, NodeJS, Django, FastAPI, Express, ASP.NET, Angular, YAML} \\[1mm]
+      \textbf{Databases}{: SQL, PostgreSQL, Azure SQL, Redis, AWS RDS, MongoDB, DynamoDB, Firebase, Firestore} \\[1mm]
+      \textbf{Cloud \& DevOps}{: Azure, AWS, CI/CD, Kubernetes, Docker, Jenkins, Terraform, Ansible, PowerShell, Yarn, NPM, RBAC} \\[1mm]
+      \textbf{Operating Systems}{: Windows, Linux (CentOS, Ubuntu), macOS, Embedded Systems, RaspberryPi, Arduino} \\[1mm]
+      \textbf{APIs and Protocols}{: REST APIs, OpenAPI, Swagger, WebRTC, SOAP, GraphQL, MQTT, WebSocket, OAuth, JSON-RPC} \\[1mm]
+      \textbf{Other Tools}{: Kafka, Jira, GitHub, Nginx, Azure AKS, Metamask, Cron, WebSockets, OpenAI, Ollama, FFMPEG, Selenium} \\[1mm]
+      }}
+  \end{itemize}
+\vspace{-13pt}
+% -----------TECHNICAL SKILLS END-----------
+
+%-----------EDUCATION-----------
+\section{Education}
+  \resumeSubHeadingListStart
+    \resumeSubheading
+      {State University of New York at Binghamton}{December 2023}
+      {Master of Science in Computer Science}{}
+      
+  \resumeSubHeadingListEnd
+  \vspace{-4pt}
+    Coursework: Operating Systems, Machine Learning, Computer Architecture, Algorithms and Data Structures \vspace{-4pt}
+    \vspace{-4pt}
+%-----------EDUCATION END-----------
+
+%-----------WORK EXPERIENCE---------------
+\section{Work Experience}
+  \resumeSubHeadingListStart
+    \workExSubheading{Midh Technologies}{Fullstack Developer}{TX}{January 2024 -- Present} 
+      \resumeItemListStart
+          \resumeItem{Spearheaded the design and development of the official company website by translating \textbf{Figma designs} into a responsive, production-grade application using \textbf{Next.js}, \textbf{TailwindCSS}, and \textbf{React.js}, improving deployment velocity by \textbf{40\%}.}
+          \resumeItem{Integrated third-party tools such as \textbf{Sumsub} (KYC/AML), \textbf{Hubspot} (CRM, ticketing, email automation), and \textbf{Stripe} (payment gateway) via SDKs and REST APIs, enhancing user onboarding and transactional efficiency.}
+          \resumeItem{Assisted in architecting a dual-database model using \textbf{Firebase} and \textbf{MongoDB Node} for seamless connectivity between \textbf{Firestore} (real-time auth/state) and \textbf{MongoDB} (primary persistence), improving data sync reliability and scalability.}
+          \resumeItem{Designed and implemented an \textbf{Admin Portal} as a separate frontend service using \textbf{React.js} and \textbf{D3.js}, integrating \textbf{Firebase Auth}, \textbf{RBAC}, and \textbf{Firebase Cloud Messaging} for secure, real-time dashboard analytics.}
+          \resumeItem{Developed and deployed secure on-chain identity and asset management using \textbf{Fireblocks SDK} and \textbf{Metamask}, enabling wallet creation and blockchain interaction within the user profile system.}
+          \resumeItem{Used \textbf{Docker} for \textbf{Node.js} containerization and orchestrated deployments via \textbf{Kubernetes} on \textbf{AWS EKS}; hosted frontend on \textbf{AWS Amplify} with CI/CD pipelines powered by \textbf{BitBucket}, ensuring scalable, automated delivery.}
+          \resumeItem{Collaborated with testers and QA teams using \textbf{Jira}, managing issue tracking and resolution during release cycles, achieving a \textbf{94\% bug resolution rate} within SLA.}
+          \resumeItemListEnd
+    \workExSubheading{Compendious Medialabs Pvt. Ltd.}{Python/Web Developer}{IN}{June 2021 -- July-2022} 
+      \resumeItemListStart
+          \resumeItem{Developed a responsive \textbf{React frontend} that consumed live data from the FastAPI backend, creating interactive \textbf{charts}, \textbf{graphs}, and \textbf{metrics dashboards} using \textbf{D3.js} and \textbf{Chart.js}, improving data visualization efficiency by \textbf{45\%}.}
+          \resumeItem{Designed and developed an in-house \textbf{data scraping application} using \textbf{Python}, \textbf{Selenium}, \textbf{RestAPI}, and \textbf{Beautiful Soup}, automating \textbf{data extraction} from diverse web sources with dynamic content structures, reducing collection time by \textbf{60\%}.}
+          \resumeItem{Implemented real-time data synchronization between the React frontend and FastAPI backend, displaying live metrics with \textbf{WebSocket connections}, handling \textbf{10,000+ data points} with smooth rendering performance.}
+          \resumeItem{Developed a \textbf{FastAPI backend} to serve the collected and scraped cleaned data through \textbf{JSON REST endpoints}, implementing \textbf{Pydantic models} for data validation and achieving \textbf{250ms average response time} for data queries.}
+          \resumeItem{Implemented advanced \textbf{state management} in React using \textbf{Redux} and \textbf{Context API}, optimizing data flow and reducing component re-renders by \textbf{35\%}, while ensuring seamless user experience across \textbf{12+ dashboard components}.}
+          \resumeItem{Authored clean, modular frontend/backend code and comprehensive internal documentation on UI logic, API schema, and data workflows—improving onboarding speed and reducing knowledge transfer time by \textbf{35\%}.}
+          \resumeItemListEnd
+    \workExSubheading{VRoKCs}{Software Engineer}{MO}{March 2020 -- Sept 2020} 
+      \resumeItemListStart
+          \resumeItem{Collaborated with ML developers to build a comprehensive \textbf{Sign Language translation and augmentation system}, contributing to \textbf{data collection}, \textbf{labeling}, and \textbf{dataset preparation} for the machine learning pipeline.}
+          \resumeItem{Developed a \textbf{Flask web application} using \textbf{Python}, \textbf{HTML5}, \textbf{CSS3}, and \textbf{JavaScript} to showcase the ML team's sign language models, providing an interactive interface for ML developers to test and demonstrate model performance.}
+          \resumeItem{Designed and deployed a \textbf{TensorFlow Lite model} integration within the web interface for \textbf{efficient, real-time inference}, optimized for edge devices and browser-based testing.}
+          \resumeItem{Integrated the deployed model with \textbf{Unity}, enabling seamless \textbf{(ASL) American Sign Language translation} within \textbf{Augmented Reality (AR)} environments for real-time user interaction and frontend demonstration.}
+          \resumeItem{Built frontend components for \textbf{image upload}, \textbf{webcam integration}, and \textbf{real-time prediction display} using vanilla \textbf{JavaScript} and \textbf{HTML5 Canvas}, allowing ML developers to easily test models with live data input.}
+          \resumeItemListEnd
+    \workExSubheading{underDogs Gaming Studios}{Web/Game Developer}{IN}{March 2019 -- Aug 2019} 
+      \resumeItemListStart
+          \resumeItem{Integrated and optimized the \textbf{Quarters API} across multiple games, facilitating seamless universal \textbf{gaming currency transactions} as part of a \textbf{POC} creating \textbf{player wallets}, conducting \textbf{secure transactions}, and converting \textbf{points to quarters}.}
+          \resumeItem{Tested \textbf{API integration}, improving \textbf{real-time data sync} \& \textbf{communication} between \textbf{clients} \& \textbf{servers} using \textbf{Python} and \textbf{C\#}}
+          \resumeItem{Developed POC for multiple \textbf{third-party APIs} including \textbf{payment gateways} (Stripe, PayPal), \textbf{shipping APIs}, and \textbf{inventory management systems} with backend services.}
+          \resumeItem{Assisted in implementing \textbf{secure transaction methods} integrating with \textbf{Unity3D}, exp in \textbf{API best practices} \& \textbf{bug fixing}.}
+          \resumeItemListEnd
+  \resumeSubHeadingListEnd
+\vspace{-12pt}
+
+%-----------WORK EXPERIENCE END-----------
+
+%-----------PROJECTS-----------
+\section{Projects} 
+  \vspace{-5pt}
+    \resumeSubHeadingListStart
+      \resumeProjectHeading{\textbf{{LinkedIn Reverse Search Platform}} $|$ \emph{\href{https://www.instagram.com/thatvocabguy/}{Instagram}}}{C++ $|$ Tensorflow $|$ Android} \\[5mm]
+        \resumeItemListStart
+          \resumeItem{Built a \textbf{data enrichment platform} using \textbf{Python}, \textbf{Selenium}, and fine-tuned \textbf{Hugging Face models} to extract LinkedIn profiles and verified emails, processing \textbf{1000+ records per batch}.}
+          \resumeItem{Developed a \textbf{Next.js frontend} with drag-and-drop Excel upload, real-time progress indicators, and interactive data tables.}
+          \resumeItem{Architected a \textbf{multi-threaded processing pipeline} integrating scraping, SalesQL APIs, \textbf{Redis caching}, and \textbf{MongoDB}, reducing repeat request time by \textbf{45\%} and enabling detailed analytics dashboards with \textbf{React.js}, \textbf{Chart.js}, and \textbf{D3.js}.}
+          \resumeItem{Implemented secure \textbf{Firebase Auth} and \textbf{Firestore} for user management, deploying with \textbf{Docker} and automated CI/CD pipelines to maintain \textbf{99.5\% uptime} during heavy usage.}
+        \resumeItemListEnd
+      \vspace{-20pt}
+      \resumeProjectHeading{\textbf{{AI-Powered Video Generation Pipeline}} $|$ \emph{\href{https://www.instagram.com/thatvocabguy/}{Instagram}}}{Python $|$ LangGraph $|$ OpenAI} \\[5mm]
+        \resumeItemListStart
+          \resumeItem{Developed an advanced \textbf{AI-powered video generation pipeline} using \textbf{Python} and \textbf{machine learning models}, integrating \textbf{F5-TTS} for high-quality voice cloning and speech synthesis to create fully AI-generated videos.}
+          \resumeItem{Integrated \textbf{OpenAI API} for dynamic script writing, \textbf{WhisperAI} for audio transcription, and \textbf{FFMPEG} for embedding subtitles and synchronizing audio-visual elements. \textbf{Chrome} and \textbf{Selenium} for managing and automating the browser.}
+          \resumeItem{Engineered a scalable video processing system that merges AI-generated audio with trending gaming backgrounds, applying randomization for unique video variants using \textbf{FFMPEG} and custom overlays.}
+          \resumeItem{Designed and deployed a multi-channel automation system with \textbf{Docker} and \textbf{CRON jobs} for scheduled generation and publishing of \textbf{50+ videos daily} across \textbf{YouTube} and \textbf{Instagram}, including platform-specific metadata and formatting.}
+          \resumeItem{Built an intuitive \textbf{Gradio interface} for real-time pipeline monitoring, voice cloning status updates, and batch processing, enabling efficient management of large-scale video production.}
+        \resumeItemListEnd
+    \resumeSubHeadingListEnd
+    \vspace{-20pt}
+%-----------PROJECTS END-----------
+\vspace{10pt}
+
+\vspace{-15pt}
+
+
+
+\end{document}
