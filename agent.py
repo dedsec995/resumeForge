@@ -2,7 +2,6 @@ import json, os, re
 from typing import TypedDict
 from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from langchain_groq import ChatGroq
-from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
@@ -17,7 +16,6 @@ import pyperclip
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY") 
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 console = Console()
@@ -27,6 +25,7 @@ class AgentState(TypedDict):
     job_description: str
     company_name: str
     position: str
+    location: str
     tailored_resume: str
     pdf_path: str
     score: float
@@ -43,18 +42,14 @@ def get_job_description(state):
     console.print("[bold cyan]1. Copy the job description from the website/document[/bold cyan]")
     console.print("[bold cyan]2. Press Enter when ready...[/bold cyan]")
     
-    # Wait for user to press Enter
     input()
     
     try:
-        # Read from clipboard
         job_description = pyperclip.paste().strip()
-        
-        # Debug: Show first 50 chars of what was copied
+                
         debug_preview = job_description[:50] + "..." if len(job_description) > 50 else job_description
         console.print(f"[dim]Debug - Clipboard content (first 50 chars): {repr(debug_preview)}[/dim]")
-        
-        # Check if it's empty or contains error messages
+
         if not job_description or "Clipboard is empty" in job_description or "Error" in job_description:
             console.print("[bold red]Issue detected with clipboard content![/bold red]")
             console.print("[bold yellow]Please copy the job description again using Ctrl+C and press Enter...[/bold yellow]")
@@ -62,7 +57,6 @@ def get_job_description(state):
             input()
             job_description = pyperclip.paste().strip()
         
-        # Validate minimum length (job descriptions should be substantial)
         if len(job_description) < 100:
             console.print(f"[bold yellow]Warning: Clipboard content is quite short ({len(job_description)} chars).[/bold yellow]")
             console.print("Is this the complete job description? (y/n): ", end="")
@@ -73,7 +67,6 @@ def get_job_description(state):
                 job_description = pyperclip.paste().strip()
         
         if job_description:
-            # Show a preview of what was copied
             preview = job_description[:300] + "..." if len(job_description) > 300 else job_description
             console.print(Panel(f"[bold green]Job description copied successfully![/bold green]\n\n[bold]Length:[/bold] {len(job_description)} characters\n\n[bold]Preview:[/bold]\n{preview}", title="Success", border_style="green"))
         else:
@@ -88,7 +81,7 @@ def get_job_description(state):
     return {"job_description": job_description, "resume": get_resume_content()}
 
 def extract_info(state):
-    console.print(Panel("Extracting Company and Position...", title="Progress", border_style="blue"))
+    console.print(Panel("Extracting Company, Position, and Location...", title="Progress", border_style="blue"))
     # llm = ChatGroq(temperature=0, model_name="llama-3.3-70b-versatile", api_key = GROQ_API_KEY)
     # endpoint = HuggingFaceEndpoint(temperature=0, repo_id="meta-llama/Meta-Llama-3-70B-Instruct", huggingfacehub_api_token=HUGGINGFACE_API_KEY, max_new_tokens=512)
     # llm = ChatHuggingFace(llm=endpoint)
@@ -96,8 +89,10 @@ def extract_info(state):
     
     llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
 
-    prompt = f"""From the following job description, extract the company name and the position title.
-                Return ONLY the JSON object, with two keys: "company" and "position". Do NOT include any other text or markdown.
+    prompt = f"""From the following job description, extract the company name, the position title, and the job location.
+                Format the location as "City, ST" (e.g., "Los Angeles, CA", "New York, NY").
+                Return ONLY the JSON object, with three keys: "company", "position", and "location". Do NOT include any other text or markdown.
+                If the location is not specified, default to "Open to Relocation".
 
                 Job Description:
                 {state['job_description']}
@@ -107,12 +102,18 @@ def extract_info(state):
         data = extract_and_parse_json(response.content)
         company = data["company"]
         position = data["position"]
+        location = data.get("location", "Open to Relocation")
     except (json.JSONDecodeError, KeyError):
-        console.print("[bold red]Error: Could not extract company and position in expected JSON format. Setting to 'Not Found'.[/bold red]")
+        console.print("[bold red]Error: Could not extract company, position, and location in expected JSON format. Setting to defaults.[/bold red]")
         company = "Not Found"
         position = "Not Found"
+        location = "Open to Relocation"
 
-    return {"company_name": company, "position": position, "tailored_resume": state['resume']}
+    resume_content = state['resume']
+    updated_resume = resume_content.replace("{\\faGlobe\\ {Open to Relocation}}", f"{{{{\\faGlobe\\ {{{location}}}}}")
+
+
+    return {"company_name": company, "position": position, "location": location, "tailored_resume": updated_resume}
 
 def edit_technical_skills(state):
     console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
@@ -218,9 +219,6 @@ def edit_experience(state):
         - Critical: Only make the change if it makes sense technically or logically.
         - You can add more details and points if needed to make the experience more relevant to the job description.
         - If change is needed in the experience to convey the narrative better, then change the entire experience point except the company name and the position title.
-        - Do not make it sound like it has been written by a robot.
-        - Do not overuse the keywords from the job description.
-        - Don't make the experience too long or too short.
 
         Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
@@ -286,7 +284,6 @@ def edit_projects(state):
         - You can add more details and points if needed to make the project more relevant to the job description.
         - You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
         - You cannot change the project title, only the bullet points.
-        - Do not overuse the keywords from the job description.
 
         Your output MUST be ONLY the updated LaTeX code for the 'Projects' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
@@ -310,6 +307,53 @@ def edit_projects(state):
     else:
         console.print("[bold yellow]Warning: Failed to extract LaTeX from LLM response for Projects. Skipping update.[/bold yellow]")
         return {"tailored_resume": resume_content}
+
+def judge_resume_quality(state):
+    console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
+    llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
+    iteration_count = state.get("iteration_count", 0) + 1
+
+    prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided LaTeX resume is tailored to the given job description. Assign a score from 0 to 100, where 100% is perfectly tailored.
+                Consider the following:
+                - Use of keywords from the job description.
+                - Quantification of achievements (STAR/XYZ method).
+                - Judge the overall narrative and flow of the resume.
+                - Overall impact and alignment with the job requirements.
+                - Specify the downsides or drawbacks of the resume and specifically the resume section that can be better aligned with the job description.
+                - Be Specific on which points can be improved in downsides.
+                - Be genuine and honest in your evaluation.
+
+                Provide your evaluation and score in a JSON object with three keys: "score" (float), "feedback" (string), and "downsides" (string).
+
+                **Job Description:**
+                ---
+                {state['job_description']}
+                ---
+
+                **Tailored LaTeX Resume (excerpt):**
+                ---
+                {state['tailored_resume']}
+                ---
+            """
+
+    response = llm.invoke(prompt)
+    data = extract_and_parse_json(response.content)
+
+    if data:
+        score = data.get("score", 0.0)
+        feedback = data.get("feedback", "No specific feedback provided.")
+        downsides = data.get("downsides", "No specific downsides provided.")
+    else:
+        console.print("[bold red]Error: Could not parse LLM feedback. Defaulting score to 0 and providing generic feedback.[/bold red]")
+        score = 0.0
+        feedback = "LLM feedback parsing failed. Please check the LLM response format."
+        downsides = "Failed to parse LLM feedback."
+
+    console.print(f"[bold green]Resume Quality Score: {score}/100[/bold green]")
+    console.print(f"[bold yellow]Feedback: {feedback}[/bold yellow]")
+    console.print(f"[bold red]Downsides: {downsides}[/bold red]")
+
+    return {"score": score, "feedback": feedback, "iteration_count": iteration_count, "downsides": downsides}
 
 def compile_resume(state):
     console.print(Panel("Compiling Resume...", title="Progress", border_style="blue"))
