@@ -64,7 +64,7 @@ class ResumeParseResponse(BaseModel):
     message: str
 
 # Global state storage (in production, use Redis or database)
-workflow_states: Dict[str, Dict[str, Any]] = {}
+workflowStates: Dict[str, Dict[str, Any]] = {}
 
 @app.get("/")
 async def rootEndpoint():
@@ -77,258 +77,262 @@ async def parseResumeEndpoint():
     try:
         from agent import get_resume_content
         import re
+        from latex_parser import parseWorkExperience, parseProjects, extractResumeItems, cleanLatexText
         
-        # Get the resume content
-        resume_content = get_resume_content()
+        resumeContent = get_resume_content()
         
-        # Initialize the parsed data structure
-        resume_data = {
+        resumeData = {
             "personalInfo": {},
             "technicalSkills": "",
             "workExperience": [],
             "projects": [],
             "education": "",
             "certifications": "",
-            "rawContent": resume_content
+            "rawContent": resumeContent
         }
         
-        # Extract Personal Information
-        name_match = re.search(r'\\huge \\scshape ([^}]+)\}', resume_content)
-        if name_match:
-            resume_data["personalInfo"]["name"] = name_match.group(1).strip()
+
+        nameMatch = re.search(r'\\huge \\scshape ([^}]+)\}', resumeContent)
+        if nameMatch:
+            resumeData["personalInfo"]["name"] = nameMatch.group(1).strip()
             
-        phone_match = re.search(r'\\faPhone\\ \\underline\{([^}]+)\}', resume_content)
-        if phone_match:
-            resume_data["personalInfo"]["phone"] = phone_match.group(1).strip()
+        phoneMatch = re.search(r'\\faPhone\\\s+([^~]+)~', resumeContent)
+        if phoneMatch:
+            resumeData["personalInfo"]["phone"] = phoneMatch.group(1).strip()
             
-        email_match = re.search(r'\\href\{mailto:([^}]+)\}', resume_content)
-        if email_match:
-            resume_data["personalInfo"]["email"] = email_match.group(1).strip()
+        emailMatch = re.search(r'\\href\{mailto:([^}]+)\}', resumeContent)
+        if emailMatch:
+            resumeData["personalInfo"]["email"] = emailMatch.group(1).strip()
             
-        linkedin_match = re.search(r'\\href\{https://www\.linkedin\.com/in/([^}]+)\}', resume_content)
-        if linkedin_match:
-            resume_data["personalInfo"]["linkedin"] = f"linkedin.com/in/{linkedin_match.group(1).strip()}"
+        linkedinMatch = re.search(r'\\href\{https://www\.linkedin\.com/in/([^}]+)\}', resumeContent)
+        if linkedinMatch:
+            resumeData["personalInfo"]["linkedin"] = f"linkedin.com/in/{linkedinMatch.group(1).strip()}"
             
-        github_match = re.search(r'\\href\{https://github\.com/([^}]+)\}', resume_content)
-        if github_match:
-            resume_data["personalInfo"]["github"] = f"github.com/{github_match.group(1).strip()}"
+        githubMatch = re.search(r'\\href\{https://github\.com/([^}]+)\}', resumeContent)
+        if githubMatch:
+            resumeData["personalInfo"]["github"] = f"github.com/{githubMatch.group(1).strip()}"
         
-        # Extract Technical Skills Section - Parse into structured categories
-        skills_pattern = r'\\section{Technical Skills}(.*?)\\vspace{-13pt}'
-        skills_match = re.search(skills_pattern, resume_content, re.DOTALL)
-        if skills_match:
-            skills_content = skills_match.group(1).strip()
+
+        skillsPattern = r'\\section{Technical Skills}(.*?)\\vspace{-13pt}'
+        skillsMatch = re.search(skillsPattern, resumeContent, re.DOTALL)
+        if skillsMatch:
+            skillsContent = skillsMatch.group(1).strip()
             
             # Parse skills into categories
-            skills_dict = {}
+            skillsDict = {}
             
             # Find all textbf{Category}{: skills} patterns
-            category_pattern = r'\\textbf\{([^}]+)\}\{:\s*([^}]+)\}'
-            category_matches = re.findall(category_pattern, skills_content)
+            categoryPattern = r'\\textbf\{([^}]+)\}\{:\s*([^}]+)\}'
+            categoryMatches = re.findall(categoryPattern, skillsContent)
             
-            for category, skills_text in category_matches:
+            for category, skillsText in categoryMatches:
                 # Clean category name
-                category_clean = category.replace('\\', '').strip()
+                categoryClean = category.replace('\\', '').strip()
                 
                 # Split skills by comma and clean them
-                skills_list = []
-                if skills_text:
-                    skills_raw = re.split(r',\s*', skills_text)
-                    for skill in skills_raw:
+                skillsList = []
+                if skillsText:
+                    skillsRaw = re.split(r',\s*', skillsText)
+                    for skill in skillsRaw:
                         # Clean LaTeX formatting
-                        skill_clean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', skill)
-                        skill_clean = re.sub(r'\\[a-zA-Z]+', '', skill_clean)
-                        skill_clean = skill_clean.strip()
-                        if skill_clean:
-                            skills_list.append(skill_clean)
+                        skillClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', skill)
+                        skillClean = re.sub(r'\\[a-zA-Z]+', '', skillClean)
+                        skillClean = skillClean.strip()
+                        if skillClean:
+                            skillsList.append(skillClean)
                 
-                skills_dict[category_clean] = skills_list
+                skillsDict[categoryClean] = skillsList
             
             # Handle certifications separately if they exist
-            cert_pattern = r'\\textbf\{Certifications\}\{:\s*([^}]*(?:\}[^}]*)*)\}'
-            cert_match = re.search(cert_pattern, skills_content)
-            if cert_match:
-                cert_content = cert_match.group(1)
+            certPattern = r'\\textbf\{Certifications\}\{:\s*([^}]*(?:\}[^}]*)*)\}'
+            certMatch = re.search(certPattern, skillsContent)
+            if certMatch:
+                certContent = certMatch.group(1)
                 # Extract certification names from href links
-                cert_links = re.findall(r'\\href\{[^}]*\}\{([^}]*)\}', cert_content)
-                if cert_links:
-                    skills_dict["Certifications"] = cert_links
+                certLinks = re.findall(r'\\href\{[^}]*\}\{([^}]*)\}', certContent)
+                if certLinks:
+                    skillsDict["Certifications"] = certLinks
             
-            resume_data["technicalSkills"] = skills_dict
+            resumeData["technicalSkills"] = skillsDict
         
-        # Extract Work Experience Section using improved parser
-        experience_pattern = r'\\section{Work Experience}(.*?)\\vspace{-12pt}'
-        experience_match = re.search(experience_pattern, resume_content, re.DOTALL)
-        if experience_match:
-            experience_content = experience_match.group(1)
+
+        experiencePattern = r'\\section{Work Experience}(.*?)\\vspace{-12pt}'
+        experienceMatch = re.search(experiencePattern, resumeContent, re.DOTALL)
+        if experienceMatch:
+            experienceContent = experienceMatch.group(1)
             
             # Use improved parser for better nested structure handling
-            from latex_parser import parse_work_experience
             try:
-                resume_data["workExperience"] = parse_work_experience(experience_content)
+                resumeData["workExperience"] = parseWorkExperience(experienceContent)
             except Exception as e:
-                print(f"Error parsing work experience with improved parser: {e}")
-                # Fallback to original method
-                entry_pattern = r'\\workExSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}(.*?)(?=\\workExSubheading|\\resumeSubHeadingListEnd)'
-                entries = re.findall(entry_pattern, experience_content, re.DOTALL)
+                entryPattern = r'\\workExSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}(.*?)(?=\\workExSubheading|\\resumeSubHeadingListEnd)'
+                entries = re.findall(entryPattern, experienceContent, re.DOTALL)
                 
                 for entry in entries:
-                    company, job_title, location, duration, description = entry
+                    company, jobTitle, location, duration, description = entry
                     
                     # Extract bullet points with better nested braces handling
                     bullets = []
-                    bullet_matches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
-                    for match in bullet_matches:
-                        bullet_text = match.group(1)
-                        # Clean up LaTeX formatting but preserve content
-                        bullet_clean = re.sub(r'\\textbf\{([^}]*)\}', r'\1', bullet_text)
-                        bullets.append(bullet_clean.strip())
+                    bulletMatches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
+                    for match in bulletMatches:
+                        bulletText = match.group(1)
+                        # Clean up LaTeX formatting but preserve bold formatting
+                        bulletClean = re.sub(r'\\textbf\{([^}]*)\}', r'**\1**', bulletText)  # Convert to markdown bold
+                        bulletClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', bulletClean)  # Remove other LaTeX commands
+                        
+                        # Clean up common LaTeX escape sequences
+                        bulletClean = re.sub(r'\\%', '%', bulletClean)  # Fix percentages
+                        bulletClean = re.sub(r'\\&', '&', bulletClean)  # Fix ampersands
+                        bulletClean = re.sub(r'\\\\', ' ', bulletClean)  # Fix double backslashes
+                        bulletClean = re.sub(r'\\\$', '$', bulletClean)  # Fix dollar signs  
+                        bulletClean = re.sub(r'\\([#&%$_{}])', r'\1', bulletClean)  # Fix other escaped chars
+                        bulletClean = re.sub(r'\s+', ' ', bulletClean)  # Normalize whitespace
+                        
+                        bullets.append(bulletClean.strip())
                     
-                    resume_data["workExperience"].append({
-                        "jobTitle": job_title.strip(),
+                    resumeData["workExperience"].append({
+                        "jobTitle": jobTitle.strip(),
                         "company": company.strip(), 
                         "location": location.strip(),
                         "duration": duration.strip(),
                         "bulletPoints": bullets
                     })
         
-        # Extract Projects Section using improved parser
-        projects_pattern = r'\\section{Projects}(.*?)%-----------PROJECTS END-----------'
-        projects_match = re.search(projects_pattern, resume_content, re.DOTALL)
-        if projects_match:
-            projects_content = projects_match.group(1)
+
+        projectsPattern = r'\\section{Projects}(.*?)%-----------PROJECTS END-----------'
+        projectsMatch = re.search(projectsPattern, resumeContent, re.DOTALL)
+        if projectsMatch:
+            projectsContent = projectsMatch.group(1)
             
             # Use improved parser for better nested structure handling
-            from latex_parser import parse_projects
             try:
-                parsed_projects = parse_projects(projects_content)
-                print(f"Improved parser found {len(parsed_projects)} projects")
-                if len(parsed_projects) > 0:
-                    resume_data["projects"] = parsed_projects
+                parsedProjects = parseProjects(projectsContent)
+                if len(parsedProjects) > 0:
+                    resumeData["projects"] = parsedProjects
                 else:
                     raise Exception("No projects found by improved parser")
             except Exception as e:
-                print(f"Error parsing projects with improved parser: {e}")
-                # Fallback to original method with improved patterns
-                print("Falling back to regex parsing for projects")
+                resumeData["projects"] = []
                 
-                # Initialize projects list for fallback
-                resume_data["projects"] = []
-                
-                # Try multiple patterns to handle the complex structure
                 patterns = [
-                    # Pattern 1: Full complex structure
                     r'\\resumeProjectHeading\{\\textbf\{\{([^}]+)\}\}[^}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd',
-                    # Pattern 2: Simpler structure
                     r'\\resumeProjectHeading\{[^{}]*\{([^}]+)\}[^{}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd',
-                    # Pattern 3: Even simpler
                     r'\\resumeProjectHeading\{.*?\{([^}]+)\}.*?\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd'
                 ]
                 
-                project_entries = []
+                projectEntries = []
                 for pattern in patterns:
-                    project_entries = re.findall(pattern, projects_content, re.DOTALL)
-                    if project_entries:
-                        print(f"Found {len(project_entries)} projects with pattern")
+                    projectEntries = re.findall(pattern, projectsContent, re.DOTALL)
+                    if projectEntries:
                         break
                 
-                if not project_entries:
-                    # Debug: print the actual content to see structure
-                    print("No projects found. Content preview:")
-                    print(projects_content[:500])
+                if not projectEntries:
+                    pass
                 
-                for entry in project_entries:
-                    project_name, tech_stack, description = entry
+                for entry in projectEntries:
+                    projectName, techStack, description = entry
                     
                     # Extract bullet points with nested braces support
                     bullets = []
-                    bullet_matches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
-                    for match in bullet_matches:
-                        bullet_text = match.group(1)
-                        # Clean up LaTeX formatting but keep content
-                        bullet_clean = re.sub(r'\\textbf\{([^}]*)\}', r'\1', bullet_text)
-                        bullets.append(bullet_clean.strip())
+                    bulletMatches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
+                    for match in bulletMatches:
+                        bulletText = match.group(1)
+                        # Clean up LaTeX formatting but preserve bold formatting
+                        bulletClean = re.sub(r'\\textbf\{([^}]*)\}', r'**\1**', bulletText)  # Convert to markdown bold
+                        bulletClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', bulletClean)  # Remove other LaTeX commands
+                        
+                        # Clean up common LaTeX escape sequences
+                        bulletClean = re.sub(r'\\%', '%', bulletClean)  # Fix percentages
+                        bulletClean = re.sub(r'\\&', '&', bulletClean)  # Fix ampersands
+                        bulletClean = re.sub(r'\\\\', ' ', bulletClean)  # Fix double backslashes
+                        bulletClean = re.sub(r'\\\$', '$', bulletClean)  # Fix dollar signs  
+                        bulletClean = re.sub(r'\\([#&%$_{}])', r'\1', bulletClean)  # Fix other escaped chars
+                        bulletClean = re.sub(r'\s+', ' ', bulletClean)  # Normalize whitespace
+                        
+                        bullets.append(bulletClean.strip())
                     
-                    resume_data["projects"].append({
-                        "projectName": project_name.strip(),
-                        "techStack": tech_stack.strip(),
+                    cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', techStack.strip())
+                    cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
+                    
+                    resumeData["projects"].append({
+                        "projectName": projectName.strip(),
+                        "techStack": cleanTechStack,
                         "duration": "", # No duration in this format
                         "bulletPoints": bullets
                     })
         
-        # Extract Education Section - Parse into structured format
-        education_pattern = r'\\section{Education}(.*?)%-----------EDUCATION END-----------'
-        education_match = re.search(education_pattern, resume_content, re.DOTALL)
-        if education_match:
-            education_content = education_match.group(1).strip()
+
+        educationPattern = r'\\section{Education}(.*?)%-----------EDUCATION END-----------'
+        educationMatch = re.search(educationPattern, resumeContent, re.DOTALL)
+        if educationMatch:
+            educationContent = educationMatch.group(1).strip()
             
-            education_entries = []
+            educationEntries = []
             
             # Find all resumeSubheading entries first
-            subheading_pattern = r'\\resumeSubheading\s*\{([^}]+)\}\{([^}]+)\}\s*\{([^}]+)\}\{([^}]*)\}'
-            subheading_matches = list(re.finditer(subheading_pattern, education_content))
+            subheadingPattern = r'\\resumeSubheading\s*\{([^}]+)\}\{([^}]+)\}\s*\{([^}]+)\}\{([^}]*)\}'
+            subheadingMatches = list(re.finditer(subheadingPattern, educationContent))
             
-            for i, match in enumerate(subheading_matches):
+            for i, match in enumerate(subheadingMatches):
                 university, date, degree, additional = match.groups()
                 
                 # Parse degree and track if present
-                degree_parts = degree.split('|')
-                main_degree = degree_parts[0].strip() if degree_parts else degree.strip()
-                track = degree_parts[1].strip() if len(degree_parts) > 1 else ""
+                degreeParts = degree.split('|')
+                mainDegree = degreeParts[0].strip() if degreeParts else degree.strip()
+                track = degreeParts[1].strip() if len(degreeParts) > 1 else ""
                 
                 # Find coursework that follows this education entry
                 # Look for coursework between this entry and the next entry (or end of section)
-                start_pos = match.end()
-                if i + 1 < len(subheading_matches):
-                    end_pos = subheading_matches[i + 1].start()
-                    section_content = education_content[start_pos:end_pos]
+                startPos = match.end()
+                if i + 1 < len(subheadingMatches):
+                    endPos = subheadingMatches[i + 1].start()
+                    sectionContent = educationContent[startPos:endPos]
                 else:
-                    section_content = education_content[start_pos:]
+                    sectionContent = educationContent[startPos:]
                 
                 # Extract coursework for this specific education entry
                 coursework = []
-                coursework_pattern = r'Coursework:\s*([^\\]+(?:\\vspace[^\\]*)?)'
-                coursework_match = re.search(coursework_pattern, section_content)
-                if coursework_match:
-                    coursework_text = coursework_match.group(1).strip()
+                courseworkPattern = r'Coursework:\s*([^\\]+(?:\\vspace[^\\]*)?)'
+                courseworkMatch = re.search(courseworkPattern, sectionContent)
+                if courseworkMatch:
+                    courseworkText = courseworkMatch.group(1).strip()
                     # Remove any LaTeX formatting like \vspace{-4pt}
-                    coursework_text = re.sub(r'\\vspace\{[^}]*\}', '', coursework_text).strip()
+                    courseworkText = re.sub(r'\\vspace\{[^}]*\}', '', courseworkText).strip()
                     # Split by comma and clean
-                    coursework = [course.strip() for course in coursework_text.split(',') if course.strip()]
+                    coursework = [cleanLatexText(course) for course in courseworkText.split(',') if course.strip()]
                 
-                education_entry = {
+                educationEntry = {
                     "university": university.strip(),
-                    "degree": main_degree,
+                    "degree": mainDegree,
                     "track": track,
                     "date": date.strip(),
                     "additional": additional.strip() if additional else "",
                     "coursework": coursework
                 }
                 
-                education_entries.append(education_entry)
+                educationEntries.append(educationEntry)
             
             # Store all education entries (consistent with other sections)
-            resume_data["education"] = education_entries
+            resumeData["education"] = educationEntries
             
-        # Extract Certifications if present
-        cert_pattern = r'\\section{Certifications}(.*?)\\vspace{[^}]+}'
-        cert_match = re.search(cert_pattern, resume_content, re.DOTALL)
-        if cert_match:
-            cert_content = cert_match.group(1).strip()
+
+        certPattern = r'\\section{Certifications}(.*?)\\vspace{[^}]+}'
+        certMatch = re.search(certPattern, resumeContent, re.DOTALL)
+        if certMatch:
+            certContent = certMatch.group(1).strip()
             # Clean up LaTeX formatting
-            cert_clean = re.sub(r'\\[a-zA-Z]+{([^}]*)}', r'\1', cert_content)
-            cert_clean = re.sub(r'\\[a-zA-Z]+', '', cert_clean)
-            cert_clean = re.sub(r'\s+', ' ', cert_clean).strip()
-            resume_data["certifications"] = cert_clean
+            certClean = re.sub(r'\\[a-zA-Z]+{([^}]*)}', r'\1', certContent)
+            certClean = re.sub(r'\\[a-zA-Z]+', '', certClean)
+            certClean = re.sub(r'\s+', ' ', certClean).strip()
+            resumeData["certifications"] = certClean
         
         return ResumeParseResponse(
             success=True,
-            resumeData=resume_data,
+            resumeData=resumeData,
             message="Resume parsed successfully"
         )
         
     except Exception as e:
-        print(f"Error in parseResume: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
 
 @app.post("/extractCompanyInfo", response_model=CompanyPositionResponse)
@@ -355,14 +359,14 @@ async def extractCompanyInfoEndpoint(request: JobDescriptionRequest):
 async def editTechnicalSkillsEndpoint(sessionId: str):
     """Edit technical skills section based on job description"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         result = edit_technical_skills(state)
         
         # Update session state
-        workflow_states[sessionId].update(result)
+        workflowStates[sessionId].update(result)
         
         return ResumeUpdateResponse(
             tailoredResume=result["tailored_resume"],
@@ -378,14 +382,14 @@ async def editTechnicalSkillsEndpoint(sessionId: str):
 async def editExperienceEndpoint(sessionId: str):
     """Edit work experience section using STAR/XYZ framework"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         result = edit_experience(state)
         
         # Update session state
-        workflow_states[sessionId].update(result)
+        workflowStates[sessionId].update(result)
         
         return ResumeUpdateResponse(
             tailoredResume=result["tailored_resume"],
@@ -401,14 +405,14 @@ async def editExperienceEndpoint(sessionId: str):
 async def editProjectsEndpoint(sessionId: str):
     """Edit projects section with achievement-oriented descriptions"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         result = edit_projects(state)
         
         # Update session state
-        workflow_states[sessionId].update(result)
+        workflowStates[sessionId].update(result)
         
         return ResumeUpdateResponse(
             tailoredResume=result["tailored_resume"],
@@ -424,14 +428,14 @@ async def editProjectsEndpoint(sessionId: str):
 async def judgeQualityEndpoint(sessionId: str):
     """Evaluate resume quality and provide feedback"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         result = judge_resume_quality(state)
         
         # Update session state
-        workflow_states[sessionId].update(result)
+        workflowStates[sessionId].update(result)
         
         return QualityScoreResponse(
             score=result["score"],
@@ -448,14 +452,14 @@ async def judgeQualityEndpoint(sessionId: str):
 async def compileResumeEndpoint(sessionId: str):
     """Compile LaTeX resume to PDF"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         result = compile_resume(state)
         
         # Update session state
-        workflow_states[sessionId].update(result)
+        workflowStates[sessionId].update(result)
         
         success = result["pdf_path"] is not None
         message = "Resume compiled successfully" if success else "Failed to compile resume"
@@ -474,19 +478,19 @@ async def compileResumeEndpoint(sessionId: str):
 async def downloadResumeEndpoint(sessionId: str):
     """Download the compiled PDF resume"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
-        pdf_path = state.get("pdf_path")
+        state = workflowStates[sessionId]
+        pdfPath = state.get("pdf_path")
         
-        if not pdf_path or not os.path.exists(pdf_path):
+        if not pdfPath or not os.path.exists(pdfPath):
             raise HTTPException(status_code=404, detail="PDF file not found")
             
         return FileResponse(
-            path=pdf_path,
+            path=pdfPath,
             media_type='application/pdf',
-            filename=os.path.basename(pdf_path)
+            filename=os.path.basename(pdfPath)
         )
         
     except Exception as e:
@@ -498,16 +502,16 @@ async def initializeSessionEndpoint(request: JobDescriptionRequest):
     """Initialize a new workflow session"""
     try:
         import uuid
-        session_id = str(uuid.uuid4())
+        sessionId = str(uuid.uuid4())
         
         # Initialize state with job description and original resume
         from agent import get_resume_content
-        resume_content = get_resume_content()
+        resumeContent = get_resume_content()
         
-        workflow_states[session_id] = {
+        workflowStates[sessionId] = {
             "job_description": request.jobDescription,
-            "resume": resume_content,
-            "tailored_resume": resume_content,  # Initialize with original resume
+            "resume": resumeContent,
+            "tailored_resume": resumeContent,  # Initialize with original resume
             "company_name": "",
             "position": "",
             "iteration_count": 0,
@@ -517,8 +521,8 @@ async def initializeSessionEndpoint(request: JobDescriptionRequest):
             "pdf_path": None
         }
         
-        print(f"Session {session_id} initialized successfully")
-        return {"sessionId": session_id, "message": "Session initialized successfully"}
+        print(f"Session {sessionId} initialized successfully")
+        return {"sessionId": sessionId, "message": "Session initialized successfully"}
         
     except Exception as e:
         print(f"Error in initializeSession: {str(e)}")
@@ -529,17 +533,17 @@ async def fullWorkflowEndpoint(request: JobDescriptionRequest, background_tasks:
     """Run the complete resume tailoring workflow"""
     try:
         import uuid
-        session_id = str(uuid.uuid4())
+        sessionId = str(uuid.uuid4())
         
-        print(f"Starting full workflow for session: {session_id}")
+        print(f"Starting full workflow for session: {sessionId}")
         
         # Initialize state
         from agent import get_resume_content
-        resume_content = get_resume_content()
+        resumeContent = get_resume_content()
         state = {
             "job_description": request.jobDescription,
-            "resume": resume_content,
-            "tailored_resume": resume_content,  # Initialize with original resume
+            "resume": resumeContent,
+            "tailored_resume": resumeContent,  # Initialize with original resume
             "company_name": "",
             "position": "",
             "iteration_count": 0,
@@ -550,17 +554,17 @@ async def fullWorkflowEndpoint(request: JobDescriptionRequest, background_tasks:
         }
         
         # Store in session
-        workflow_states[session_id] = state
+        workflowStates[sessionId] = state
         
         # Step 1: Extract company info
         print("Extracting company information...")
         state.update(extract_info(state))
         
         # Main workflow loop
-        max_iterations = 3
+        maxIterations = 3
         iteration = 0
         
-        while iteration < max_iterations:
+        while iteration < maxIterations:
             iteration += 1
             print(f"Starting iteration {iteration}")
             
@@ -594,7 +598,7 @@ async def fullWorkflowEndpoint(request: JobDescriptionRequest, background_tasks:
         state.update(compile_resume(state))
         
         # Update session state
-        workflow_states[session_id] = state
+        workflowStates[sessionId] = state
         
         success = state.get("pdf_path") is not None
         message = f"Workflow completed successfully. Final score: {state.get('score', 0)}" if success else "Workflow completed but compilation failed"
@@ -615,10 +619,10 @@ async def fullWorkflowEndpoint(request: JobDescriptionRequest, background_tasks:
 async def getSessionStatusEndpoint(sessionId: str):
     """Get current status of a workflow session"""
     try:
-        if sessionId not in workflow_states:
+        if sessionId not in workflowStates:
             raise HTTPException(status_code=404, detail="Session not found")
             
-        state = workflow_states[sessionId]
+        state = workflowStates[sessionId]
         
         return {
             "sessionId": sessionId,
@@ -638,8 +642,8 @@ async def getSessionStatusEndpoint(sessionId: str):
 async def deleteSessionEndpoint(sessionId: str):
     """Clean up session data"""
     try:
-        if sessionId in workflow_states:
-            del workflow_states[sessionId]
+        if sessionId in workflowStates:
+            del workflowStates[sessionId]
             return {"message": "Session deleted successfully"}
         else:
             raise HTTPException(status_code=404, detail="Session not found")

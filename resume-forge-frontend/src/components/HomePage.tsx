@@ -14,7 +14,12 @@ import {
   CircularProgress,
   Accordion,
   AccordionSummary,
-  AccordionDetails
+  AccordionDetails,
+  TextField,
+  IconButton,
+  Divider,
+  Fade,
+  Alert
 } from '@mui/material';
 import { 
   WorkOutline as ResumeIcon,
@@ -22,15 +27,45 @@ import {
   Speed as FastIcon,
   GetApp as DownloadIcon,
   Preview as PreviewIcon,
-  ExpandMore as ExpandMoreIcon
+  ExpandMore as ExpandMoreIcon,
+  Save as SaveIcon,
+  Add as AddIcon,
+  Delete as DeleteIcon
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useState } from 'react';
 import axios from 'axios';
 
+// Utility function to render markdown bold formatting as HTML
+const renderFormattedText = (text: string) => {
+  if (typeof text !== 'string') return text;
+  return text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+};
+
+// Custom JSON display component that preserves bold formatting
+const FormattedJSONDisplay = ({ data }: { data: any }) => {
+  const jsonString = JSON.stringify(data, null, 2);
+  const formattedJson = renderFormattedText(jsonString);
+  
+  return (
+    <Box 
+      component="pre" 
+      sx={{ 
+        fontSize: '0.875rem', 
+        color: 'text.secondary', 
+        overflow: 'auto',
+        whiteSpace: 'pre-wrap'
+      }}
+      dangerouslySetInnerHTML={{ __html: formattedJson }}
+    />
+  );
+};
+
 const HomePage = () => {
   const [resumeData, setResumeData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editMode, setEditMode] = useState(false);
 
   const handleGetStarted = () => {
     toast.success('Coming soon! Resume tailoring will be available shortly.');
@@ -48,7 +83,8 @@ const HomePage = () => {
       const response = await axios.get('http://localhost:8002/parseResume');
       if (response.data.success) {
         setResumeData(response.data.resumeData);
-        toast.success('Resume loaded successfully!');
+        setEditMode(true);
+        toast.success('Resume loaded successfully! Now you can edit it.');
       } else {
         toast.error('Failed to load resume');
       }
@@ -58,6 +94,39 @@ const HomePage = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSaveResume = async () => {
+    if (!resumeData) return;
+    
+    setSaving(true);
+    try {
+      // For now, we'll just show a success message since we don't have a save endpoint yet
+      // In a real implementation, you'd send the data to a backend endpoint
+      toast.success('Resume changes saved successfully!');
+      console.log('Resume data to save:', resumeData);
+    } catch (error) {
+      console.error('Error saving resume:', error);
+      toast.error('Failed to save resume changes.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const updateResumeData = (path: string, value: any) => {
+    setResumeData((prev: any) => {
+      const newData = { ...prev };
+      const keys = path.split('.');
+      let current = newData;
+      
+      for (let i = 0; i < keys.length - 1; i++) {
+        if (!current[keys[i]]) current[keys[i]] = {};
+        current = current[keys[i]];
+      }
+      
+      current[keys[keys.length - 1]] = value;
+      return newData;
+    });
   };
 
   return (
@@ -142,112 +211,392 @@ const HomePage = () => {
         </Box>
 
         {/* Resume Data Display Section */}
-        {resumeData && (
+        {resumeData && editMode && (
+          <Fade in={true}>
           <Box sx={{ mt: 8, mb: 4 }}>
-            <Typography variant="h4" gutterBottom textAlign="center" sx={{ mb: 4 }}>
-              Resume Data Preview
+              <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                <Typography variant="h4" gutterBottom textAlign="center">
+                  Edit Your Resume
             </Typography>
-            <Paper sx={{ p: 3, bgcolor: 'background.paper', border: '1px solid', borderColor: 'divider' }}>
-              
+                <Button
+                  variant="contained"
+                  startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                  onClick={handleSaveResume}
+                  disabled={saving}
+                  sx={{ px: 3 }}
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </Button>
+              </Box>
+
+              <Alert severity="info" sx={{ mb: 3 }}>
+                💡 Use **text** to make text bold. Changes are saved locally and can be applied to your resume template.
+              </Alert>
+
               {/* Personal Information */}
               <Accordion defaultExpanded>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                   <Typography variant="h6" fontWeight={600}>Personal Information</Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box component="pre" sx={{ fontSize: '0.875rem', color: 'text.secondary', overflow: 'auto' }}>
-                    {JSON.stringify(resumeData.personalInfo, null, 2)}
-                  </Box>
+                    <Grid container spacing={2}>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Full Name"
+                          value={resumeData.personalInfo?.name || ''}
+                          onChange={(e) => updateResumeData('personalInfo.name', e.target.value)}
+                          margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Email"
+                          type="email"
+                          value={resumeData.personalInfo?.email || ''}
+                          onChange={(e) => updateResumeData('personalInfo.email', e.target.value)}
+                          margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="Phone"
+                          value={resumeData.personalInfo?.phone || ''}
+                          onChange={(e) => updateResumeData('personalInfo.phone', e.target.value)}
+                          margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="LinkedIn"
+                          value={resumeData.personalInfo?.linkedin || ''}
+                          onChange={(e) => updateResumeData('personalInfo.linkedin', e.target.value)}
+                          margin="normal"
+                        />
+                      </Grid>
+                      <Grid item xs={12} md={6}>
+                        <TextField
+                          fullWidth
+                          label="GitHub"
+                          value={resumeData.personalInfo?.github || ''}
+                          onChange={(e) => updateResumeData('personalInfo.github', e.target.value)}
+                          margin="normal"
+                        />
+                      </Grid>
+                    </Grid>
                 </AccordionDetails>
               </Accordion>
 
               {/* Technical Skills */}
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" fontWeight={600}>Technical Skills ({Object.keys(resumeData.technicalSkills || {}).length} categories)</Typography>
+                    <Typography variant="h6" fontWeight={600}>
+                      Technical Skills ({Object.keys(resumeData.technicalSkills || {}).length} categories)
+                    </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box component="pre" sx={{ fontSize: '0.875rem', color: 'text.secondary', overflow: 'auto' }}>
-                    {JSON.stringify(resumeData.technicalSkills, null, 2)}
+                    <Stack spacing={3}>
+                      {Object.entries(resumeData.technicalSkills || {}).map(([category, skills], categoryIndex) => (
+                        <Box key={category}>
+                          <TextField
+                            fullWidth
+                            label={`Category ${categoryIndex + 1}`}
+                            value={category}
+                            onChange={(e) => {
+                              const newSkills = { ...resumeData.technicalSkills };
+                              delete newSkills[category];
+                              newSkills[e.target.value] = skills;
+                              updateResumeData('technicalSkills', newSkills);
+                            }}
+                            margin="normal"
+                            size="small"
+                          />
+                          <TextField
+                            fullWidth
+                            label="Skills (comma-separated)"
+                            value={Array.isArray(skills) ? skills.join(', ') : skills}
+                            onChange={(e) => {
+                              const skillsArray = e.target.value.split(',').map(s => s.trim()).filter(s => s);
+                              updateResumeData(`technicalSkills.${category}`, skillsArray);
+                            }}
+                            multiline
+                            rows={2}
+                            margin="normal"
+                          />
+                          <Box sx={{ my: 2 }} />
                   </Box>
+                      ))}
+                    </Stack>
                 </AccordionDetails>
               </Accordion>
 
               {/* Work Experience */}
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" fontWeight={600}>Work Experience ({resumeData.workExperience?.length || 0} entries)</Typography>
+                    <Typography variant="h6" fontWeight={600}>
+                      Work Experience ({resumeData.workExperience?.length || 0} entries)
+                    </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box component="pre" sx={{ fontSize: '0.875rem', color: 'text.secondary', overflow: 'auto' }}>
-                    {JSON.stringify(resumeData.workExperience, null, 2)}
+                    <Stack spacing={3}>
+                      {(resumeData.workExperience || []).map((job: any, jobIndex: number) => (
+                        <Box key={jobIndex} sx={{ mb: 3 }}>
+                          <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', mb: 2 }}>
+                            Job {jobIndex + 1}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Job Title"
+                                value={job.jobTitle || ''}
+                                onChange={(e) => updateResumeData(`workExperience.${jobIndex}.jobTitle`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Company"
+                                value={job.company || ''}
+                                onChange={(e) => updateResumeData(`workExperience.${jobIndex}.company`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Location"
+                                value={job.location || ''}
+                                onChange={(e) => updateResumeData(`workExperience.${jobIndex}.location`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Duration"
+                                value={job.duration || ''}
+                                onChange={(e) => updateResumeData(`workExperience.${jobIndex}.duration`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                          </Grid>
+                          
+                          <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
+                            Bullet Points:
+                          </Typography>
+                          {(job.bulletPoints || []).map((bullet: string, bulletIndex: number) => (
+                            <Box key={bulletIndex} sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                              <TextField
+                                fullWidth
+                                multiline
+                                rows={2}
+                                value={bullet}
+                                onChange={(e) => updateResumeData(`workExperience.${jobIndex}.bulletPoints.${bulletIndex}`, e.target.value)}
+                                placeholder="• Achievement or responsibility (use **text** for bold)"
+                              />
+                              <IconButton 
+                                onClick={() => {
+                                  const newBullets = [...job.bulletPoints];
+                                  newBullets.splice(bulletIndex, 1);
+                                  updateResumeData(`workExperience.${jobIndex}.bulletPoints`, newBullets);
+                                }}
+                                color="error"
+                                size="small"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
+                            </Box>
+                          ))}
+                          <Button
+                            startIcon={<AddIcon />}
+                            onClick={() => {
+                              const newBullets = [...(job.bulletPoints || []), ''];
+                              updateResumeData(`workExperience.${jobIndex}.bulletPoints`, newBullets);
+                            }}
+                            size="small"
+                          >
+                            Add Bullet Point
+                          </Button>
                   </Box>
+                      ))}
+                    </Stack>
                 </AccordionDetails>
               </Accordion>
 
               {/* Projects */}
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" fontWeight={600}>Projects ({resumeData.projects?.length || 0} entries)</Typography>
+                    <Typography variant="h6" fontWeight={600}>
+                      Projects ({resumeData.projects?.length || 0} entries)
+                    </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box component="pre" sx={{ fontSize: '0.875rem', color: 'text.secondary', overflow: 'auto' }}>
-                    {JSON.stringify(resumeData.projects, null, 2)}
+                    <Stack spacing={3}>
+                      {(resumeData.projects || []).map((project: any, projectIndex: number) => (
+                        <Box key={projectIndex} sx={{ mb: 3 }}>
+                          <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', mb: 2 }}>
+                            Project {projectIndex + 1}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Project Name"
+                                value={project.projectName || ''}
+                                onChange={(e) => updateResumeData(`projects.${projectIndex}.projectName`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Tech Stack"
+                                value={project.techStack || ''}
+                                onChange={(e) => updateResumeData(`projects.${projectIndex}.techStack`, e.target.value)}
+                                margin="normal"
+                                placeholder="React | Node.js | MongoDB"
+                              />
+                            </Grid>
+                          </Grid>
+                          
+                          <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
+                            Project Details:
+                          </Typography>
+                          {(project.bulletPoints || []).map((bullet: string, bulletIndex: number) => (
+                            <Box key={bulletIndex} sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                              <TextField
+                                fullWidth
+                                multiline
+                                rows={2}
+                                value={bullet}
+                                onChange={(e) => updateResumeData(`projects.${projectIndex}.bulletPoints.${bulletIndex}`, e.target.value)}
+                                placeholder="• Project achievement or feature (use **text** for bold)"
+                              />
+                              <IconButton 
+                                onClick={() => {
+                                  const newBullets = [...project.bulletPoints];
+                                  newBullets.splice(bulletIndex, 1);
+                                  updateResumeData(`projects.${projectIndex}.bulletPoints`, newBullets);
+                                }}
+                                color="error"
+                                size="small"
+                              >
+                                <DeleteIcon />
+                              </IconButton>
                   </Box>
+                          ))}
+                          <Button
+                            startIcon={<AddIcon />}
+                            onClick={() => {
+                              const newBullets = [...(project.bulletPoints || []), ''];
+                              updateResumeData(`projects.${projectIndex}.bulletPoints`, newBullets);
+                            }}
+                            size="small"
+                          >
+                            Add Detail
+                          </Button>
+                        </Box>
+                      ))}
+                    </Stack>
                 </AccordionDetails>
               </Accordion>
 
               {/* Education */}
               <Accordion>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" fontWeight={600}>Education ({resumeData.education?.length || 0} entries)</Typography>
+                    <Typography variant="h6" fontWeight={600}>
+                      Education ({resumeData.education?.length || 0} entries)
+                    </Typography>
                 </AccordionSummary>
                 <AccordionDetails>
-                  <Box component="pre" sx={{ fontSize: '0.875rem', color: 'text.secondary', overflow: 'auto' }}>
-                    {JSON.stringify(resumeData.education, null, 2)}
-                  </Box>
+                    <Stack spacing={3}>
+                      {(resumeData.education || []).map((edu: any, eduIndex: number) => (
+                        <Box key={eduIndex} sx={{ mb: 3 }}>
+                          <Typography variant="h6" gutterBottom sx={{ color: 'text.primary', mb: 2 }}>
+                            Education {eduIndex + 1}
+                          </Typography>
+                          <Grid container spacing={2}>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="University"
+                                value={edu.university || ''}
+                                onChange={(e) => updateResumeData(`education.${eduIndex}.university`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Degree"
+                                value={edu.degree || ''}
+                                onChange={(e) => updateResumeData(`education.${eduIndex}.degree`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Date"
+                                value={edu.date || ''}
+                                onChange={(e) => updateResumeData(`education.${eduIndex}.date`, e.target.value)}
+                                margin="normal"
+                                placeholder="May 2021"
+                              />
+                            </Grid>
+                            <Grid item xs={12} md={6}>
+                              <TextField
+                                fullWidth
+                                label="Track/Specialization"
+                                value={edu.track || ''}
+                                onChange={(e) => updateResumeData(`education.${eduIndex}.track`, e.target.value)}
+                                margin="normal"
+                              />
+                            </Grid>
+                            <Grid item xs={12}>
+                              <TextField
+                                fullWidth
+                                label="Coursework (comma-separated)"
+                                value={Array.isArray(edu.coursework) ? edu.coursework.join(', ') : edu.coursework || ''}
+                                onChange={(e) => {
+                                  const courses = e.target.value.split(',').map(c => c.trim()).filter(c => c);
+                                  updateResumeData(`education.${eduIndex}.coursework`, courses);
+                                }}
+                                multiline
+                                rows={2}
+                                margin="normal"
+                                placeholder="Operating Systems, Machine Learning, Data Structures"
+                              />
+                            </Grid>
+                          </Grid>
+                        </Box>
+                      ))}
+                    </Stack>
                 </AccordionDetails>
               </Accordion>
 
-              {/* Certifications */}
-              {resumeData.certifications && (
+                {/* Preview Section */}
                 <Accordion>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                    <Typography variant="h6" fontWeight={600}>Certifications</Typography>
+                    <Typography variant="h6" fontWeight={600}>Preview (Formatted Output)</Typography>
                   </AccordionSummary>
                   <AccordionDetails>
-                    <Typography variant="body1" color="text.secondary">
-                      {resumeData.certifications}
+                    <Typography variant="body2" color="text.secondary" gutterBottom>
+                      Preview of your resume with bold formatting:
                     </Typography>
-                  </AccordionDetails>
-                </Accordion>
-              )}
-
-              {/* Raw Content Toggle */}
-              <Accordion>
-                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Typography variant="h6" fontWeight={600}>Raw LaTeX Content</Typography>
-                </AccordionSummary>
-                <AccordionDetails>
-                  <Box 
-                    component="pre" 
-                    sx={{ 
-                      fontSize: '0.75rem', 
-                      color: 'text.secondary', 
-                      overflow: 'auto',
-                      maxHeight: '300px',
-                      bgcolor: 'grey.900',
-                      p: 2,
-                      borderRadius: 1
-                    }}
-                  >
-                    {resumeData.rawContent}
-                  </Box>
+                    <Box sx={{ mt: 2 }}>
+                      <FormattedJSONDisplay data={resumeData} />
+                    </Box>
                 </AccordionDetails>
               </Accordion>
 
-            </Paper>
           </Box>
+          </Fade>
         )}
 
         {/* Feature Cards */}

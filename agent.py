@@ -219,7 +219,8 @@ def edit_experience(state):
         - Critical: Only make the change if it makes sense technically or logically.
         - You can add more details and points if needed to make the experience more relevant to the job description.
         - If change is needed in the experience to convey the narrative better, then change the entire experience point except the company name and the position title.
-
+        - Do not Over describe the point e.g. "as mesaured by".
+        - Start with Strong action verb and try to reduce use of articles.
         Your output MUST be ONLY the updated LaTeX code for the 'Work Experience' section, wrapped in a single markdown block like this: ```latex [your code here] ```.
 
         **Job Description:**
