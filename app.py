@@ -63,6 +63,13 @@ class ResumeParseResponse(BaseModel):
     resumeData: Dict[str, Any]
     message: str
 
+class ResumeUpdateRequest(BaseModel):
+    resumeData: Dict[str, Any]
+
+class ResumeUpdateResponse(BaseModel):
+    success: bool
+    message: str
+
 # Global state storage (in production, use Redis or database)
 workflowStates: Dict[str, Dict[str, Any]] = {}
 
@@ -77,7 +84,7 @@ async def parseResumeEndpoint():
     try:
         from agent import get_resume_content
         import re
-        from latex_parser import parseWorkExperience, parseProjects, extractResumeItems, cleanLatexText
+        from latex_parser import parseWorkExperience, parseProjects, parseCertifications, extractResumeItems, cleanLatexText
         
         resumeContent = get_resume_content()
         
@@ -87,7 +94,8 @@ async def parseResumeEndpoint():
             "workExperience": [],
             "projects": [],
             "education": "",
-            "certifications": "",
+            "certifications": [],
+            "invisibleKeywords": "",
             "rawContent": resumeContent
         }
         
@@ -111,9 +119,14 @@ async def parseResumeEndpoint():
         githubMatch = re.search(r'\\href\{https://github\.com/([^}]+)\}', resumeContent)
         if githubMatch:
             resumeData["personalInfo"]["github"] = f"github.com/{githubMatch.group(1).strip()}"
+            
+        # Extract website URL (looking for faBriefcase pattern)
+        websiteMatch = re.search(r'faBriefcase.*?href\{([^}]+)\}', resumeContent)
+        if websiteMatch:
+            resumeData["personalInfo"]["website"] = websiteMatch.group(1).strip()
         
 
-        skillsPattern = r'\\section{Technical Skills}(.*?)\\vspace{-13pt}'
+        skillsPattern = r'\\section{Technical Skills}(.*?)\\vspace{-14pt}'
         skillsMatch = re.search(skillsPattern, resumeContent, re.DOTALL)
         if skillsMatch:
             skillsContent = skillsMatch.group(1).strip()
@@ -154,9 +167,19 @@ async def parseResumeEndpoint():
                     skillsDict["Certifications"] = certLinks
             
             resumeData["technicalSkills"] = skillsDict
+            
+            # Also create the new frontend-compatible format
+            technical_skills_categories = []
+            for category, skills in skillsDict.items():
+                if category.lower() != "certifications" and isinstance(skills, list):
+                    technical_skills_categories.append({
+                        "categoryName": category,
+                        "skills": ", ".join(skills)
+                    })
+            resumeData["technicalSkillsCategories"] = technical_skills_categories
         
 
-        experiencePattern = r'\\section{Work Experience}(.*?)\\vspace{-12pt}'
+        experiencePattern = r'\\section{Work Experience}(.*?)\\vspace{-14pt}'
         experienceMatch = re.search(experiencePattern, resumeContent, re.DOTALL)
         if experienceMatch:
             experienceContent = experienceMatch.group(1)
@@ -165,8 +188,17 @@ async def parseResumeEndpoint():
             try:
                 resumeData["workExperience"] = parseWorkExperience(experienceContent)
             except Exception as e:
-                entryPattern = r'\\workExSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}(.*?)(?=\\workExSubheading|\\resumeSubHeadingListEnd)'
+                # Handle both normal and BeginAccSupp/EndAccSupp formatted entries
+                entryPattern = r'\\workExSubheading\{([^}]+)\}\{([^{}]*(?:\\BeginAccSupp\{[^}]*\}[^{}]*\\EndAccSupp\{\}|[^{}])*)\}\{([^}]+)\}\{([^}]+)\}(.*?)(?=\\workExSubheading|\\resumeSubHeadingListEnd)'
                 entries = re.findall(entryPattern, experienceContent, re.DOTALL)
+                
+                # Clean up job titles that might have BeginAccSupp formatting
+                cleaned_entries = []
+                for company, jobTitle, location, duration, description in entries:
+                    # Remove BeginAccSupp/EndAccSupp formatting from job title
+                    cleanJobTitle = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', jobTitle)
+                    cleaned_entries.append((company, cleanJobTitle, location, duration, description))
+                entries = cleaned_entries
                 
                 for entry in entries:
                     company, jobTitle, location, duration, description = entry
@@ -215,8 +247,8 @@ async def parseResumeEndpoint():
                 resumeData["projects"] = []
                 
                 patterns = [
-                    r'\\resumeProjectHeading\{\\textbf\{\{([^}]+)\}\}[^}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd',
-                    r'\\resumeProjectHeading\{[^{}]*\{([^}]+)\}[^{}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd',
+                    r'\\resumeProjectHeading\{\\textbf\{\{([^}]+)\}\}[^}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd\s*\\vspace\{-20pt\}',
+                    r'\\resumeProjectHeading\{[^{}]*\{([^}]+)\}[^{}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd\s*(?:\\vspace\{-20pt\}|\\resumeSubHeadingListEnd)',
                     r'\\resumeProjectHeading\{.*?\{([^}]+)\}.*?\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd'
                 ]
                 
@@ -232,31 +264,42 @@ async def parseResumeEndpoint():
                 for entry in projectEntries:
                     projectName, techStack, description = entry
                     
+                    # Extract project link from the project heading
+                    # Look for the full project heading in the original content to extract the link
+                    projectHeadingPattern = rf'\\resumeProjectHeading.*?{re.escape(projectName)}.*?\\resumeItemListStart'
+                    projectHeadingMatch = re.search(projectHeadingPattern, projectsContent, re.DOTALL)
+                    projectLink = "#"  # Default link
+                    
+                    if projectHeadingMatch:
+                        headingText = projectHeadingMatch.group(0)
+                        linkPattern = r'\\href\{([^}]*)\}\{([^}]*)\}'
+                        linkMatch = re.search(linkPattern, headingText)
+                        if linkMatch:
+                            projectLink = linkMatch.group(1)
+                            linkText = linkMatch.group(2)
+                        else:
+                            linkText = "Link"
+                    else:
+                        linkText = "Link"
+                    
+                    # Clean tech stack from BeginAccSupp formatting
+                    cleanTechStack = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', techStack)
+                    cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', cleanTechStack.strip())
+                    cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
+                    
                     # Extract bullet points with nested braces support
                     bullets = []
                     bulletMatches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
                     for match in bulletMatches:
                         bulletText = match.group(1)
-                        # Clean up LaTeX formatting but preserve bold formatting
-                        bulletClean = re.sub(r'\\textbf\{([^}]*)\}', r'**\1**', bulletText)  # Convert to markdown bold
-                        bulletClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', bulletClean)  # Remove other LaTeX commands
-                        
-                        # Clean up common LaTeX escape sequences
-                        bulletClean = re.sub(r'\\%', '%', bulletClean)  # Fix percentages
-                        bulletClean = re.sub(r'\\&', '&', bulletClean)  # Fix ampersands
-                        bulletClean = re.sub(r'\\\\', ' ', bulletClean)  # Fix double backslashes
-                        bulletClean = re.sub(r'\\\$', '$', bulletClean)  # Fix dollar signs  
-                        bulletClean = re.sub(r'\\([#&%$_{}])', r'\1', bulletClean)  # Fix other escaped chars
-                        bulletClean = re.sub(r'\s+', ' ', bulletClean)  # Normalize whitespace
-                        
+                        bulletClean = cleanLatexText(bulletText) # Using unified cleaner
                         bullets.append(bulletClean.strip())
-                    
-                    cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', techStack.strip())
-                    cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
                     
                     resumeData["projects"].append({
                         "projectName": projectName.strip(),
                         "techStack": cleanTechStack,
+                        "projectLink": projectLink.strip(),
+                        "linkText": linkText.strip(),
                         "duration": "", # No duration in this format
                         "bulletPoints": bullets
                     })
@@ -316,15 +359,36 @@ async def parseResumeEndpoint():
             resumeData["education"] = educationEntries
             
 
-        certPattern = r'\\section{Certifications}(.*?)\\vspace{[^}]+}'
-        certMatch = re.search(certPattern, resumeContent, re.DOTALL)
-        if certMatch:
-            certContent = certMatch.group(1).strip()
-            # Clean up LaTeX formatting
-            certClean = re.sub(r'\\[a-zA-Z]+{([^}]*)}', r'\1', certContent)
-            certClean = re.sub(r'\\[a-zA-Z]+', '', certClean)
-            certClean = re.sub(r'\s+', ' ', certClean).strip()
-            resumeData["certifications"] = certClean
+        # Extract Certifications
+        try:
+            parsedCertifications = parseCertifications(resumeContent)
+            resumeData["certifications"] = parsedCertifications
+        except Exception as e:
+            # Fallback to old parsing method for compatibility
+            certPattern = r'\\section{Certifications}(.*?)\\vspace{[^}]+}'
+            certMatch = re.search(certPattern, resumeContent, re.DOTALL)
+            if certMatch:
+                certContent = certMatch.group(1).strip()
+                # Extract URLs and text from href patterns
+                href_patterns = re.findall(r'\\href\{([^}]*)\}\{([^}]*)\}', certContent)
+                certifications = []
+                for url, text in href_patterns:
+                    clean_text = cleanLatexText(text)
+                    certifications.append({
+                        "url": url.strip(),
+                        "text": clean_text
+                    })
+                resumeData["certifications"] = certifications
+
+        # Extract Invisible Keywords (ATS Section)
+        invisiblePattern = r'\\pdfliteral direct \{3 Tr\}\s*\n([^%]*?)(?:\n%|\s*\\pdfliteral direct \{0 Tr\})'
+        invisibleMatch = re.search(invisiblePattern, resumeContent, re.DOTALL)
+        if invisibleMatch:
+            invisibleContent = invisibleMatch.group(1).strip()
+            # Clean up any LaTeX comments and normalize whitespace
+            invisibleContent = re.sub(r'%.*?\n', '', invisibleContent)  # Remove comments
+            invisibleContent = re.sub(r'\s+', ' ', invisibleContent)    # Normalize whitespace
+            resumeData["invisibleKeywords"] = invisibleContent.strip()
         
         return ResumeParseResponse(
             success=True,
@@ -334,6 +398,34 @@ async def parseResumeEndpoint():
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
+
+@app.post("/updateResume", response_model=ResumeUpdateResponse)
+async def updateResumeEndpoint(request: ResumeUpdateRequest):
+    """Update the resume.tex file with edited content using template-based regeneration"""
+    try:
+        from resume_templates import generate_complete_resume_template
+        
+        resumeData = request.resumeData
+        
+        # Generate the complete resume using the template system
+        # This ensures no data is lost and maintains consistent formatting
+        complete_resume_content = generate_complete_resume_template(resumeData)
+        
+        # Write the complete new resume to file
+        resumeFilePath = "template/resume.tex"
+        with open(resumeFilePath, 'w', encoding='utf-8') as f:
+            f.write(complete_resume_content)
+        
+        return ResumeUpdateResponse(
+            success=True,
+            message="Resume updated successfully using template system"
+        )
+        
+    except Exception as e:
+        print(f"Error updating resume: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to update resume: {str(e)}")
 
 @app.post("/extractCompanyInfo", response_model=CompanyPositionResponse)
 async def extractCompanyInfoEndpoint(request: JobDescriptionRequest):

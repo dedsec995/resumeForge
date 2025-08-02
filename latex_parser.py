@@ -47,11 +47,15 @@ def extractResumeItems(content):
 
 def parseWorkExperience(content):
     experiences = []
-    pattern = r'\\workExSubheading\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}\{([^}]+)\}'
+    # Updated pattern to handle BeginAccSupp formatting in job titles
+    pattern = r'\\workExSubheading\{([^}]+)\}\{([^{}]*(?:\\BeginAccSupp\{[^}]*\}[^{}]*\\EndAccSupp\{\}|[^{}])*)\}\{([^}]+)\}\{([^}]+)\}'
     matches = re.finditer(pattern, content)
     
     for match in matches:
         company, jobTitle, location, duration = match.groups()
+        
+        # Clean BeginAccSupp formatting from job title
+        jobTitle = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', jobTitle)
         
         startPos = match.end()
         nextMatch = re.search(r'\\workExSubheading', content[startPos:])
@@ -72,16 +76,20 @@ def parseWorkExperience(content):
 
 def parseProjects(content):
     projects = []
-    pattern = r'\\resumeProjectHeading\{.*\}\{([^}]+)\}(?:\s*\\\\)'
+    # Updated pattern to handle BeginAccSupp formatting in tech stack
+    pattern = r'\\resumeProjectHeading\{.*\}\{([^{}]*(?:\\BeginAccSupp\{[^}]*\}[^{}]*\\EndAccSupp\{\}|[^{}])*)\}(?:\s*\\\\)'
     matches = list(re.finditer(pattern, content))
     
     for i, match in enumerate(matches):
         techStack = match.group(1)
+        # Clean BeginAccSupp formatting from tech stack
+        techStack = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', techStack)
         
         headingStart = match.start()
         headingEnd = match.end()
         fullHeading = content[headingStart:headingEnd]
         
+        # Extract project name
         namePattern = r'\\textbf\{\{([^}]+)\}\}'
         nameMatch = re.search(namePattern, fullHeading)
         if nameMatch:
@@ -90,6 +98,12 @@ def parseProjects(content):
             fallbackPattern = r'\\resumeProjectHeading\{([^{}]*)\}'
             fallbackMatch = re.search(fallbackPattern, fullHeading)
             projectName = fallbackMatch.group(1) if fallbackMatch else "Unknown Project"
+        
+        # Extract project link and link text
+        linkPattern = r'\\href\{([^}]*)\}\{([^}]*)\}'
+        linkMatch = re.search(linkPattern, fullHeading)
+        projectLink = linkMatch.group(1) if linkMatch else "#"
+        linkText = linkMatch.group(2) if linkMatch else "Link"
         
         contentStart = headingEnd
         if i + 1 < len(matches):
@@ -106,11 +120,71 @@ def parseProjects(content):
         projects.append({
             "projectName": projectName.strip(),
             "techStack": cleanTechStack,
+            "projectLink": projectLink.strip(),
+            "linkText": linkText.strip(),
             "duration": "",
             "bulletPoints": bulletPoints
         })
     
     return projects
+
+def parseCertifications(content):
+    """Parse certifications from technical skills section to extract URLs and text from href links"""
+    certifications = []
+    
+    # Look for certifications in technical skills section - use robust pattern that captures full content
+    cert_match = re.search(r'\\textbf\{Certifications\}\{:(.*?)(?:\\\\ \[1mm\]|\\\\\[1mm\])', content, re.DOTALL)
+    
+    if not cert_match:
+        return certifications
+    
+    cert_content = cert_match.group(1).strip()
+    
+    # Simple approach: split by commas first, then process each part
+    # The structure is: \href{url1}{text1} - suffix1, \href{url2}{text2} - suffix2
+    parts = cert_content.split(',')
+    
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+            
+        # Look for href pattern in this part
+        href_match = re.search(r'\\href\{([^}]+)\}\{([^}]+)\}(.*)', part)
+        
+        if href_match:
+            url = href_match.group(1).strip()
+            base_text = href_match.group(2).strip()
+            suffix = href_match.group(3).strip()
+            
+            # Clean the suffix (remove LaTeX commands and extra characters like } )
+            suffix = re.sub(r'\\[a-zA-Z]+', '', suffix)
+            suffix = re.sub(r'[{}]', '', suffix)  # Remove any leftover braces
+            suffix = suffix.strip(' -')
+            
+            # Combine base text with suffix
+            if suffix:
+                full_text = f"{base_text} - {suffix}"
+            else:
+                full_text = base_text
+            
+            # Clean the final text
+            clean_text = cleanLatexText(full_text)
+            
+            certifications.append({
+                "url": url,
+                "text": clean_text
+            })
+        else:
+            # No href found, might be plain text
+            clean_part = cleanLatexText(part)
+            if clean_part and len(clean_part) > 5:
+                certifications.append({
+                    "url": "",
+                    "text": clean_part
+                })
+    
+    return certifications
 
 def cleanLatexText(text):
     text = re.sub(r'\\textbf\{([^}]*)\}', r'**\1**', text)
