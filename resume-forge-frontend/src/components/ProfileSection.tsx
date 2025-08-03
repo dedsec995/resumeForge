@@ -62,7 +62,17 @@ const ProfileSection = () => {
             setOriginalResumeData(JSON.parse(JSON.stringify(response.data.resumeData))); // Deep copy
             setHasLoaded(true);
             setHasUnsavedChanges(false); // Reset changes flag
-            toast.success('Resume loaded successfully!');
+            
+            // Check if this is a new profile (all fields empty)
+            const isNewProfile = !response.data.resumeData.personalInfo?.name && 
+                                 response.data.resumeData.workExperience?.length === 0 &&
+                                 response.data.resumeData.projects?.length === 0;
+            
+            if (isNewProfile) {
+              toast.success('Welcome! Please fill in your profile information.');
+            } else {
+              toast.success('Resume loaded successfully!');
+            }
           } else if (isMounted) {
             toast.error('Failed to load resume');
           }

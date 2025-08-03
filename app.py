@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 import json
 import os
 import asyncio
+from datetime import datetime
 from agent import (
     get_job_description, extract_info, edit_technical_skills, 
     edit_experience, edit_projects, compile_resume, 
@@ -80,371 +81,117 @@ async def rootEndpoint():
 
 @app.get("/parseResume", response_model=ResumeParseResponse)
 async def parseResumeEndpoint():
-    """Parse the resume template and return structured JSON data"""
+    """Load resume data from JSON file or create empty structure"""
     try:
-        from agent import get_resume_content
-        import re
-        from latex_parser import parseWorkExperience, parseProjects, parseCertifications, extractResumeItems, cleanLatexText
+        json_path = "./resume_data.json"
         
-        resumeContent = get_resume_content()
-        
-        resumeData = {
-            "personalInfo": {},
-            "technicalSkills": "",
+        # Check if JSON file exists, if not create empty structure
+        if not os.path.exists(json_path):
+            empty_data = {
+                "personalInfo": {
+                    "name": "",
+                    "email": "",
+                    "phone": "",
+                    "linkedin": "",
+                    "github": "",
+                    "website": ""
+                },
+                "certifications": [],
+                "technicalSkillsCategories": [],
             "workExperience": [],
             "projects": [],
-            "education": "",
-            "certifications": [],
-            "invisibleKeywords": "",
-            "rawContent": resumeContent
-        }
-        
-
-        nameMatch = re.search(r'\\huge \\scshape ([^}]+)\}', resumeContent)
-        if nameMatch:
-            resumeData["personalInfo"]["name"] = nameMatch.group(1).strip()
-            
-        phoneMatch = re.search(r'\\faPhone\\\s+([^~]+)~', resumeContent)
-        if phoneMatch:
-            resumeData["personalInfo"]["phone"] = phoneMatch.group(1).strip()
-            
-        emailMatch = re.search(r'\\href\{mailto:([^}]+)\}', resumeContent)
-        if emailMatch:
-            resumeData["personalInfo"]["email"] = emailMatch.group(1).strip()
-            
-        linkedinMatch = re.search(r'\\href\{https://www\.linkedin\.com/in/([^}]+)\}', resumeContent)
-        if linkedinMatch:
-            resumeData["personalInfo"]["linkedin"] = f"linkedin.com/in/{linkedinMatch.group(1).strip()}"
-            
-        githubMatch = re.search(r'\\href\{https://github\.com/([^}]+)\}', resumeContent)
-        if githubMatch:
-            resumeData["personalInfo"]["github"] = f"github.com/{githubMatch.group(1).strip()}"
-            
-        # Extract website URL (looking for faBriefcase pattern)
-        websiteMatch = re.search(r'faBriefcase.*?href\{([^}]+)\}', resumeContent)
-        if websiteMatch:
-            resumeData["personalInfo"]["website"] = websiteMatch.group(1).strip()
-        
-
-        skillsPattern = r'\\section{Technical Skills}(.*?)\\vspace{-14pt}'
-        skillsMatch = re.search(skillsPattern, resumeContent, re.DOTALL)
-        if skillsMatch:
-            skillsContent = skillsMatch.group(1).strip()
-            
-            # Parse skills into categories
-            skillsDict = {}
-            
-            # Find all textbf{Category}{: skills} patterns
-            categoryPattern = r'\\textbf\{([^}]+)\}\{:\s*([^}]+)\}'
-            categoryMatches = re.findall(categoryPattern, skillsContent)
-            
-            for category, skillsText in categoryMatches:
-                # Clean category name
-                categoryClean = category.replace('\\', '').strip()
-                
-                # Split skills by comma and clean them
-                skillsList = []
-                if skillsText:
-                    skillsRaw = re.split(r',\s*', skillsText)
-                    for skill in skillsRaw:
-                        # Clean LaTeX formatting
-                        skillClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', skill)
-                        skillClean = re.sub(r'\\[a-zA-Z]+', '', skillClean)
-                        skillClean = skillClean.strip()
-                        if skillClean:
-                            skillsList.append(skillClean)
-                
-                skillsDict[categoryClean] = skillsList
-            
-            # Handle certifications separately if they exist
-            certPattern = r'\\textbf\{Certifications\}\{:\s*([^}]*(?:\}[^}]*)*)\}'
-            certMatch = re.search(certPattern, skillsContent)
-            if certMatch:
-                certContent = certMatch.group(1)
-                # Extract certification names from href links
-                certLinks = re.findall(r'\\href\{[^}]*\}\{([^}]*)\}', certContent)
-                if certLinks:
-                    skillsDict["Certifications"] = certLinks
-            
-            resumeData["technicalSkills"] = skillsDict
-            
-            # Also create the new frontend-compatible format, preserving order from LaTeX
-            technical_skills_categories = []
-            # Use the original order from the regex matches
-            for category, skillsText in categoryMatches:
-                categoryClean = category.replace('\\', '').strip()
-                if categoryClean.lower() != "certifications":
-                    # Split skills by comma and clean them
-                    skillsList = []
-                    if skillsText:
-                        skillsRaw = re.split(r',\s*', skillsText)
-                        for skill in skillsRaw:
-                            # Clean LaTeX formatting
-                            skillClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', skill)
-                            skillClean = re.sub(r'\\[a-zA-Z]+', '', skillClean)
-                            skillClean = skillClean.strip()
-                            if skillClean:
-                                skillsList.append(skillClean)
-                    
-                    if skillsList:  # Only add if there are skills
-                        technical_skills_categories.append({
-                            "categoryName": categoryClean,
-                            "skills": ", ".join(skillsList)
-                        })
-            resumeData["technicalSkillsCategories"] = technical_skills_categories
-        
-
-        experiencePattern = r'\\section{Work Experience}(.*?)\\vspace{-14pt}'
-        experienceMatch = re.search(experiencePattern, resumeContent, re.DOTALL)
-        if experienceMatch:
-            experienceContent = experienceMatch.group(1)
-            
-            # Use improved parser for better nested structure handling
-            try:
-                resumeData["workExperience"] = parseWorkExperience(experienceContent)
-            except Exception as e:
-                # Handle both normal and BeginAccSupp/EndAccSupp formatted entries
-                entryPattern = r'\\workExSubheading\{([^}]+)\}\{([^{}]*(?:\\BeginAccSupp\{[^}]*\}[^{}]*\\EndAccSupp\{\}|[^{}])*)\}\{([^}]+)\}\{([^}]+)\}(.*?)(?=\\workExSubheading|\\resumeSubHeadingListEnd)'
-                entries = re.findall(entryPattern, experienceContent, re.DOTALL)
-                
-                # Clean up job titles that might have BeginAccSupp formatting
-                cleaned_entries = []
-                for company, jobTitle, location, duration, description in entries:
-                    # Remove BeginAccSupp/EndAccSupp formatting from job title
-                    cleanJobTitle = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', jobTitle)
-                    cleaned_entries.append((company, cleanJobTitle, location, duration, description))
-                entries = cleaned_entries
-                
-                for entry in entries:
-                    company, jobTitle, location, duration, description = entry
-                    
-                    # Extract bullet points with better nested braces handling
-                    bullets = []
-                    bulletMatches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
-                    for match in bulletMatches:
-                        bulletText = match.group(1)
-                        # Clean up LaTeX formatting but preserve bold formatting
-                        bulletClean = re.sub(r'\\textbf\{([^}]*)\}', r'**\1**', bulletText)  # Convert to markdown bold
-                        bulletClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', bulletClean)  # Remove other LaTeX commands
-                        
-                        # Clean up common LaTeX escape sequences
-                        bulletClean = re.sub(r'\\%', '%', bulletClean)  # Fix percentages
-                        bulletClean = re.sub(r'\\&', '&', bulletClean)  # Fix ampersands
-                        bulletClean = re.sub(r'\\\\', ' ', bulletClean)  # Fix double backslashes
-                        bulletClean = re.sub(r'\\\$', '$', bulletClean)  # Fix dollar signs  
-                        bulletClean = re.sub(r'\\([#&%$_{}])', r'\1', bulletClean)  # Fix other escaped chars
-                        bulletClean = re.sub(r'\s+', ' ', bulletClean)  # Normalize whitespace
-                        
-                        bullets.append(bulletClean.strip())
-                    
-                    resumeData["workExperience"].append({
-                        "jobTitle": jobTitle.strip(),
-                        "company": company.strip(), 
-                        "location": location.strip(),
-                        "duration": duration.strip(),
-                        "bulletPoints": bullets
-                    })
-        
-
-        projectsPattern = r'\\section{Projects}(.*?)%-----------PROJECTS END-----------'
-        projectsMatch = re.search(projectsPattern, resumeContent, re.DOTALL)
-        if projectsMatch:
-            projectsContent = projectsMatch.group(1)
-            
-            # Use improved parser for better nested structure handling
-            try:
-                parsedProjects = parseProjects(projectsContent)
-                if len(parsedProjects) > 0:
-                    resumeData["projects"] = parsedProjects
-                else:
-                    raise Exception("No projects found by improved parser")
-            except Exception as e:
-                resumeData["projects"] = []
-                
-                patterns = [
-                    r'\\resumeProjectHeading\{\\textbf\{\{([^}]+)\}\}[^}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd\s*\\vspace\{-20pt\}',
-                    r'\\resumeProjectHeading\{[^{}]*\{([^}]+)\}[^{}]*\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd\s*(?:\\vspace\{-20pt\}|\\resumeSubHeadingListEnd)',
-                    r'\\resumeProjectHeading\{.*?\{([^}]+)\}.*?\}\{([^}]+)\}.*?\\resumeItemListStart(.*?)\\resumeItemListEnd'
-                ]
-                
-                projectEntries = []
-                for pattern in patterns:
-                    projectEntries = re.findall(pattern, projectsContent, re.DOTALL)
-                    if projectEntries:
-                        break
-                
-                if not projectEntries:
-                    pass
-                
-                for entry in projectEntries:
-                    projectName, techStack, description = entry
-                    
-                    # Extract project link from the project heading
-                    # Look for the full project heading in the original content to extract the link
-                    projectHeadingPattern = rf'\\resumeProjectHeading.*?{re.escape(projectName)}.*?\\resumeItemListStart'
-                    projectHeadingMatch = re.search(projectHeadingPattern, projectsContent, re.DOTALL)
-                    projectLink = "#"  # Default link
-                    
-                    if projectHeadingMatch:
-                        headingText = projectHeadingMatch.group(0)
-                        linkPattern = r'\\href\{([^}]*)\}\{([^}]*)\}'
-                        linkMatch = re.search(linkPattern, headingText)
-                        if linkMatch:
-                            projectLink = linkMatch.group(1)
-                            linkText = linkMatch.group(2)
-                        else:
-                            linkText = "Link"
-                    else:
-                        linkText = "Link"
-                    
-                    # Clean tech stack from BeginAccSupp formatting
-                    cleanTechStack = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', techStack)
-                    cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', cleanTechStack.strip())
-                    cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
-                    
-                    # Convert pipe-separated format to comma-separated for UI editing
-                    if '|' in cleanTechStack:
-                        cleanTechStack = ', '.join([tech.strip() for tech in cleanTechStack.split('|') if tech.strip()])
-                    
-                    # Extract bullet points with nested braces support
-                    bullets = []
-                    bulletMatches = re.finditer(r'\\resumeItem\{([^{}]*(?:\{[^{}]*\}[^{}]*)*)\}', description)
-                    for match in bulletMatches:
-                        bulletText = match.group(1)
-                        bulletClean = cleanLatexText(bulletText) # Using unified cleaner
-                        bullets.append(bulletClean.strip())
-                    
-                    resumeData["projects"].append({
-                        "projectName": projectName.strip(),
-                        "techStack": cleanTechStack,
-                        "projectLink": projectLink.strip(),
-                        "linkText": linkText.strip(),
-                        "duration": "", # No duration in this format
-                        "bulletPoints": bullets
-                    })
-        
-
-        educationPattern = r'\\section{Education}(.*?)%-----------EDUCATION END-----------'
-        educationMatch = re.search(educationPattern, resumeContent, re.DOTALL)
-        if educationMatch:
-            educationContent = educationMatch.group(1).strip()
-            
-            educationEntries = []
-            
-            # Find all resumeSubheading entries first
-            subheadingPattern = r'\\resumeSubheading\s*\{([^}]+)\}\{([^}]+)\}\s*\{([^}]+)\}\{([^}]*)\}'
-            subheadingMatches = list(re.finditer(subheadingPattern, educationContent))
-            
-            for i, match in enumerate(subheadingMatches):
-                university, date, degree, additional = match.groups()
-                
-                # Parse degree and track if present
-                degreeParts = degree.split('|')
-                mainDegree = degreeParts[0].strip() if degreeParts else degree.strip()
-                track = degreeParts[1].strip() if len(degreeParts) > 1 else ""
-                
-                # Find coursework that follows this education entry
-                # Look for coursework between this entry and the next entry (or end of section)
-                startPos = match.end()
-                if i + 1 < len(subheadingMatches):
-                    endPos = subheadingMatches[i + 1].start()
-                    sectionContent = educationContent[startPos:endPos]
-                else:
-                    sectionContent = educationContent[startPos:]
-                
-                # Extract coursework for this specific education entry
-                coursework = []
-                courseworkPattern = r'Coursework:\s*([^\\]+(?:\\vspace[^\\]*)?)'
-                courseworkMatch = re.search(courseworkPattern, sectionContent)
-                if courseworkMatch:
-                    courseworkText = courseworkMatch.group(1).strip()
-                    # Remove any LaTeX formatting like \vspace{-4pt}
-                    courseworkText = re.sub(r'\\vspace\{[^}]*\}', '', courseworkText).strip()
-                    # Split by comma and clean
-                    coursework = [cleanLatexText(course) for course in courseworkText.split(',') if course.strip()]
-                
-                educationEntry = {
-                    "university": university.strip(),
-                    "degree": mainDegree,
-                    "track": track,
-                    "date": date.strip(),
-                    "additional": additional.strip() if additional else "",
-                    "coursework": coursework
+                "education": [],
+                "atsKeywords": "",
+                "metadata": {
+                    "lastUpdated": "",
+                    "version": "1.0",
+                    "created": datetime.now().isoformat()
                 }
-                
-                educationEntries.append(educationEntry)
+            }
             
-            # Store all education entries (consistent with other sections)
-            resumeData["education"] = educationEntries
+            with open(json_path, 'w', encoding='utf-8') as file:
+                json.dump(empty_data, file, indent=2, ensure_ascii=False)
             
-
-        # Extract Certifications
-        try:
-            parsedCertifications = parseCertifications(resumeContent)
-            resumeData["certifications"] = parsedCertifications
-        except Exception as e:
-            # Fallback to old parsing method for compatibility
-            certPattern = r'\\section{Certifications}(.*?)\\vspace{[^}]+}'
-            certMatch = re.search(certPattern, resumeContent, re.DOTALL)
-            if certMatch:
-                certContent = certMatch.group(1).strip()
-                # Extract URLs and text from href patterns
-                href_patterns = re.findall(r'\\href\{([^}]*)\}\{([^}]*)\}', certContent)
-                certifications = []
-                for url, text in href_patterns:
-                    clean_text = cleanLatexText(text)
-                    certifications.append({
-                        "url": url.strip(),
-                        "text": clean_text
-                    })
-                resumeData["certifications"] = certifications
-
-        # Extract Invisible Keywords (ATS Section)
-        invisiblePattern = r'\\pdfliteral direct \{3 Tr\}\s*\n([^%]*?)(?:\n%|\s*\\pdfliteral direct \{0 Tr\})'
-        invisibleMatch = re.search(invisiblePattern, resumeContent, re.DOTALL)
-        if invisibleMatch:
-            invisibleContent = invisibleMatch.group(1).strip()
-            # Clean up any LaTeX comments and normalize whitespace
-            invisibleContent = re.sub(r'%.*?\n', '', invisibleContent)  # Remove comments
-            invisibleContent = re.sub(r'\s+', ' ', invisibleContent)    # Normalize whitespace
-            resumeData["invisibleKeywords"] = invisibleContent.strip()
+            # Add backward compatibility fields
+            empty_data["technicalSkills"] = {}
+            empty_data["invisibleKeywords"] = empty_data.get("atsKeywords", "")
+            
+            return ResumeParseResponse(
+                success=True,
+                resumeData=empty_data,
+                message="New profile created - please fill in your information"
+            )
+        
+        # Load existing JSON data
+        with open(json_path, 'r', encoding='utf-8') as file:
+            resume_data = json.load(file)
+        
+        # Add technicalSkills for backward compatibility if needed
+        if "technicalSkillsCategories" in resume_data and "technicalSkills" not in resume_data:
+            technical_skills = {}
+            for category in resume_data["technicalSkillsCategories"]:
+                category_name = category.get("categoryName", "")
+                skills_text = category.get("skills", "")
+                if category_name and skills_text:
+                    technical_skills[category_name] = skills_text.split(", ")
+            resume_data["technicalSkills"] = technical_skills
+        
+        # Ensure backward compatibility fields exist
+        if "invisibleKeywords" not in resume_data:
+            resume_data["invisibleKeywords"] = resume_data.get("atsKeywords", "")
         
         return ResumeParseResponse(
             success=True,
-            resumeData=resumeData,
-            message="Resume parsed successfully"
+            resumeData=resume_data,
+            message="Resume data loaded successfully"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to load resume data: {str(e)}")
 
 @app.post("/updateResume", response_model=ResumeUpdateResponse)
 async def updateResumeEndpoint(request: ResumeUpdateRequest):
-    """Update the resume.tex file with edited content using template-based regeneration"""
+    """Save resume data to JSON file and optionally generate LaTeX"""
     try:
-        from resume_templates import generate_complete_resume_template
-        
+        json_path = "./resume_data.json"
         resumeData = request.resumeData
         
-        # Generate the complete resume using the template system
-        # This ensures no data is lost and maintains consistent formatting
-        complete_resume_content = generate_complete_resume_template(resumeData)
+        # Add metadata
+        if "metadata" not in resumeData:
+            resumeData["metadata"] = {}
         
-        # Write the complete new resume to file
-        resumeFilePath = "template/resume.tex"
-        with open(resumeFilePath, 'w', encoding='utf-8') as f:
-            f.write(complete_resume_content)
+        resumeData["metadata"]["lastUpdated"] = datetime.now().isoformat()
+        if "version" not in resumeData["metadata"]:
+            resumeData["metadata"]["version"] = "1.0"
+        if "created" not in resumeData["metadata"]:
+            resumeData["metadata"]["created"] = datetime.now().isoformat()
+        
+        # Save to JSON file
+        with open(json_path, 'w', encoding='utf-8') as f:
+            json.dump(resumeData, f, indent=2, ensure_ascii=False)
+        
+        # Optionally generate LaTeX file for backward compatibility
+        try:
+            from resume_templates import generate_complete_resume_template
+            complete_resume_content = generate_complete_resume_template(resumeData)
+            
+            resumeFilePath = "template/resume.tex"
+            with open(resumeFilePath, 'w', encoding='utf-8') as f:
+                f.write(complete_resume_content)
+        except Exception as latex_error:
+            print(f"Warning: Failed to generate LaTeX file: {str(latex_error)}")
+            # Don't fail the entire operation if LaTeX generation fails
         
         return ResumeUpdateResponse(
             success=True,
-            message="Resume updated successfully using template system"
+            message="Resume data saved successfully to JSON"
         )
         
     except Exception as e:
-        print(f"Error updating resume: {str(e)}")
+        print(f"Error saving resume data: {str(e)}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Failed to update resume: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to save resume data: {str(e)}")
 
 @app.post("/extractCompanyInfo", response_model=CompanyPositionResponse)
 async def extractCompanyInfoEndpoint(request: JobDescriptionRequest):

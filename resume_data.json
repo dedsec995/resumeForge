@@ -1,0 +1,108 @@
+{
+  "personalInfo": {
+    "name": "Amit Suresh Luhar",
+    "email": "aluhar1@binghamton.edu",
+    "phone": "(607) 352-0975",
+    "linkedin": "linkedin.com/in/amit-luhar/",
+    "github": "github.com/dedsec995",
+    "website": "https://amitluhar.com/"
+  },
+  "certifications": [
+    {
+      "text": "Natural Language Processing - DeepLearning.AI",
+      "url": "https://www.coursera.org/account/accomplishments/certificate/PXWY38Y7VJZB"
+    },
+    {
+      "text": "TensorFlow Developer Specialization",
+      "url": "https://www.coursera.org/account/accomplishments/specialization/certificate/YW8U4922JT6N"
+    }
+  ],
+  "technicalSkillsCategories": [
+    {
+      "categoryName": "Backend & Cloud",
+      "skills": "Flask, Node, FastApi, Django, REST APIs, Docker, Kubernetes, MLFlow, AWS, Git"
+    },
+    {
+      "categoryName": "ML / AI",
+      "skills": "PyTorch, TensorFlow, Keras, Langchain, Transformers, Scikit-learn, Pandas, NumPy, OpenCV"
+    },
+    {
+      "categoryName": "Languages",
+      "skills": "Python, C++, SQL, Bash, JavaScript/TypeScript"
+    },
+    {
+      "categoryName": "Data & Pipelines",
+      "skills": "PySpark, Apache Airflow, Dask, Kafka, JSON, CSV"
+    }
+  ],
+  "workExperience": [
+    {
+      "jobTitle": "Machine Learning Assistant",
+      "company": "Binghamton University",
+      "location": "Binghamton, NY",
+      "duration": "January 2025 -- Present",
+      "bulletPoints": "Architected 'Data Insight', a **multi-agent AI platform** that accelerates the product development lifecycle by automating **EDA** and feature engineering. System achieved over **90% accuracy** in feature identification, enabling data scientists to rapidly uncover data\nCollaborated in a team of six researchers to architect an automated **AutoML pipeline**, orchestrated agentic workflows for training diverse ML models and leveraged **MLflow** for experiment tracking, resulting 70% reduction in end-to-end analysis"
+    },
+    {
+      "jobTitle": "SafeRide Engineer",
+      "company": "Binghamton University",
+      "location": "Binghamton, NY",
+      "duration": "August 2024 -- December 2024",
+      "bulletPoints": "Developed and deployed a scalable, **LLM-powered chatbot** using Python and **Langchain**, integrating with a existing platform to automate user inquiries\nConstructed Python scripts and tooling to execute **dynamic SQL queries** against database, significantly improving the data processing efficiency of the AI agent and removing human interaction\nImplemented comprehensive **LLM observability using Langfuse** for detailed tracing and cost monitoring, ensuring the reliability and quality of the production service"
+    },
+    {
+      "jobTitle": "Artificial Intelligence Engineer",
+      "company": "Flow.ai",
+      "location": "Austin, Texas",
+      "duration": "January 2024 -- May 2024",
+      "bulletPoints": "Architected end-to-end NLP solutions for Django SaaS platform utilizing **Transformer**, **Bedrock**, **SageMaker**, and **ECS**\nIncreased **Mixtral 8x7B** accuracy in sales-related query processing by **31%** through **document chunk mechanisms** within **RAG**\nReduced **LLM inference latency** to an average of **2.78s** using **vLLM** and **PagedAttention** for optimized **KV cache** handling\nImproved **response times** by **40%** through **Redis caching** of frequent queries, reducing redundant **LLM calls**"
+    },
+    {
+      "jobTitle": "Software Engineer",
+      "company": "Tata Elxsi",
+      "location": "Pune, India",
+      "duration": "August 2021 -- June 2022",
+      "bulletPoints": "Enhanced a **large-scale data processing system** by optimizing a **C++ framework** for **real-time telemetry**, reducing data transmission latency by **21%** (**55.3 ms**) to improve downstream data availability for **millions of vehicles**\nDeveloped a **data pipeline** managing diverse CAN protocols, implementing **thread-safe concurrent data transfer** of **3 million vehicles** data via **Spark**, pipelined through **Kafka**, and scaled with **Kubernetes** to process **100,000+ events/second**\nUtilized **Apache Airflow** to monitor **data pipeline performance**, troubleshoot issues, and ensure **data quality** and **reliability**\nPartnered with the testing team to design a **car emulator**, obviating **testing costs** by eliminating the necessity of physical vehicles for testing"
+    },
+    {
+      "jobTitle": "Software Engineer",
+      "company": "Shree Hari Enterprise",
+      "location": "Mumbai, India",
+      "duration": "January 2020  -- June 2021",
+      "bulletPoints": "Designed and deployed a **dynamic route optimization engine** (**VRP-based**) utilizing **real-time Mumbai traffic data**, reduced **vehicle idle time by 40 minutes per day** and optimized delivery sequences for **400+ daily orders**\nDeveloped a **hyper-local demand forecasting model** using **XGBoost** for **FMCG products**, leveraging **Tally ERP data** and improving **forecast accuracy by 13%** and **preventing stockouts**\nImplemented an **MLOps pipeline** using **MLFlow** for **continuous integration and deployment** of the forecasting model, automating model retraining cycles and **reducing deployment time by 50%**\nCollaborated with stakeholders to decrease excess inventory holding **costs by 7%** while maintaining a **99% service level**"
+    }
+  ],
+  "projects": [
+    {
+      "projectName": "Foodie",
+      "techStack": "Python, LangGraph, OpenAI",
+      "projectLink": "https://github.com/dedsec995/Foodiee/",
+      "linkText": "Source Code",
+      "bulletPoints": "Orchestrated an **agentic workflow using LangGraph** to build an intelligent cooking assistant that automates recipe discovery, scales ingredients for different serving sizes, and manages user inventory"
+    },
+    {
+      "projectName": "Navi Drive",
+      "techStack": "C++, Tensorflow, Android",
+      "projectLink": "http://ijrar.org/viewfull.php?\\&p_id=IJRAR21B1839",
+      "linkText": "Paper",
+      "bulletPoints": "Crafted a real-time solution, fine-tuning **SSD mobilenet v2 keras** for vehicles, traffic signs, traffic lights for object detection\nOptimized and deployed tensorflow lite on edge device, reducing inference to **100ms & 38 mAP** accuracy by **8 bit quantization**"
+    }
+  ],
+  "education": [
+    {
+      "university": "State University of New York at Binghamton",
+      "degree": "Master of Science in Computer Science",
+      "date": "December 2024",
+      "track": "Artificial Intelligence Trakc",
+      "coursework": "Operating Systems, Machine Learning, Computer Architecture, Algorithms and Data Structures"
+    }
+  ],
+  "atsKeywords": "",
+  "metadata": {
+    "lastUpdated": "2025-08-02T19:55:40.054636",
+    "version": "1.0",
+    "created": ""
+  },
+  "technicalSkills": {},
+  "invisibleKeywords": "AWS, EC2, AMAZON WEB SERVICE, production systems, Implement best practices, Kubernetes, NLP, machine learning algorithms, engineering principles"
+}

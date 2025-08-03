@@ -137,10 +137,19 @@ def generate_education_template(education_data):
   \\vspace{{-4pt}}"""
         
         if coursework:
-            # Escape special characters in coursework
-            safe_coursework = [course.replace('%', '\\%').replace('&', '\\&') for course in coursework]
-            coursework_text = ", ".join(safe_coursework)
-            education_content += f"""
+            # Handle both string and array formats for coursework
+            if isinstance(coursework, str):
+                # If it's a string, split by comma
+                coursework_list = [course.strip() for course in coursework.split(',') if course.strip()]
+            else:
+                # If it's already an array, use as is
+                coursework_list = coursework
+            
+            if coursework_list:
+                # Escape special characters in coursework
+                safe_coursework = [course.replace('%', '\\%').replace('&', '\\&') for course in coursework_list]
+                coursework_text = ", ".join(safe_coursework)
+                education_content += f"""
   Coursework: {coursework_text} \\vspace{{-4pt}}
   \\vspace{{-4pt}}"""
     
@@ -153,7 +162,7 @@ def generate_work_experience_template(work_experience_data):
         return ""
     
     work_content = """%-----------WORK EXPERIENCE---------------
-\\section{Work Experience}
+\\section{Work Experience:}
   \\resumeSubHeadingListStart"""
     
     for job in work_experience_data:
@@ -201,8 +210,7 @@ def generate_projects_template(projects_data):
         return ""
     
     projects_content = """%-----------PROJECTS-----------
-\\section{Projects} 
-  \\vspace{-5pt}
+\\section{Projects:}
     \\resumeSubHeadingListStart"""
     
     for i, project in enumerate(projects_data):
@@ -258,7 +266,7 @@ def generate_projects_template(projects_data):
         
         if i < len(projects_data) - 1:  # Add spacing between projects except last
             projects_content += """
-      \\vspace{-20pt}"""
+      \\vspace{-10pt}"""
     
     projects_content += """
     \\resumeSubHeadingListEnd
@@ -421,18 +429,17 @@ def generate_complete_resume_template(resume_data):
     if technical_skills and "Certifications" in technical_skills:
         del technical_skills["Certifications"]
     
-    # Build the complete resume
+    # Build the complete resume - UPDATED ORDER to match new structure
     complete_resume = document_header
     complete_resume += generate_header_template(personal_info)
     complete_resume += "\n\n"
-    complete_resume += generate_technical_skills_template(technical_skills, certifications, technical_skills_categories)
-    complete_resume += "\n\n"
+    # Education comes first (after header)
     complete_resume += generate_education_template(education)
     complete_resume += "\n\n"
+    complete_resume += generate_technical_skills_template(technical_skills, certifications, technical_skills_categories)
+    complete_resume += "\n\n"
     complete_resume += generate_work_experience_template(work_experience)
-    complete_resume += "\n"
-    complete_resume += generate_invisible_keywords_template(invisible_keywords)
-    complete_resume += "\n\\vspace{-24pt}\n"
+    complete_resume += "\n\n"
     complete_resume += generate_projects_template(projects)
     complete_resume += "\n\\vspace{10pt}\n\n\\vspace{-15pt}\n\n\n\n\\end{document}"
     
