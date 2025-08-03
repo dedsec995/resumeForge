@@ -7,6 +7,7 @@ import json
 import os
 import asyncio
 from datetime import datetime
+import uuid
 from agent import (
     get_job_description, extract_info, edit_technical_skills, 
     edit_experience, edit_projects, compile_resume, 
@@ -31,6 +32,9 @@ app.add_middleware(
 # Request/Response Models
 class JobDescriptionRequest(BaseModel):
     jobDescription: str
+
+class WorkflowSessionRequest(BaseModel):
+    sessionId: str
     
 class CompanyPositionResponse(BaseModel):
     companyName: str
@@ -70,6 +74,32 @@ class ResumeUpdateRequest(BaseModel):
 class ResumeUpdateResponse(BaseModel):
     success: bool
     message: str
+
+# Create Resume Models
+class CreateResumeRequest(BaseModel):
+    jobDescription: str
+    jobTitle: Optional[str] = ""
+    companyName: Optional[str] = ""
+
+class CreateResumeResponse(BaseModel):
+    success: bool
+    sessionId: str
+    message: str
+    timestamp: str
+
+class CreateResumeSession(BaseModel):
+    sessionId: str
+    jobDescription: str
+    jobTitle: str
+    companyName: str
+    timestamp: str
+    filePath: str
+    status: str = "created"
+
+class GetSessionsResponse(BaseModel):
+    success: bool
+    sessions: list
+    totalSessions: int
 
 # Global state storage (in production, use Redis or database)
 workflowStates: Dict[str, Dict[str, Any]] = {}
@@ -170,17 +200,17 @@ async def updateResumeEndpoint(request: ResumeUpdateRequest):
         with open(json_path, 'w', encoding='utf-8') as f:
             json.dump(resumeData, f, indent=2, ensure_ascii=False)
         
-        # Optionally generate LaTeX file for backward compatibility
-        try:
-            from resume_templates import generate_complete_resume_template
-            complete_resume_content = generate_complete_resume_template(resumeData)
-            
-            resumeFilePath = "template/resume.tex"
-            with open(resumeFilePath, 'w', encoding='utf-8') as f:
-                f.write(complete_resume_content)
-        except Exception as latex_error:
-            print(f"Warning: Failed to generate LaTeX file: {str(latex_error)}")
-            # Don't fail the entire operation if LaTeX generation fails
+        # LaTeX file generation commented out - only updating JSON
+        # try:
+        #     from resume_templates import generate_complete_resume_template
+        #     complete_resume_content = generate_complete_resume_template(resumeData)
+        #     
+        #     resumeFilePath = "template/resume.tex"
+        #     with open(resumeFilePath, 'w', encoding='utf-8') as f:
+        #         f.write(complete_resume_content)
+        # except Exception as latex_error:
+        #     print(f"Warning: Failed to generate LaTeX file: {str(latex_error)}")
+        #     # Don't fail the entire operation if LaTeX generation fails
         
         return ResumeUpdateResponse(
             success=True,
@@ -387,33 +417,116 @@ async def initializeSessionEndpoint(request: JobDescriptionRequest):
         raise HTTPException(status_code=500, detail=f"Failed to initialize session: {str(e)}")
 
 @app.post("/fullWorkflow", response_model=WorkflowResponse)
-async def fullWorkflowEndpoint(request: JobDescriptionRequest, background_tasks: BackgroundTasks):
+async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks: BackgroundTasks):
     """Run the complete resume tailoring workflow"""
     try:
         import uuid
-        sessionId = str(uuid.uuid4())
+        workflowSessionId = str(uuid.uuid4())
         
-        print(f"Starting full workflow for session: {sessionId}")
+        print(f"Starting full workflow for session: {workflowSessionId}")
+        print(f"Using resume session ID: {request.sessionId}")
         
-        # Initialize state
-        from agent import get_resume_content
-        resumeContent = get_resume_content()
+        # Get complete session data from the resume session
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{request.sessionId}.json"
+        
+        if not os.path.exists(sessions_dir):
+            raise HTTPException(status_code=404, detail="Sessions directory not found")
+        
+        if not os.path.exists(session_file_path):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        with open(session_file_path, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        # Load resume data from the main resume_data.json file
+        resume_data = {}
+        if os.path.exists("resume_data.json"):
+            try:
+                with open("resume_data.json", 'r', encoding='utf-8') as f:
+                    resume_data = json.load(f)
+            except Exception as e:
+                print(f"Warning: Could not load resume_data.json: {e}")
+                resume_data = {}
+        
+        # Combine session data with resume data for complete view
+        complete_data = {
+            **session_data,
+            "resumeData": resume_data
+        }
+        
+        # Print complete session data
+        print("\n" + "="*80)
+        print("COMPLETE SESSION DATA (with resume data)")
+        print("="*80)
+        print(json.dumps(complete_data, indent=2, ensure_ascii=False))
+        print("="*80)
+        print("END OF COMPLETE SESSION DATA")
+        print("="*80 + "\n")
+        
+        # Extract job description
+        job_description = session_data.get("jobDescription", "")
+        
+        # Print job description separately
+        print("\n" + "="*80)
+        print("EXTRACTED JOB DESCRIPTION")
+        print("="*80)
+        print(job_description)
+        print("="*80)
+        print("END OF JOB DESCRIPTION")
+        print("="*80 + "\n")
+        
+        # Print resume data separately
+        print("\n" + "="*80)
+        print("EXTRACTED RESUME DATA")
+        print("="*80)
+        print(json.dumps(resume_data, indent=2, ensure_ascii=False))
+        print("="*80)
+        print("END OF RESUME DATA")
+        print("="*80 + "\n")
+        
+        # Convert resume data to string for agent processing
+        resume_content = json.dumps(resume_data, indent=2, ensure_ascii=False)
+        
         state = {
-            "job_description": request.jobDescription,
-            "resume": resumeContent,
-            "tailored_resume": resumeContent,  # Initialize with original resume
+            "job_description": job_description,
+            "resume": resume_content,
+            "tailored_resume": resume_content,
             "company_name": "",
             "position": "",
             "iteration_count": 0,
             "score": 0.0,
             "feedback": "",
             "downsides": "",
-            "pdf_path": None
+            "pdf_path": None,
+            "session_data": session_data  # Store complete session data
         }
         
-        # Store in session
-        workflowStates[sessionId] = state
+        # Store in workflow session
+        workflowStates[workflowSessionId] = state
         
+        # Print final state breakdown
+        print("\n" + "="*80)
+        print("DEBUG: COMPLETE STATE BREAKDOWN")
+        print("="*80)
+        print(f"Workflow Session ID: {workflowSessionId}")
+        print(f"Resume Session ID: {request.sessionId}")
+        print(f"Job Description Length: {len(state['job_description'])} characters")
+        print(f"Job Description Preview: {state['job_description'][:200]}...")
+        print(f"Resume Content Length: {len(state['resume'])} characters")
+        print(f"Resume Content Preview: {state['resume'][:200]}...")
+        print(f"Company Name: {state['company_name']}")
+        print(f"Position: {state['position']}")
+        print(f"Iteration Count: {state['iteration_count']}")
+        print(f"Score: {state['score']}")
+        print(f"Feedback: {state['feedback']}")
+        print(f"Downsides: {state['downsides']}")
+        print(f"PDF Path: {state['pdf_path']}")
+        print("="*80)
+        print("BREAKPOINT: State initialized with complete session data. Ready for manual inspection.")
+        print("="*80 + "\n")
+        
+        exit()        
         # Step 1: Extract company info
         print("Extracting company information...")
         state.update(extract_info(state))
@@ -509,6 +622,165 @@ async def deleteSessionEndpoint(sessionId: str):
     except Exception as e:
         print(f"Error in deleteSession: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
+
+# Create Resume Endpoints
+@app.post("/createResumeSession", response_model=CreateResumeResponse)
+async def createResumeSessionEndpoint(request: CreateResumeRequest):
+    """Create a new resume session with job description"""
+    try:
+        # Generate unique session ID
+        session_id = str(uuid.uuid4())
+        timestamp = datetime.now().isoformat()
+        
+        # Create session data (without redundant resumeData)
+        session_data = {
+            "sessionId": session_id,
+            "jobDescription": request.jobDescription,
+            "timestamp": timestamp,
+            "status": "created",
+            "metadata": {
+                "created": timestamp,
+                "lastUpdated": timestamp,
+                "wordCount": len(request.jobDescription.split()),
+                "characterCount": len(request.jobDescription)
+            }
+        }
+        
+        # Ensure create_resume_sessions directory exists
+        sessions_dir = "create_resume_sessions"
+        if not os.path.exists(sessions_dir):
+            os.makedirs(sessions_dir)
+        
+        # Save session to individual file
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        with open(session_file_path, 'w', encoding='utf-8') as f:
+            json.dump(session_data, f, indent=2, ensure_ascii=False)
+        
+        # Update index file
+        index_path = "create_resume_index.json"
+        if os.path.exists(index_path):
+            with open(index_path, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+        else:
+            index_data = {"sessions": [], "metadata": {"created": timestamp, "lastUpdated": "", "totalSessions": 0}}
+        
+        # Add session to index
+        session_summary = {
+            "sessionId": session_id,
+            "timestamp": timestamp,
+            "filePath": session_file_path,
+            "status": "created",
+            "preview": request.jobDescription[:200] + "..." if len(request.jobDescription) > 200 else request.jobDescription
+        }
+        
+        index_data["sessions"].insert(0, session_summary)  # Add to beginning (newest first)
+        index_data["metadata"]["lastUpdated"] = timestamp
+        index_data["metadata"]["totalSessions"] = len(index_data["sessions"])
+        
+        if not index_data["metadata"]["created"]:
+            index_data["metadata"]["created"] = timestamp
+        
+        # Save updated index
+        with open(index_path, 'w', encoding='utf-8') as f:
+            json.dump(index_data, f, indent=2, ensure_ascii=False)
+        
+        return CreateResumeResponse(
+            success=True,
+            sessionId=session_id,
+            message="Resume session created successfully",
+            timestamp=timestamp
+        )
+        
+    except Exception as e:
+        print(f"Error creating resume session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to create resume session: {str(e)}")
+
+@app.get("/getResumeSessions", response_model=GetSessionsResponse)
+async def getResumeSessionsEndpoint():
+    """Get all resume sessions"""
+    try:
+        index_path = "create_resume_index.json"
+        
+        if not os.path.exists(index_path):
+            return GetSessionsResponse(
+                success=True,
+                sessions=[],
+                totalSessions=0
+            )
+        
+        with open(index_path, 'r', encoding='utf-8') as f:
+            index_data = json.load(f)
+        
+        return GetSessionsResponse(
+            success=True,
+            sessions=index_data.get("sessions", []),
+            totalSessions=index_data.get("metadata", {}).get("totalSessions", 0)
+        )
+        
+    except Exception as e:
+        print(f"Error fetching resume sessions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch resume sessions: {str(e)}")
+
+@app.get("/getResumeSession/{session_id}")
+async def getResumeSessionEndpoint(session_id: str):
+    """Get a specific resume session by ID"""
+    try:
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        
+        if not os.path.exists(sessions_dir):
+            raise HTTPException(status_code=404, detail="Sessions directory not found")
+        
+        if not os.path.exists(session_file_path):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        with open(session_file_path, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        return {
+            "success": True,
+            "sessionData": session_data
+        }
+        
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Resume session not found")
+    except Exception as e:
+        print(f"Error fetching resume session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch resume session: {str(e)}")
+
+@app.delete("/deleteResumeSession/{session_id}")
+async def deleteResumeSessionEndpoint(session_id: str):
+    """Delete a specific resume session"""
+    try:
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        
+        # Remove session file
+        if os.path.exists(session_file_path):
+            os.remove(session_file_path)
+        
+        # Update index
+        index_path = "create_resume_index.json"
+        if os.path.exists(index_path):
+            with open(index_path, 'r', encoding='utf-8') as f:
+                index_data = json.load(f)
+            
+            # Remove session from index
+            index_data["sessions"] = [s for s in index_data["sessions"] if s["sessionId"] != session_id]
+            index_data["metadata"]["totalSessions"] = len(index_data["sessions"])
+            index_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+            
+            with open(index_path, 'w', encoding='utf-8') as f:
+                json.dump(index_data, f, indent=2, ensure_ascii=False)
+        
+        return {
+            "success": True,
+            "message": "Resume session deleted successfully"
+        }
+        
+    except Exception as e:
+        print(f"Error deleting resume session: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete resume session: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

@@ -70,8 +70,6 @@ const ProfileSection = () => {
             
             if (isNewProfile) {
               toast.success('Welcome! Please fill in your profile information.');
-            } else {
-              toast.success('Resume loaded successfully!');
             }
           } else if (isMounted) {
             toast.error('Failed to load resume');

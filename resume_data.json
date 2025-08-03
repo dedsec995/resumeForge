@@ -19,16 +19,16 @@
   ],
   "technicalSkillsCategories": [
     {
-      "categoryName": "Backend & Cloud",
-      "skills": "Flask, Node, FastApi, Django, REST APIs, Docker, Kubernetes, MLFlow, AWS, Git"
+      "categoryName": "Languages",
+      "skills": "Python, C++, SQL, Bash, JavaScript/TypeScript"
     },
     {
       "categoryName": "ML / AI",
       "skills": "PyTorch, TensorFlow, Keras, Langchain, Transformers, Scikit-learn, Pandas, NumPy, OpenCV"
     },
     {
-      "categoryName": "Languages",
-      "skills": "Python, C++, SQL, Bash, JavaScript/TypeScript"
+      "categoryName": "Backend & Cloud",
+      "skills": "Flask, Node, FastApi, Django, REST APIs, Docker, Kubernetes, MLFlow, AWS, Git"
     },
     {
       "categoryName": "Data & Pipelines",
@@ -99,7 +99,7 @@
   ],
   "atsKeywords": "",
   "metadata": {
-    "lastUpdated": "2025-08-02T19:55:40.054636",
+    "lastUpdated": "2025-08-02T19:59:10.839836",
     "version": "1.0",
     "created": ""
   },
