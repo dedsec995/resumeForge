@@ -93,16 +93,14 @@
       "university": "State University of New York at Binghamton",
       "degree": "Master of Science in Computer Science",
       "date": "December 2024",
-      "track": "Artificial Intelligence Trakc",
+      "track": "Artificial Intelligence Track",
       "coursework": "Operating Systems, Machine Learning, Computer Architecture, Algorithms and Data Structures"
     }
   ],
-  "atsKeywords": "",
   "metadata": {
     "lastUpdated": "2025-08-02T19:59:10.839836",
     "version": "1.0",
     "created": ""
   },
-  "technicalSkills": {},
   "invisibleKeywords": "AWS, EC2, AMAZON WEB SERVICE, production systems, Implement best practices, Kubernetes, NLP, machine learning algorithms, engineering principles"
 }

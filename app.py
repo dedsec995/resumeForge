@@ -8,11 +8,7 @@ import os
 import asyncio
 from datetime import datetime
 import uuid
-from agent import (
-    get_job_description, extract_info, edit_technical_skills, 
-    edit_experience, edit_projects, compile_resume, 
-    judge_resume_quality, decide_after_judging, AgentState
-)
+from agent import workflow
 
 app = FastAPI(
     title="Resume Forge API",
@@ -101,6 +97,11 @@ class GetSessionsResponse(BaseModel):
     sessions: list
     totalSessions: int
 
+class GenerateLatexResponse(BaseModel):
+    success: bool
+    latexFilePath: Optional[str]
+    message: str
+
 # Global state storage (in production, use Redis or database)
 workflowStates: Dict[str, Dict[str, Any]] = {}
 
@@ -131,7 +132,6 @@ async def parseResumeEndpoint():
             "workExperience": [],
             "projects": [],
                 "education": [],
-                "atsKeywords": "",
                 "metadata": {
                     "lastUpdated": "",
                     "version": "1.0",
@@ -142,9 +142,7 @@ async def parseResumeEndpoint():
             with open(json_path, 'w', encoding='utf-8') as file:
                 json.dump(empty_data, file, indent=2, ensure_ascii=False)
             
-            # Add backward compatibility fields
-            empty_data["technicalSkills"] = {}
-            empty_data["invisibleKeywords"] = empty_data.get("atsKeywords", "")
+            empty_data["invisibleKeywords"] = ""
             
             return ResumeParseResponse(
                 success=True,
@@ -156,19 +154,9 @@ async def parseResumeEndpoint():
         with open(json_path, 'r', encoding='utf-8') as file:
             resume_data = json.load(file)
         
-        # Add technicalSkills for backward compatibility if needed
-        if "technicalSkillsCategories" in resume_data and "technicalSkills" not in resume_data:
-            technical_skills = {}
-            for category in resume_data["technicalSkillsCategories"]:
-                category_name = category.get("categoryName", "")
-                skills_text = category.get("skills", "")
-                if category_name and skills_text:
-                    technical_skills[category_name] = skills_text.split(", ")
-            resume_data["technicalSkills"] = technical_skills
-        
-        # Ensure backward compatibility fields exist
+        # Ensure invisibleKeywords field exists
         if "invisibleKeywords" not in resume_data:
-            resume_data["invisibleKeywords"] = resume_data.get("atsKeywords", "")
+            resume_data["invisibleKeywords"] = ""
         
         return ResumeParseResponse(
             success=True,
@@ -420,13 +408,6 @@ async def initializeSessionEndpoint(request: JobDescriptionRequest):
 async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks: BackgroundTasks):
     """Run the complete resume tailoring workflow"""
     try:
-        import uuid
-        workflowSessionId = str(uuid.uuid4())
-        
-        print(f"Starting full workflow for session: {workflowSessionId}")
-        print(f"Using resume session ID: {request.sessionId}")
-        
-        # Get complete session data from the resume session
         sessions_dir = "create_resume_sessions"
         session_file_path = f"{sessions_dir}/{request.sessionId}.json"
         
@@ -439,7 +420,6 @@ async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks
         with open(session_file_path, 'r', encoding='utf-8') as f:
             session_data = json.load(f)
         
-        # Load resume data from the main resume_data.json file
         resume_data = {}
         if os.path.exists("resume_data.json"):
             try:
@@ -448,139 +428,110 @@ async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks
             except Exception as e:
                 print(f"Warning: Could not load resume_data.json: {e}")
                 resume_data = {}
-        
-        # Combine session data with resume data for complete view
-        complete_data = {
-            **session_data,
-            "resumeData": resume_data
-        }
-        
-        # Print complete session data
-        print("\n" + "="*80)
-        print("COMPLETE SESSION DATA (with resume data)")
-        print("="*80)
-        print(json.dumps(complete_data, indent=2, ensure_ascii=False))
-        print("="*80)
-        print("END OF COMPLETE SESSION DATA")
-        print("="*80 + "\n")
-        
-        # Extract job description
+
         job_description = session_data.get("jobDescription", "")
         
-        # Print job description separately
-        print("\n" + "="*80)
-        print("EXTRACTED JOB DESCRIPTION")
-        print("="*80)
-        print(job_description)
-        print("="*80)
-        print("END OF JOB DESCRIPTION")
-        print("="*80 + "\n")
-        
-        # Print resume data separately
-        print("\n" + "="*80)
-        print("EXTRACTED RESUME DATA")
-        print("="*80)
-        print(json.dumps(resume_data, indent=2, ensure_ascii=False))
-        print("="*80)
-        print("END OF RESUME DATA")
-        print("="*80 + "\n")
-        
-        # Convert resume data to string for agent processing
-        resume_content = json.dumps(resume_data, indent=2, ensure_ascii=False)
-        
-        state = {
-            "job_description": job_description,
-            "resume": resume_content,
-            "tailored_resume": resume_content,
-            "company_name": "",
-            "position": "",
-            "iteration_count": 0,
-            "score": 0.0,
-            "feedback": "",
-            "downsides": "",
-            "pdf_path": None,
-            "session_data": session_data  # Store complete session data
+        combined_data = {
+            "sessionId": request.sessionId,
+            "jobDescription": job_description,
+            **resume_data
         }
         
-        # Store in workflow session
-        workflowStates[workflowSessionId] = state
-        
-        # Print final state breakdown
-        print("\n" + "="*80)
-        print("DEBUG: COMPLETE STATE BREAKDOWN")
-        print("="*80)
-        print(f"Workflow Session ID: {workflowSessionId}")
-        print(f"Resume Session ID: {request.sessionId}")
-        print(f"Job Description Length: {len(state['job_description'])} characters")
-        print(f"Job Description Preview: {state['job_description'][:200]}...")
-        print(f"Resume Content Length: {len(state['resume'])} characters")
-        print(f"Resume Content Preview: {state['resume'][:200]}...")
-        print(f"Company Name: {state['company_name']}")
-        print(f"Position: {state['position']}")
-        print(f"Iteration Count: {state['iteration_count']}")
-        print(f"Score: {state['score']}")
-        print(f"Feedback: {state['feedback']}")
-        print(f"Downsides: {state['downsides']}")
-        print(f"PDF Path: {state['pdf_path']}")
-        print("="*80)
-        print("BREAKPOINT: State initialized with complete session data. Ready for manual inspection.")
-        print("="*80 + "\n")
-        
-        exit()        
-        # Step 1: Extract company info
-        print("Extracting company information...")
-        state.update(extract_info(state))
-        
-        # Main workflow loop
-        maxIterations = 3
-        iteration = 0
-        
-        while iteration < maxIterations:
-            iteration += 1
-            print(f"Starting iteration {iteration}")
+        try:
+            result = workflow({"resume_data": combined_data})
             
-            # Step 2: Edit technical skills
-            print("Editing technical skills...")
-            state.update(edit_technical_skills(state))
+            score = result.get("score", 0.0)
+            company_name = result.get("company_name", "")
+            position = result.get("position", "")
+            tailored_resume = result.get("tailored_resume_data", {})
             
-            # Step 3: Edit experience
-            print("Editing experience section...")
-            state.update(edit_experience(state))
+            session_data["workflowResult"] = {
+                "score": score,
+                "company_name": company_name,
+                "position": position,
+                "location": result.get("location", ""),
+                "feedback": result.get("feedback", ""),
+                "downsides": result.get("downsides", ""),
+                "iteration_count": result.get("iteration_count", 0)
+            }
+            session_data["tailoredResume"] = tailored_resume.get("resumeData", {})
+            session_data["status"] = "completed"
+            session_data["completedAt"] = datetime.now().isoformat()
+            session_data["score"] = score
+            session_data["companyName"] = company_name
+            session_data["position"] = position
             
-            # Step 4: Edit projects
-            print("Editing projects section...")
-            state.update(edit_projects(state))
+            with open(session_file_path, 'w', encoding='utf-8') as f:
+                json.dump(session_data, f, indent=2, ensure_ascii=False)
             
-            # Step 5: Judge quality
-            print("Evaluating resume quality...")
-            state.update(judge_resume_quality(state))
-            
-            # Decision point
-            decision = decide_after_judging(state)
-            
-            if decision == "compile_resume" or state["score"] >= 90:
-                print(f"Quality threshold met. Score: {state['score']}")
-                break
+            try:
+                from resume_templates import generate_complete_resume_template
                 
-            print(f"Score {state['score']} below threshold. Continuing iteration...")
-        
-        # Final compilation
-        print("Compiling final resume...")
-        state.update(compile_resume(state))
-        
-        # Update session state
-        workflowStates[sessionId] = state
-        
-        success = state.get("pdf_path") is not None
-        message = f"Workflow completed successfully. Final score: {state.get('score', 0)}" if success else "Workflow completed but compilation failed"
-        
-        return WorkflowResponse(
-            success=success,
-            finalScore=state.get("score", 0),
-            pdfPath=state.get("pdf_path"),
-            iterationCount=state.get("iteration_count", 0),
-            message=message
-        )
+                latex_content = generate_complete_resume_template(tailored_resume.get("resumeData", {}))
+                
+                output_dir = "output"
+                if not os.path.exists(output_dir):
+                    os.makedirs(output_dir)
+                
+                latex_filename = f"resume_{request.sessionId}.tex"
+                latex_file_path = os.path.join(output_dir, latex_filename)
+                
+                with open(latex_file_path, 'w', encoding='utf-8') as f:
+                    f.write(latex_content)
+                
+                session_data["latexFilePath"] = latex_file_path
+                session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+                
+                with open(session_file_path, 'w', encoding='utf-8') as f:
+                    json.dump(session_data, f, indent=2, ensure_ascii=False)
+                    
+            except Exception as latex_error:
+                print(f"Warning: LaTeX generation failed: {str(latex_error)}")
+            
+            index_path = "create_resume_index.json"
+            if os.path.exists(index_path):
+                with open(index_path, 'r', encoding='utf-8') as f:
+                    index_data = json.load(f)
+                
+                for session in index_data["sessions"]:
+                    if session["sessionId"] == request.sessionId:
+                        session["status"] = "completed"
+                        session["score"] = score
+                        session["companyName"] = company_name
+                        session["position"] = position
+                        break
+                
+                index_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+                
+                with open(index_path, 'w', encoding='utf-8') as f:
+                    json.dump(index_data, f, indent=2, ensure_ascii=False)
+            
+            return WorkflowResponse(
+                success=True,
+                finalScore=result.get("score", 0.0),
+                pdfPath=None,
+                iterationCount=result.get("iteration_count", 0),
+                message="Workflow completed successfully"
+            )
+            
+        except Exception as workflow_error:
+            error_data = {
+                "error": str(workflow_error),
+                "timestamp": datetime.now().isoformat(),
+                "sessionId": request.sessionId
+            }
+            
+            error_file_path = f"create_resume_sessions/{request.sessionId}_error.json"
+            with open(error_file_path, 'w', encoding='utf-8') as f:
+                json.dump(error_data, f, indent=2, ensure_ascii=False)
+            
+            return WorkflowResponse(
+                success=False,
+                finalScore=0.0,
+                pdfPath=None,
+                iterationCount=0,
+                message=f"Workflow failed: {str(workflow_error)}"
+            )
         
     except Exception as e:
         print(f"Error in fullWorkflow: {str(e)}")
@@ -723,7 +674,6 @@ async def getResumeSessionsEndpoint():
 
 @app.get("/getResumeSession/{session_id}")
 async def getResumeSessionEndpoint(session_id: str):
-    """Get a specific resume session by ID"""
     try:
         sessions_dir = "create_resume_sessions"
         session_file_path = f"{sessions_dir}/{session_id}.json"
@@ -737,6 +687,10 @@ async def getResumeSessionEndpoint(session_id: str):
         with open(session_file_path, 'r', encoding='utf-8') as f:
             session_data = json.load(f)
         
+        if session_data.get("latexFilePath") and os.path.exists(session_data["latexFilePath"]):
+            with open(session_data["latexFilePath"], 'r', encoding='utf-8') as f:
+                session_data["latexContent"] = f.read()
+        
         return {
             "success": True,
             "sessionData": session_data
@@ -745,7 +699,6 @@ async def getResumeSessionEndpoint(session_id: str):
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="Resume session not found")
     except Exception as e:
-        print(f"Error fetching resume session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch resume session: {str(e)}")
 
 @app.delete("/deleteResumeSession/{session_id}")
@@ -781,6 +734,127 @@ async def deleteResumeSessionEndpoint(session_id: str):
     except Exception as e:
         print(f"Error deleting resume session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete resume session: {str(e)}")
+
+@app.post("/generateLatex/{session_id}", response_model=GenerateLatexResponse)
+async def generateLatexEndpoint(session_id: str):
+    try:
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        
+        if not os.path.exists(sessions_dir):
+            raise HTTPException(status_code=404, detail="Sessions directory not found")
+        
+        if not os.path.exists(session_file_path):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        with open(session_file_path, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        if session_data.get("status") != "completed" or not session_data.get("tailoredResume"):
+            raise HTTPException(status_code=400, detail="Session not completed or no tailored resume data available")
+        
+        from resume_templates import generate_complete_resume_template
+        
+        latex_content = generate_complete_resume_template(session_data["tailoredResume"])
+        
+        output_dir = "output"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        latex_filename = f"resume_{session_id}.tex"
+        latex_file_path = os.path.join(output_dir, latex_filename)
+        
+        with open(latex_file_path, 'w', encoding='utf-8') as f:
+            f.write(latex_content)
+        
+        session_data["latexFilePath"] = latex_file_path
+        session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+        
+        with open(session_file_path, 'w', encoding='utf-8') as f:
+            json.dump(session_data, f, indent=2, ensure_ascii=False)
+        
+        return GenerateLatexResponse(
+            success=True,
+            latexFilePath=latex_file_path,
+            message="LaTeX file generated successfully"
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate LaTeX file: {str(e)}")
+
+@app.get("/downloadPDF/{session_id}")
+async def downloadPDFEndpoint(session_id: str):
+    try:
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        
+        if not os.path.exists(session_file_path):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        with open(session_file_path, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        latex_file_path = session_data.get("latexFilePath")
+        if not latex_file_path or not os.path.exists(latex_file_path):
+            raise HTTPException(status_code=404, detail="LaTeX file not found. Please generate LaTeX first.")
+        
+        from latex2pdf import compile_latex
+        output_dir = os.path.dirname(latex_file_path)
+        
+        try:
+            compile_latex(latex_file_path, output_dir)
+        except Exception as compile_error:
+            raise HTTPException(status_code=500, detail=f"LaTeX compilation failed: {str(compile_error)}")
+        
+        pdf_filename = f"resume_{session_id}.pdf"
+        pdf_file_path = os.path.join(output_dir, pdf_filename)
+        
+        if not os.path.exists(pdf_file_path):
+            raise HTTPException(status_code=500, detail="PDF generation failed. The LaTeX file could not be compiled to PDF. Please check the LaTeX content for errors.")
+        
+        session_data["pdfFilePath"] = pdf_file_path
+        session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+        
+        with open(session_file_path, 'w', encoding='utf-8') as f:
+            json.dump(session_data, f, indent=2, ensure_ascii=False)
+        
+        return FileResponse(
+            path=pdf_file_path,
+            media_type='application/pdf',
+            filename=pdf_filename
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download PDF: {str(e)}")
+
+@app.get("/downloadLatex/{session_id}")
+async def downloadLatexEndpoint(session_id: str):
+    try:
+        sessions_dir = "create_resume_sessions"
+        session_file_path = f"{sessions_dir}/{session_id}.json"
+        
+        if not os.path.exists(session_file_path):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        with open(session_file_path, 'r', encoding='utf-8') as f:
+            session_data = json.load(f)
+        
+        latex_file_path = session_data.get("latexFilePath")
+        if not latex_file_path or not os.path.exists(latex_file_path):
+            raise HTTPException(status_code=404, detail="LaTeX file not found")
+        
+        latex_filename = f"resume_{session_id}.tex"
+        
+        return FileResponse(
+            path=latex_file_path,
+            media_type='application/x-tex',
+            filename=latex_filename
+        )
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to download LaTeX: {str(e)}")
 
 if __name__ == "__main__":
     import uvicorn

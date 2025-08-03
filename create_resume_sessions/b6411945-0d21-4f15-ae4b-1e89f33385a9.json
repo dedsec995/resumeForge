@@ -1,25 +1,25 @@
 {
-  "sessionId": "d82b7e61-0cc2-489f-842d-eba9a0f6df71",
+  "sessionId": "b6411945-0d21-4f15-ae4b-1e89f33385a9",
   "jobDescription": "Machine Learning Engineer (Hybrid)\nat Weedmaps (View all jobs)\nAustin, TX\nMachine Learning Engineer (Hybrid - Onsite 2 days a week)\n\nOverview:\n\nThe Machine Learning Engineer at Weedmaps will be a key technical contributor within our Data organization. In this role you will build and deploy sophisticated AI and machine learning systems that power our marketplace and e-commerce platform. The ideal candidate is a hands-on ML practitioner with strong software engineering fundamentals who can build end-to-end systems that deliver measurable business impact. You will collaborate extensively with cross-functional teams, including Product to understand user needs and translate them into ML solutions; Engineering to integrate ML systems into our broader ecosystem; Data and Analytics to leverage insights and coordinate on data strategies; as well as stakeholders across the business to ensure ML initiatives are aligned with company objectives.\n\nAs part of our Data organization, you will develop and deploy machine learning solutions that address unique challenges in our marketplace, including product matching, personalized recommendations that comply with complex regulatory requirements, and data-driven optimizations across our marketplace. The explosive growth of the cannabis industry requires increasingly sophisticated ML solutions that can scale with our business.\n\nThe impact you'll make:\n\nDevelop production-ready Python-based ML models with a focus on advanced NLP, similarity metrics, and product matching and recommendations\nCreate and refine machine learning pipelines that can handle the unique challenges of our product data, including inconsistent naming and categorization\nDevelop comprehensive evaluation frameworks including evals and metrics to benchmark ML model performance in real-world scenarios\nImplement automated evaluation pipelines to continuously monitor model performance in production\nBuild and maintain scalable ML infrastructure using a mix of managed services (eg AWS SageMaker) and custom services (such as function as a service apps on Kubernetes)\nImplement best practices for model serving, versioning, and monitoring in production environments\nOptimize model deployment pipelines for reliability, performance, and cost-efficiency\nDesign, implement, and analyze A/B (or MAB) tests to evaluate ML system performance in production systems (e.g. with Optimizely or similar tools), ensuring that ML systems achieve business objectives\nDesign and build API-based microservices that integrate ML functionality into our broader engineering ecosystem, ideally creating reusable ML components that can be leveraged across multiple product lines\nWhat you've accomplished:\n\nBachelor's degree in Computer Science, Data Science, or related quantitative field\n2+ years of experience building and deploying machine learning models in production environments\n4+ Years of relevant experience in Machine Learning, Data Science, Data/Software Engineering.\nStrong programming skills in Python and experience with modern LLM endpoints\nExperience with MLOps practices for model monitoring, maintenance, and lifecycle management\nDemonstrated expertise in machine learning algorithms and frameworks (e.g. TensorFlow, PyTorch, or scikit-learn) as well as modern LLM systems (Anthropic, OpenAI) with a proven track record of deploying models to production\nProficiency in software engineering best practices, including version control, code review, testing, and documentation\nStrong understanding of data engineering principles and experience with data preprocessing, feature engineering, and data quality assurance\nHistory of effective collaboration with cross-functional teams to deliver ML solutions that drive measurable business results\nExperience communicating complex ML concepts to both technical and non-technical stakeholders\nExperience with cloud computing platforms, preferably AWS (particularly SageMaker and Bedrock)\nBonus points:\n\nExperience using AI endpoints such as Claude or ChatGPT for embeddings and more advanced AI pipeline use cases such as hybrid ranking systems leveraging RAG with AI-based re-rankers that optimize specific metrics (e.g. precision)\nSuccessfully built and deployed ML systems that solved real business problems in e-commerce or marketplace environments\nE-commerce or marketplace business experience preferred\nRegulated industry experience - nice to have\nThe base pay range for this position is $181,875.00 - $200,645.00 per year\n\n2025 Benefits for Full Time, Regular Employees:\n\nPhysical Health benefits: Medical, Dental & Vision:\nEmployee - employer paid premium 100%\nCompany contribution to a HSA when electing the High Deductible Health Plan\nFor plans that offer coverage to your dependents, you pay a small contribution\nMental Health benefits:\nFree access to CALM app for employees and dependents\nEmployee Training\nMental Health seminars and Q&A sessions\nBasic Life & AD&D - employer paid 1x salary up to $250,000\n401(k) Retirement Plan (with employer match contribution)\nGenerous PTO, Paid Sick Leave, and Company Holidays\nSupplemental, voluntary benefits\nStudent Loan Repayment/529 Education Savings - including a company contribution\nFSA (Medical, Dependent, Transit and Parking)\nVoluntary Life and AD&D Insurance\nCritical Illness Insurance\nAccident Insurance\nShort- and Long-term Disability Insurance\nPet Insurance\nFamily planning/fertility\nIdentity theft protection\nLegal access to a network of attorneys\nPaid parental leave\nWhy Work at Weedmaps?\n\nYou get to work at the leading technology company in the cannabis industry\nYou get to play a meaningful role in helping to advance cannabis causes, including helping improve the lives of patients who rely on the benefits of cannabis\nYou get an opportunity to shape the future of the cannabis industry\nYou get to work on challenging issues in a collaborative environment that encourages you to do your best \nYou get to work in a casual and fun environment; no fancy clothes required, but you are free to dress to the nines!\nGenerous PTO and company holidays\nNumerous opportunities and tools to learn and grow your professional skills\nEndless opportunities to network and connect with other Weedmappers through speaker series, Employee Resource Groups, happy hours, team celebrations, game nights, and much more!",
-  "timestamp": "2025-08-03T02:58:33.440073",
+  "timestamp": "2025-08-03T12:59:16.227640",
   "status": "completed",
   "metadata": {
-    "created": "2025-08-03T02:58:33.440073",
-    "lastUpdated": "2025-08-03T14:08:50.101947",
+    "created": "2025-08-03T12:59:16.227640",
+    "lastUpdated": "2025-08-03T13:31:57.425171",
     "wordCount": 886,
     "characterCount": 6327
   },
   "workflowResult": {
-    "score": 92.0,
+    "score": 95.0,
     "company_name": "Weedmaps",
     "position": "Machine Learning Engineer",
     "location": "Austin, TX",
-    "feedback": "The resume is well-tailored to the job description of a Machine Learning Engineer at Weedmaps. The candidate has a strong background in machine learning, data science, and software engineering, which aligns well with the job requirements. The candidate's experience in developing production-ready Python-based ML models, creating and refining machine learning pipelines, and implementing automated evaluation pipelines is particularly impressive. The candidate's work experience and projects demonstrate a strong understanding of machine learning algorithms and frameworks, MLOps practices, and software engineering best practices. The candidate also has experience with cloud computing platforms, specifically AWS and AWS SageMaker, which is a plus. The candidate's certifications in Natural Language Processing and TensorFlow Developer Specialization further strengthen their qualifications. The candidate's communication skills, as evidenced by their experience in communicating complex ML concepts to both technical and non-technical stakeholders, are also a strong point.",
-    "downsides": "While the candidate's resume is generally strong, there are a few areas that could be improved. The candidate could provide more specific examples of their experience in designing, implementing, and analyzing A/B (or MAB) tests to evaluate ML system performance in production systems. The candidate could also provide more details about their experience in building and maintaining scalable ML infrastructure using a mix of managed services and custom services. Additionally, the candidate could provide more information about their experience in optimizing model deployment pipelines for reliability, performance, and cost-efficiency. Finally, the candidate could provide more details about their experience in working in a regulated industry, if applicable.",
+    "feedback": "The resume is highly tailored to the job description of a Machine Learning Engineer at Weedmaps. The candidate has a strong background in machine learning, data science, and software engineering, which aligns with the job requirements. The candidate's experience in developing and deploying machine learning models, NLP solutions, and managing ML lifecycle is particularly impressive. The use of quantifiable achievements in the work experience section is commendable. The candidate's technical skills section is well-aligned with the job description, showcasing proficiency in Python, TensorFlow, PyTorch, Scikit-learn, AWS, and SageMaker among others. The candidate's projects also demonstrate relevant skills and experience.",
+    "downsides": "While the resume is highly tailored, there are a few areas that could be improved. The candidate could have included more specific examples of collaboration with cross-functional teams and communication with non-technical stakeholders. The resume could also benefit from more specific examples of experience in e-commerce or marketplace environments, as this is a preferred qualification in the job description. Lastly, the candidate could have included more keywords from the job description in the ATS keywords section.",
     "iteration_count": 1
   },
   "tailoredResume": {
-    "sessionId": "d82b7e61-0cc2-489f-842d-eba9a0f6df71",
+    "sessionId": "b6411945-0d21-4f15-ae4b-1e89f33385a9",
     "personalInfo": {
       "name": "Amit Suresh Luhar",
       "email": "aluhar1@binghamton.edu",
@@ -41,31 +41,27 @@
     "technicalSkillsCategories": [
       {
         "categoryName": "Languages",
-        "skills": "Python"
+        "skills": "Python, SQL"
       },
       {
         "categoryName": "ML / AI",
-        "skills": "TensorFlow, PyTorch, Scikit-learn, AWS SageMaker, Machine Learning Model Deployment, Model Monitoring, Model Versioning, AI-based Re-ranking"
+        "skills": "PyTorch, TensorFlow, Scikit-learn, NLP, Similarity Metrics, Product Matching and Recommendations, Model Evaluation and Monitoring, A/B Testing, Machine Learning Lifecycle Management"
       },
       {
         "categoryName": "Backend & Cloud",
-        "skills": "AWS, AWS SageMaker, Kubernetes, Microservices, API development, Model Deployment Optimization"
+        "skills": "AWS, AWS SageMaker, API-based Microservices, Kubernetes, Version Control, Code Review, Testing, Documentation"
       },
       {
         "categoryName": "Data & Pipelines",
-        "skills": "Data Preprocessing, Feature Engineering, Data Quality Assurance, Machine Learning Pipelines"
+        "skills": "Data Preprocessing, Feature Engineering, Data Quality Assurance"
       },
       {
         "categoryName": "MLOps",
-        "skills": "Model Monitoring, Model Maintenance, Lifecycle Management, A/B or MAB testing"
+        "skills": "Model Deployment, Monitoring, Maintenance, and Lifecycle Management"
       },
       {
-        "categoryName": "Software Engineering Practices",
-        "skills": "Version Control, Code Review, Testing, Documentation"
-      },
-      {
-        "categoryName": "Communication",
-        "skills": "Technical and Non-technical Stakeholder Communication"
+        "categoryName": "Collaboration & Communication",
+        "skills": "Cross-functional Collaboration, Technical and Non-technical Communication"
       }
     ],
     "workExperience": [
@@ -74,35 +70,35 @@
         "company": "Binghamton University",
         "location": "Binghamton, NY",
         "duration": "January 2025 -- Present",
-        "bulletPoints": "Developed 'Data Insight', a **multi-agent AI platform** that improved product development lifecycle by automating **EDA** and feature engineering, resulting in **90% accuracy** in feature identification and enabling data scientists to quickly identify critical data insights\nIn a team of six, architected an automated **AutoML pipeline** that streamlined the training of diverse ML models, leveraged **MLflow** for experiment tracking, and achieved a 70% reduction in end-to-end analysis time"
+        "bulletPoints": "Led the creation of 'Data Insight', an **AI platform** that automated **EDA** and feature engineering, achieving a **90% accuracy** rate in feature identification, thus expediting data scientists' work\nWorked with a team of six to architect an **AutoML pipeline** that streamlined workflows for diverse ML model training and utilized **MLflow** for experiment tracking, resulting in a 70% reduction in end-to-end analysis time"
       },
       {
         "jobTitle": "SafeRide Engineer",
         "company": "Binghamton University",
         "location": "Binghamton, NY",
         "duration": "August 2024 -- December 2024",
-        "bulletPoints": "Engineered an **LLM-powered chatbot** using Python and **Langchain** which was integrated into an existing platform to automate user inquiries, significantly improving customer service efficiency\nConstructed Python scripts to execute **dynamic SQL queries**, improving data processing efficiency by 30% and automating previously manual tasks\nImplemented **LLM observability using Langfuse** for detailed tracing and cost monitoring, improving the reliability and quality of the production service by 20%"
+        "bulletPoints": "Developed and deployed a scalable, **LLM-powered chatbot** using Python and **Langchain**, integrated with an existing platform to automate user inquiries\nConstructed Python scripts to execute **dynamic SQL queries** against a database, greatly enhancing the AI agent's data processing efficiency and eliminating the need for human interaction\nImplemented comprehensive **LLM observability using Langfuse** for detailed tracing and cost monitoring, ensuring the reliability and quality of the production service"
       },
       {
         "jobTitle": "Artificial Intelligence Engineer",
         "company": "Flow.ai",
         "location": "Austin, Texas",
         "duration": "January 2024 -- May 2024",
-        "bulletPoints": "Designed end-to-end NLP solutions for Django SaaS platform with **Transformer**, **Bedrock**, **SageMaker**, and **ECS**, streamlining business operations by 30%\nIncreased **Mixtral 8x7B** accuracy in sales-related query processing by **31%** through **document chunk mechanisms** within **RAG**\nOptimized **LLM inference latency** to an average of **2.78s** using **vLLM** and **PagedAttention** for **KV cache** handling, improving customer experience by 40%\nEnhanced **response times** by **40%** through **Redis caching** of frequent queries, reducing redundant **LLM calls** and improving system efficiency"
+        "bulletPoints": "Led the development of end-to-end NLP solutions for a Django SaaS platform utilizing **Transformer**, **Bedrock**, **SageMaker**, and **ECS**\nImproved **Mixtral 8x7B** accuracy in sales-related query processing by **31%** through the implementation of **document chunk mechanisms** within **RAG**\nOptimized **LLM inference latency** to an average of **2.78s** using **vLLM** and **PagedAttention** for efficient **KV cache** management\nReduced **response times** by **40%** through **Redis caching** of frequent queries, minimizing redundant **LLM calls**"
       },
       {
         "jobTitle": "Software Engineer",
         "company": "Tata Elxsi",
         "location": "Pune, India",
         "duration": "August 2021 -- June 2022",
-        "bulletPoints": "Optimized a **large-scale data processing system** by enhancing a **C++ framework** for **real-time telemetry**, reducing data transmission latency by **21%** (**55.3 ms**) and improving downstream data availability for **millions of vehicles**\nDeveloped a **data pipeline** for managing diverse CAN protocols, implemented **thread-safe concurrent data transfer** of **3 million vehicles** data via **Spark**, and scaled with **Kubernetes** to process **100,000+ events/second**\nUtilized **Apache Airflow** to monitor **data pipeline performance**, troubleshoot issues, and ensure **data quality** and **reliability**\nCollaborated with the testing team to design a **car emulator**, reducing **testing costs** by eliminating the need for physical vehicles"
+        "bulletPoints": "Boosted the efficiency of a **large-scale data processing system** by optimizing a **C++ framework** for **real-time telemetry**, resulting in a **21%** reduction in data transmission latency (**55.3 ms**) and improved data availability for **millions of vehicles**\nDeveloped a **data pipeline** managing diverse CAN protocols, implemented **thread-safe concurrent data transfer** of **3 million vehicles** data via **Spark**, pipelined through **Kafka**, and scaled with **Kubernetes** to process **100,000+ events/second**\nLeveraged **Apache Airflow** to monitor **data pipeline performance**, troubleshoot issues, and ensure **data quality** and **reliability**\nWorked with the testing team to design a **car emulator**, eliminating the need for physical vehicles for testing and significantly reducing **testing costs**"
       },
       {
         "jobTitle": "Software Engineer",
         "company": "Shree Hari Enterprise",
         "location": "Mumbai, India",
         "duration": "January 2020  -- June 2021",
-        "bulletPoints": "Designed and deployed a **dynamic route optimization engine** (**VRP-based**) utilizing **real-time Mumbai traffic data**, reduced **vehicle idle time by 40 minutes per day** and optimized delivery sequences for **400+ daily orders**\nDeveloped a **hyper-local demand forecasting model** using **XGBoost** for **FMCG products**, leveraging **Tally ERP data** and improving **forecast accuracy by 13%**, preventing stockouts\nImplemented an **MLOps pipeline** using **MLFlow** for **continuous integration and deployment** of the forecasting model, automating model retraining cycles and **reducing deployment time by 50%**\nCollaborated with stakeholders to decrease excess inventory holding **costs by 7%** while maintaining a **99% service level**"
+        "bulletPoints": "Designed and deployed a **dynamic route optimization engine** (**VRP-based**) utilizing **real-time Mumbai traffic data**, leading to a daily reduction of **vehicle idle time by 40 minutes** and an optimized delivery sequence for **400+ daily orders**\nDeveloped a **hyper-local demand forecasting model** using **XGBoost** for **FMCG products**, leveraging **Tally ERP data**, which improved **forecast accuracy by 13%** and prevented stockouts\nImplemented an **MLOps pipeline** using **MLFlow** for **continuous integration and deployment** of the forecasting model, automating model retraining cycles and reducing deployment time by 50%\nCollaborated with stakeholders to decrease excess inventory holding costs by 7% while maintaining a 99% service level"
       }
     ],
     "projects": [
@@ -112,10 +108,10 @@
         "projectLink": "https://github.com/dedsec995/Foodiee/",
         "linkText": "Source Code",
         "bulletPoints": [
-          "Leveraged **Python** and **OpenAI** to develop an intelligent cooking assistant, Foodie, addressing the challenge of automating recipe discovery and ingredient management.",
-          "Designed an **agentic workflow using LangGraph**, enabling the system to intelligently scale ingredients for varying serving sizes, leading to enhanced user experience.",
-          "Implemented advanced **NLP techniques** to process and understand user queries, resulting in a more intuitive and user-friendly application.",
-          "The system was able to handle **1000+ user queries per day**, demonstrating its scalability and robustness."
+          "In response to the challenge of automating recipe discovery and ingredient management, I developed an intelligent cooking assistant, Foodie, using **Python** and **LangGraph**.",
+          "I was responsible for designing and implementing the **machine learning** algorithms that powered the assistant's decision-making capabilities.",
+          "I accomplished a **20% improvement in recipe recommendation accuracy** by integrating **OpenAI** into the existing system, enabling more personalized and relevant suggestions.",
+          "The project resulted in a user-friendly platform that could scale ingredients for different serving sizes and manage user inventory, enhancing the overall user experience."
         ]
       },
       {
@@ -124,11 +120,11 @@
         "projectLink": "http://ijrar.org/viewfull.php?\\&p_id=IJRAR21B1839",
         "linkText": "Paper",
         "bulletPoints": [
-          "Developed Navi Drive, a real-time object detection solution for vehicles, traffic signs, and traffic lights, addressing the need for safer and smarter navigation systems.",
-          "Fine-tuned **SSD mobilenet v2 keras** model using **Tensorflow**, improving object detection accuracy to **38 mAP**.",
-          "Optimized and deployed the model on an edge device using **Tensorflow Lite**, reducing inference time to **100ms**.",
-          "Implemented **8 bit quantization** to optimize the model, demonstrating strong skills in **MLOps practices** and model lifecycle management.",
-          "The system was successfully tested on **100+ hours of driving footage**, proving its reliability and real-world applicability."
+          "Faced with the task of improving real-time object detection in a driving environment, I developed Navi Drive, a solution that utilized **Tensorflow** and **SSD mobilenet v2 keras**.",
+          "I was responsible for fine-tuning the model for detecting vehicles, traffic signs, and traffic lights, which resulted in a **38 mAP** accuracy.",
+          "By optimizing and deploying the model on an edge device using **Tensorflow Lite**, I achieved a reduction in inference time to **100ms**.",
+          "This accomplishment was further enhanced by **8 bit quantization**, which improved the model's performance and efficiency.",
+          "The project resulted in a more responsive and reliable driving assistant, contributing to safer and more efficient driving experiences."
         ]
       }
     ],
@@ -146,11 +142,11 @@
       "version": "1.0",
       "created": ""
     },
-    "invisibleKeywords": "Python, TensorFlow, PyTorch, Scikit-learn, AWS SageMaker, Machine Learning Model Deployment, Model Monitoring, Model Versioning, AI-based Re-ranking, Kubernetes, Microservices, API development, Data Preprocessing, Feature Engineering, MLOps"
+    "invisibleKeywords": "Machine Learning, Python, AWS SageMaker, NLP, TensorFlow, Scikit-learn, Model Evaluation, A/B Testing, MLOps, API-based Microservices, Kubernetes, Data Preprocessing, Feature Engineering, Cross-functional Collaboration, ML Lifecycle Management"
   },
-  "completedAt": "2025-08-03T13:11:41.651579",
-  "score": 92.0,
+  "completedAt": "2025-08-03T13:00:35.347151",
+  "score": 95.0,
   "companyName": "Weedmaps",
   "position": "Machine Learning Engineer",
-  "latexFilePath": "output\\resume_d82b7e61-0cc2-489f-842d-eba9a0f6df71.tex"
+  "latexFilePath": "output\\resume_b6411945-0d21-4f15-ae4b-1e89f33385a9.tex"
 }

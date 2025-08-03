@@ -402,21 +402,19 @@ def generate_complete_resume_template(resume_data):
     # Generate each section
     personal_info = resume_data.get("personalInfo", {})
     
-    # Handle both old and new technical skills format
-    technical_skills = resume_data.get("technicalSkills", {})
+    # Get technical skills categories
     technical_skills_categories = resume_data.get("technicalSkillsCategories", [])
     
-    # Convert new format to old format if needed, preserving order
-    if technical_skills_categories and not technical_skills:
-        technical_skills = {}
-        for category in technical_skills_categories:
-            category_name = category.get("categoryName", "").strip()
-            skills_text = category.get("skills", "").strip()
-            if category_name and skills_text:
-                # Split comma-separated skills into list
-                skills_list = [skill.strip() for skill in skills_text.split(",") if skill.strip()]
-                if skills_list:
-                    technical_skills[category_name] = skills_list
+    # Convert categories to skills format for template generation
+    technical_skills = {}
+    for category in technical_skills_categories:
+        category_name = category.get("categoryName", "").strip()
+        skills_text = category.get("skills", "").strip()
+        if category_name and skills_text:
+            # Split comma-separated skills into list
+            skills_list = [skill.strip() for skill in skills_text.split(",") if skill.strip()]
+            if skills_list:
+                technical_skills[category_name] = skills_list
     
     education = resume_data.get("education", [])
     certifications = resume_data.get("certifications", [])
