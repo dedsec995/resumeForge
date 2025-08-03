@@ -37,3 +37,13 @@ def extract_and_parse_json(text: str):
         return json.loads(json_str)
     except json.JSONDecodeError:
         return None
+
+def parse_keywords_from_json(text: str) -> str:
+    """
+    Extracts keywords from a JSON object string and returns them as a comma-separated string.
+    The JSON is expected to have a "keywords" key with a list of strings.
+    """
+    data = extract_and_parse_json(text)
+    if data and "keywords" in data and isinstance(data["keywords"], list):
+        return ", ".join(data["keywords"])
+    return ""
