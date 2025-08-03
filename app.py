@@ -168,14 +168,29 @@ async def parseResumeEndpoint():
             
             resumeData["technicalSkills"] = skillsDict
             
-            # Also create the new frontend-compatible format
+            # Also create the new frontend-compatible format, preserving order from LaTeX
             technical_skills_categories = []
-            for category, skills in skillsDict.items():
-                if category.lower() != "certifications" and isinstance(skills, list):
-                    technical_skills_categories.append({
-                        "categoryName": category,
-                        "skills": ", ".join(skills)
-                    })
+            # Use the original order from the regex matches
+            for category, skillsText in categoryMatches:
+                categoryClean = category.replace('\\', '').strip()
+                if categoryClean.lower() != "certifications":
+                    # Split skills by comma and clean them
+                    skillsList = []
+                    if skillsText:
+                        skillsRaw = re.split(r',\s*', skillsText)
+                        for skill in skillsRaw:
+                            # Clean LaTeX formatting
+                            skillClean = re.sub(r'\\[a-zA-Z]+\{([^}]*)\}', r'\1', skill)
+                            skillClean = re.sub(r'\\[a-zA-Z]+', '', skillClean)
+                            skillClean = skillClean.strip()
+                            if skillClean:
+                                skillsList.append(skillClean)
+                    
+                    if skillsList:  # Only add if there are skills
+                        technical_skills_categories.append({
+                            "categoryName": categoryClean,
+                            "skills": ", ".join(skillsList)
+                        })
             resumeData["technicalSkillsCategories"] = technical_skills_categories
         
 
@@ -286,6 +301,10 @@ async def parseResumeEndpoint():
                     cleanTechStack = re.sub(r'\\BeginAccSupp\{[^}]*\}(.*?)\\EndAccSupp\{\}', r'\1', techStack)
                     cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', cleanTechStack.strip())
                     cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
+                    
+                    # Convert pipe-separated format to comma-separated for UI editing
+                    if '|' in cleanTechStack:
+                        cleanTechStack = ', '.join([tech.strip() for tech in cleanTechStack.split('|') if tech.strip()])
                     
                     # Extract bullet points with nested braces support
                     bullets = []

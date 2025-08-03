@@ -37,9 +37,9 @@ def generate_header_template(personal_info):
     
     return header
 
-def generate_technical_skills_template(skills_data, certifications_data=None):
+def generate_technical_skills_template(skills_data, certifications_data=None, ordered_categories=None):
     """Generate the technical skills section including certifications"""
-    if not skills_data:
+    if not skills_data and not ordered_categories:
         return ""
     
     skills_content = """%-----------TECHNICAL SKILLS-----------
@@ -49,14 +49,35 @@ def generate_technical_skills_template(skills_data, certifications_data=None):
     \\small{\\item{   
 """
     
-    # First, process all non-certification categories
-    for category, skills in skills_data.items():
-        if isinstance(skills, list) and skills and category.lower() != "certifications":
-            # Regular skills categories (not certifications)
-            safe_category = category.replace('%', '\\%').replace('&', '\\&')
-            skills_escaped = [skill.replace('%', '\\%').replace('&', '\\&') for skill in skills]
-            skills_text = ", ".join(skills_escaped)
-            skills_content += f"    \\textbf{{{safe_category}}}{{: {skills_text}}} \\\\ [1mm]\n"
+    # Use ordered categories if available, otherwise fall back to dictionary order
+    if ordered_categories:
+        # Process categories in the order they appear in the frontend
+        for category in ordered_categories:
+            category_name = category.get("categoryName", "").strip()
+            skills_text = category.get("skills", "").strip()
+            
+            # Skip empty categories or certifications (handled separately)
+            if not category_name or category_name.lower() == "certifications":
+                continue
+                
+            if skills_text:
+                # Split comma-separated skills into list
+                skills_list = [skill.strip() for skill in skills_text.split(",") if skill.strip()]
+                if skills_list:
+                    # Regular skills categories (not certifications)
+                    safe_category = category_name.replace('%', '\\%').replace('&', '\\&')
+                    skills_escaped = [skill.replace('%', '\\%').replace('&', '\\&') for skill in skills_list]
+                    skills_text_formatted = ", ".join(skills_escaped)
+                    skills_content += f"    \\textbf{{{safe_category}}}{{: {skills_text_formatted}}} \\\\ [1mm]\n"
+    else:
+        # Fallback to dictionary order (for backward compatibility)
+        for category, skills in skills_data.items():
+            if isinstance(skills, list) and skills and category.lower() != "certifications":
+                # Regular skills categories (not certifications)
+                safe_category = category.replace('%', '\\%').replace('&', '\\&')
+                skills_escaped = [skill.replace('%', '\\%').replace('&', '\\&') for skill in skills]
+                skills_text = ", ".join(skills_escaped)
+                skills_content += f"    \\textbf{{{safe_category}}}{{: {skills_text}}} \\\\ [1mm]\n"
     
     # Then, add certifications at the very end if they exist
     if certifications_data and len(certifications_data) > 0:
@@ -146,7 +167,15 @@ def generate_work_experience_template(work_experience_data):
     \\workExSubheading{{{company}}}{{{job_title}}}{{{location}}}{{{duration}}} 
       \\resumeItemListStart"""
         
-        for bullet in bullet_points:
+        # Handle both string and array formats for bullet points
+        if isinstance(bullet_points, str):
+            # If it's a string, split by newlines
+            bullets = [line.strip() for line in bullet_points.split('\n') if line.strip()]
+        else:
+            # If it's already an array, use as is
+            bullets = bullet_points or []
+            
+        for bullet in bullets:
             if bullet.strip():
                 # Convert markdown bold to LaTeX properly
                 bullet_latex = re.sub(r'\*\*(.*?)\*\*', r'\\textbf{\1}', bullet)
@@ -192,14 +221,30 @@ def generate_projects_template(projects_data):
         else:
             link_section = f"\\emph{{\\href{{#}}{{{display_text}}}}}"
         
-        # Format tech stack with proper pipe symbols
-        tech_stack_formatted = tech_stack.replace('|', '$|$')
+        # Convert comma-separated tech stack to pipe-separated format, then format with LaTeX symbols
+        if ',' in tech_stack and '|' not in tech_stack:
+            # Input is comma-separated, convert to pipe-separated
+            tech_stack_pipes = ' | '.join([tech.strip() for tech in tech_stack.split(',') if tech.strip()])
+        else:
+            # Input is already pipe-separated or single technology
+            tech_stack_pipes = tech_stack
+        
+        # Format tech stack with proper LaTeX pipe symbols
+        tech_stack_formatted = tech_stack_pipes.replace('|', '$|$')
         
         projects_content += f"""
       \\resumeProjectHeading{{\\textbf{{{{{project_name}}}}} $|$ {link_section}}}{{{tech_stack_formatted}}} \\\\[5mm]
         \\resumeItemListStart"""
         
-        for bullet in bullet_points:
+        # Handle both string and array formats for bullet points
+        if isinstance(bullet_points, str):
+            # If it's a string, split by newlines
+            bullets = [line.strip() for line in bullet_points.split('\n') if line.strip()]
+        else:
+            # If it's already an array, use as is
+            bullets = bullet_points or []
+            
+        for bullet in bullets:
             if bullet.strip():
                 # Convert markdown bold to LaTeX properly
                 bullet_latex = re.sub(r'\*\*(.*?)\*\*', r'\\textbf{\1}', bullet)
@@ -353,7 +398,7 @@ def generate_complete_resume_template(resume_data):
     technical_skills = resume_data.get("technicalSkills", {})
     technical_skills_categories = resume_data.get("technicalSkillsCategories", [])
     
-    # Convert new format to old format if needed
+    # Convert new format to old format if needed, preserving order
     if technical_skills_categories and not technical_skills:
         technical_skills = {}
         for category in technical_skills_categories:
@@ -380,7 +425,7 @@ def generate_complete_resume_template(resume_data):
     complete_resume = document_header
     complete_resume += generate_header_template(personal_info)
     complete_resume += "\n\n"
-    complete_resume += generate_technical_skills_template(technical_skills, certifications)
+    complete_resume += generate_technical_skills_template(technical_skills, certifications, technical_skills_categories)
     complete_resume += "\n\n"
     complete_resume += generate_education_template(education)
     complete_resume += "\n\n"

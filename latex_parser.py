@@ -117,6 +117,10 @@ def parseProjects(content):
         cleanTechStack = re.sub(r'\s*\$\|\$\s*', ' | ', techStack.strip())
         cleanTechStack = re.sub(r'\s*\|\s*', ' | ', cleanTechStack)
         
+        # Convert pipe-separated format to comma-separated for UI editing
+        if '|' in cleanTechStack:
+            cleanTechStack = ', '.join([tech.strip() for tech in cleanTechStack.split('|') if tech.strip()])
+        
         projects.append({
             "projectName": projectName.strip(),
             "techStack": cleanTechStack,
