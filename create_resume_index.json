@@ -1,8 +1,16 @@
 {
-  "sessions": [],
+  "sessions": [
+    {
+      "sessionId": "d82b7e61-0cc2-489f-842d-eba9a0f6df71",
+      "timestamp": "2025-08-03T02:58:33.440073",
+      "filePath": "create_resume_sessions/d82b7e61-0cc2-489f-842d-eba9a0f6df71.json",
+      "status": "created",
+      "preview": "Machine Learning Engineer (Hybrid)\nat Weedmaps (View all jobs)\nAustin, TX\nMachine Learning Engineer (Hybrid - Onsite 2 days a week)\n\nOverview:\n\nThe Machine Learning Engineer at Weedmaps will be a key ..."
+    }
+  ],
   "metadata": {
     "created": "2025-08-02T20:16:32.762806",
-    "lastUpdated": "2025-08-02T21:02:49.910544",
-    "totalSessions": 0
+    "lastUpdated": "2025-08-03T02:58:33.440073",
+    "totalSessions": 1
   }
 }

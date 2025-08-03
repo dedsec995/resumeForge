@@ -9,34 +9,53 @@ def clean_the_text(content):
     latex_content = latex_match.group(1)
     return latex_content
 
+import re
+import json
+
+
 def extract_and_parse_json(text: str):
     """
-    Extracts a JSON object from a string and parses it.
-    The JSON object can be enclosed in ```json ... ``` or ``` ... ```,
-    or be a raw JSON object in the text.
+    Extracts a JSON object or array from a string and parses it.
+    The JSON data can be enclosed in `````` or ``````,
+    or present as raw JSON array/object text.
     """
-    # Case 1: JSON is in a markdown code block with "json" language identifier
-    match = re.search(r"```json\s*({.*})\s*```", text, re.DOTALL)
+    # Pattern to match JSON array or object inside markdown code fences with language identifier
+    match = re.search(r"``````", text, re.DOTALL)
     if match:
         json_str = match.group(1)
     else:
-        # Case 2: JSON is in a markdown code block without language identifier
-        match = re.search(r"```\s*({.*})\s*```", text, re.DOTALL)
+        # Pattern to match JSON array or object inside markdown code fences without language identifier
+        match = re.search(r"``````", text, re.DOTALL)
         if match:
             json_str = match.group(1)
         else:
-            # Case 3: Raw JSON object in the text
-            start_index = text.find('{')
-            end_index = text.rfind('}')
-            if start_index != -1 and end_index != -1 and end_index > start_index:
-                json_str = text[start_index:end_index+1]
+            # Attempt to extract the first JSON array or object from raw text
+            # Find first [ and matching ] or first { and matching }
+            array_start = text.find("[")
+            object_start = text.find("{")
+            if array_start != -1 and (object_start == -1 or array_start < object_start):
+                # Extract JSON array
+                # Find corresponding closing bracket for array (could use stack parser for robustness)
+                array_end = text.rfind("]")
+                if array_end != -1 and array_end > array_start:
+                    json_str = text[array_start : array_end + 1]
+                else:
+                    return None
+            elif object_start != -1:
+                # Extract JSON object
+                object_end = text.rfind("}")
+                if object_end != -1 and object_end > object_start:
+                    json_str = text[object_start : object_end + 1]
+                else:
+                    return None
             else:
-                return None # No JSON object found
+                return None
 
     try:
         return json.loads(json_str)
     except json.JSONDecodeError:
         return None
+
 
 def parse_keywords_from_json(text: str) -> str:
     """
