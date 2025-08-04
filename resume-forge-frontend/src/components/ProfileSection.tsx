@@ -26,7 +26,7 @@ import {
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 
 const ProfileSection = () => {
   const [resumeData, setResumeData] = useState<any>(null);
@@ -43,8 +43,7 @@ const ProfileSection = () => {
     'Technical Skills',
     'Work Experience',
     'Projects',
-    'Education',
-    'ATS Keywords'
+    'Education'
   ];
 
   // Auto-load resume data when component mounts
@@ -56,7 +55,7 @@ const ProfileSection = () => {
     
           const loadResumeData = async () => {
         try {
-          const response = await axios.get('http://localhost:8002/parseResume');
+          const response = await apiClient.get('/parseResume');
           if (isMounted && response.data.success) {
             setResumeData(response.data.resumeData);
             setOriginalResumeData(JSON.parse(JSON.stringify(response.data.resumeData))); // Deep copy
@@ -125,7 +124,7 @@ const ProfileSection = () => {
     
     setSaving(true);
     try {
-      const response = await axios.post('http://localhost:8002/updateResume', {
+      const response = await apiClient.post('/updateResume', {
         resumeData: resumeData
       });
       
@@ -930,24 +929,7 @@ const ProfileSection = () => {
           </Box>
         );
 
-      case 6: // ATS Keywords
-        return (
-          <Box sx={{ p: 2 }}>
-            <Alert severity="warning" sx={{ mb: 2 }}>
-              ⚠️ These keywords are invisible in the PDF but help with ATS (Applicant Tracking System) scanning.
-            </Alert>
-            <TextField
-              fullWidth
-              size="small"
-              multiline
-              rows={6}
-              value={resumeData.invisibleKeywords || ''}
-              onChange={(e) => updateResumeData('invisibleKeywords', e.target.value)}
-              placeholder="AWS, EC2, production systems, machine learning, engineering principles..."
-              label="ATS Keywords (comma-separated)"
-            />
-          </Box>
-        );
+
 
       default:
         return (

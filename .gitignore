@@ -10,6 +10,7 @@ pip-selfcheck.json
 
 # Environment
 .env
+resume-forge-frontend/.env
 
 # PDF
 *.aux
@@ -26,3 +27,14 @@ prompt.md
 bakup_prompt.txt
 
 create_resume_session/
+
+# Firebase Configuration
+firebase.json
+firebase_config.py
+firebase-key.json
+serviceAccountKey.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!vite.config.ts

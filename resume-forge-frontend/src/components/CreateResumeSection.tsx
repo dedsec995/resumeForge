@@ -29,7 +29,7 @@ import {
   DataObject as DataObjectIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import apiClient from '../utils/apiClient';
 import { toast } from 'react-hot-toast';
 
 interface ResumeSession {
@@ -91,7 +91,7 @@ const CreateResumeSection = () => {
   const loadSessions = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('http://localhost:8002/getResumeSessions');
+              const response = await apiClient.get('/getResumeSessions');
       if (response.data.success) {
         setSessions(response.data.sessions);
       }
@@ -111,13 +111,94 @@ const CreateResumeSection = () => {
 
     try {
       setSubmitting(true);
-      const response = await axios.post('http://localhost:8002/createResumeSession', {
+      const response = await apiClient.post('/createResumeSession', {
         jobDescription: jobDescription.trim()
       });
 
       if (response.data.success) {
-        toast.success('Resume session created successfully!');
+        const sessionId = response.data.sessionId;
+        toast.success('Resume session created! Starting automatic processing...');
         setJobDescription('');
+        
+        // Automatically start the workflow
+        try {
+          setWorkflowLoading(true);
+          
+          // Start the workflow
+          const workflowResponse = await apiClient.post('/fullWorkflow', {
+            sessionId: sessionId
+          });
+
+          if (workflowResponse.data.success) {
+            toast.success('Processing started! Creating your tailored resume...');
+            
+            // Start polling for status updates
+            const pollInterval = setInterval(async () => {
+              try {
+                const statusResponse = await apiClient.get(`/sessionStatus/${sessionId}`);
+                const status = statusResponse.data.status;
+                
+                console.log('Workflow status:', status, statusResponse.data);
+                
+                if (status === 'completed') {
+                  clearInterval(pollInterval);
+                  setWorkflowLoading(false);
+                  toast.success(`Resume processing completed! Final score: ${statusResponse.data.currentScore}/100`);
+                  
+                  // Refresh the sessions list to show updated status
+                  loadSessions();
+                  
+                  // If the modal is open for this session, refresh the session data
+                  if (selectedSession && selectedSession.sessionId === sessionId) {
+                    try {
+                      const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+                      if (sessionResponse.data.success && sessionResponse.data.sessionData) {
+                        setSelectedSession(sessionResponse.data.sessionData);
+                      }
+                    } catch (refreshError) {
+                      console.error('Error refreshing session data:', refreshError);
+                    }
+                  }
+                  
+                } else if (status === 'failed') {
+                  clearInterval(pollInterval);
+                  setWorkflowLoading(false);
+                  toast.error(`Processing failed: ${statusResponse.data.error || 'Unknown error'}`);
+                  
+                  // Refresh the sessions list
+                  loadSessions();
+                  
+                } else if (status === 'processing') {
+                  // Still processing, continue polling
+                  console.log('Still processing...');
+                }
+                
+              } catch (pollError) {
+                console.error('Error polling status:', pollError);
+                clearInterval(pollInterval);
+                setWorkflowLoading(false);
+                toast.error('Error checking processing status');
+              }
+            }, 3000); // Poll every 3 seconds
+            
+            // Set a timeout to stop polling after 10 minutes
+            setTimeout(() => {
+              clearInterval(pollInterval);
+              setWorkflowLoading(false);
+              toast.error('Processing timeout. Please check the session manually.');
+              loadSessions();
+            }, 600000); // 10 minutes
+            
+          } else {
+            setWorkflowLoading(false);
+            toast.error('Failed to start processing');
+          }
+        } catch (workflowError) {
+          console.error('Error starting workflow:', workflowError);
+          setWorkflowLoading(false);
+          toast.error('Failed to start automatic processing. You can start it manually.');
+        }
+        
         loadSessions(); // Refresh the sessions list
       } else {
         toast.error('Failed to create resume session');
@@ -134,9 +215,38 @@ const CreateResumeSection = () => {
     try {
       setDialogLoading(true);
       setDialogOpen(true);
-      const response = await axios.get(`http://localhost:8002/getResumeSession/${sessionId}`);
+      const response = await apiClient.get(`/getResumeSession/${sessionId}`);
       if (response.data.success && response.data.sessionData) {
         setSelectedSession(response.data.sessionData);
+        
+        // If the session is still processing, start auto-refresh
+        if (response.data.sessionData.status === 'processing') {
+          const refreshInterval = setInterval(async () => {
+            try {
+              const refreshResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+              if (refreshResponse.data.success && refreshResponse.data.sessionData) {
+                const newStatus = refreshResponse.data.sessionData.status;
+                setSelectedSession(refreshResponse.data.sessionData);
+                
+                // Stop refreshing if completed or failed
+                if (newStatus === 'completed' || newStatus === 'failed') {
+                  clearInterval(refreshInterval);
+                  loadSessions(); // Refresh the sessions list
+                }
+              }
+            } catch (refreshError) {
+              console.error('Error auto-refreshing session:', refreshError);
+            }
+          }, 3000); // Refresh every 3 seconds
+          
+          // Clean up interval when modal closes
+          const cleanup = () => {
+            clearInterval(refreshInterval);
+          };
+          
+          // Store cleanup function to call when modal closes
+          (window as { sessionRefreshCleanup?: () => void }).sessionRefreshCleanup = cleanup;
+        }
       } else {
         toast.error('Failed to load session details');
         setDialogOpen(false);
@@ -156,7 +266,7 @@ const CreateResumeSection = () => {
     }
 
     try {
-      const response = await axios.delete(`http://localhost:8002/deleteResumeSession/${sessionId}`);
+              const response = await apiClient.delete(`/deleteResumeSession/${sessionId}`);
       if (response.data.success) {
         toast.success('Session deleted successfully');
         loadSessions(); // Refresh the sessions list
@@ -175,23 +285,70 @@ const CreateResumeSection = () => {
 
     try {
       setWorkflowLoading(true);
-      const response = await axios.post('http://localhost:8002/fullWorkflow', {
+      
+      // Start the workflow
+      const response = await apiClient.post('/fullWorkflow', {
         sessionId: selectedSession.sessionId
       });
 
       if (response.data.success) {
-        toast.success(`Workflow completed! Final score: ${response.data.finalScore}`);
-        console.log('Workflow response:', response.data);
-        // Refresh the session data to get updated status
-        await handleViewSession(selectedSession.sessionId);
+        toast.success('Workflow started! Processing your resume...');
+        
+        // Start polling for status updates
+        const pollInterval = setInterval(async () => {
+          try {
+            const statusResponse = await apiClient.get(`/sessionStatus/${selectedSession.sessionId}`);
+            const status = statusResponse.data.status;
+            
+            console.log('Workflow status:', status, statusResponse.data);
+            
+            if (status === 'completed') {
+              clearInterval(pollInterval);
+              setWorkflowLoading(false);
+              toast.success(`Workflow completed! Final score: ${statusResponse.data.currentScore}/100`);
+              
+              // Refresh the session data to show updated results
+              await handleViewSession(selectedSession.sessionId);
+              
+            } else if (status === 'failed') {
+              clearInterval(pollInterval);
+              setWorkflowLoading(false);
+              toast.error(`Workflow failed: ${statusResponse.data.error || 'Unknown error'}`);
+              
+              // Refresh the session data to show error status
+              await handleViewSession(selectedSession.sessionId);
+              
+            } else if (status === 'processing') {
+              // Still processing, keep polling
+              console.log('Workflow still processing...');
+            }
+            
+          } catch (pollError) {
+            console.error('Error polling status:', pollError);
+            // Don't stop polling on poll errors, might be temporary
+          }
+        }, 3000); // Poll every 3 seconds
+        
+        // Safety timeout to stop polling after 5 minutes
+        setTimeout(() => {
+          clearInterval(pollInterval);
+          if (workflowLoading) {
+            setWorkflowLoading(false);
+            toast('Workflow is taking longer than expected. Please check the session later.', { 
+              icon: '⚠️',
+              duration: 5000 
+            });
+          }
+        }, 300000); // 5 minutes
+        
       } else {
-        toast.error('Workflow failed to complete');
+        setWorkflowLoading(false);
+        toast.error('Failed to start workflow');
       }
     } catch (error) {
       console.error('Error starting workflow:', error);
-      toast.error('Failed to start resume workflow');
-    } finally {
       setWorkflowLoading(false);
+      toast.error('Failed to start resume workflow');
     }
   };
 
@@ -203,7 +360,7 @@ const CreateResumeSection = () => {
 
     try {
       setDownloadLoading(true);
-      const response = await axios.post(`http://localhost:8002/generateLatex/${selectedSession.sessionId}`);
+              const response = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
 
       if (response.data.success) {
         toast.success('LaTeX file generated successfully!');
@@ -227,14 +384,30 @@ const CreateResumeSection = () => {
 
     try {
       setDownloadLoading(true);
-      const response = await axios.get(`http://localhost:8002/downloadPDF/${selectedSession.sessionId}`, {
+              const response = await apiClient.get(`/downloadPDF/${selectedSession.sessionId}`, {
         responseType: 'blob'
       });
+
+      // Generate filename based on person name, company and position
+      const generateFilename = () => {
+        const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+        const companyName = selectedSession.companyName || '';
+        const position = selectedSession.position || '';
+        
+        if (personName || companyName || position) {
+          const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
+          return `${parts.join('_')}.pdf`;
+        }
+        return `resume_${selectedSession.sessionId}.pdf`;
+      };
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `resume_${selectedSession.sessionId}.pdf`);
+      link.setAttribute('download', generateFilename());
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -258,14 +431,30 @@ const CreateResumeSection = () => {
 
     try {
       setDownloadLoading(true);
-      const response = await axios.get(`http://localhost:8002/downloadLatex/${selectedSession.sessionId}`, {
+              const response = await apiClient.get(`/downloadLatex/${selectedSession.sessionId}`, {
         responseType: 'blob'
       });
+
+      // Generate filename based on person name, company and position
+      const generateFilename = () => {
+        const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+        const companyName = selectedSession.companyName || '';
+        const position = selectedSession.position || '';
+        
+        if (personName || companyName || position) {
+          const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
+          return `${parts.join('_')}.tex`;
+        }
+        return `resume_${selectedSession.sessionId}.tex`;
+      };
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
       const link = document.createElement('a');
       link.href = url;
-      link.setAttribute('download', `resume_${selectedSession.sessionId}.tex`);
+      link.setAttribute('download', generateFilename());
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -296,15 +485,28 @@ const CreateResumeSection = () => {
           Create Resume
         </Typography>
         <Typography variant="body1" color="text.secondary">
-          Paste a job description to create a tailored resume session
+          Paste a job description to automatically create and process your tailored resume
         </Typography>
       </Box>
+
+      {/* Global Processing Indicator */}
+      {workflowLoading && (
+        <Alert 
+          severity="info" 
+          sx={{ mb: 3 }}
+          icon={<CircularProgress size={20} />}
+        >
+          <Typography variant="body2">
+            <strong>Processing Resume...</strong> We're analyzing the job description, tailoring your resume, and generating LaTeX files. This may take a few minutes.
+          </Typography>
+        </Alert>
+      )}
 
       {/* Job Description Input Form */}
       <Paper sx={{ p: 2, mb: 3 }}>
         <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <AddIcon sx={{ mr: 1 }} />
-          New Resume Session
+          New Resume (Auto-Process)
         </Typography>
 
         <TextField
@@ -324,11 +526,11 @@ const CreateResumeSection = () => {
             variant="contained"
             size="large"
             onClick={handleSubmit}
-            disabled={submitting || !jobDescription.trim()}
-            startIcon={submitting ? <CircularProgress size={20} /> : <AddIcon />}
+            disabled={submitting || workflowLoading || !jobDescription.trim()}
+            startIcon={submitting || workflowLoading ? <CircularProgress size={20} /> : <AddIcon />}
             sx={{ px: 4 }}
           >
-            {submitting ? 'Creating...' : 'Create Resume Session'}
+            {submitting ? 'Creating Session...' : workflowLoading ? 'Processing Resume...' : 'Create & Process Resume'}
           </Button>
         </Box>
       </Paper>
@@ -370,14 +572,33 @@ const CreateResumeSection = () => {
                    >
                      <CardContent sx={{ flexGrow: 1, p: 2, pb: 1 }}>
                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                           <DescriptionIcon sx={{ mr: 1, color: 'primary.main' }} />
-                           <Box>
-                             <Typography variant="h6" component="div" sx={{ fontWeight: 600, mb: 0.5 }}>
+                         <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                           <DescriptionIcon sx={{ mr: 1, color: 'primary.main', flexShrink: 0 }} />
+                           <Box sx={{ flex: 1, minWidth: 0 }}>
+                             <Typography 
+                               variant="h6" 
+                               component="div" 
+                               sx={{ 
+                                 fontWeight: 600, 
+                                 mb: 0.5,
+                                 overflow: 'hidden',
+                                 textOverflow: 'ellipsis',
+                                 whiteSpace: 'nowrap'
+                               }}
+                             >
                                {session.status === 'completed' && session.companyName ? session.companyName : 'Resume Session'}
                              </Typography>
                              {session.status === 'completed' && session.position ? (
-                               <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
+                               <Typography 
+                                 variant="body2" 
+                                 sx={{ 
+                                   color: 'text.secondary', 
+                                   fontSize: '0.85rem',
+                                   overflow: 'hidden',
+                                   textOverflow: 'ellipsis',
+                                   whiteSpace: 'nowrap'
+                                 }}
+                               >
                                  {session.position}
                                </Typography>
                              ) : (
@@ -387,13 +608,7 @@ const CreateResumeSection = () => {
                              )}
                            </Box>
                          </Box>
-                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                           <Chip 
-                             label={session.status} 
-                             size="small" 
-                             color={session.status === 'completed' ? 'success' : 'default'}
-                             sx={{ textTransform: 'capitalize' }}
-                           />
+                         <Box sx={{ flexShrink: 0 }}>
                            <IconButton
                              size="small"
                              color="error"
@@ -428,7 +643,16 @@ const CreateResumeSection = () => {
                          </Typography>
                        </Box>
                        
-                       <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 1, mb: 0.5 }}>
+                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, mb: 0.5 }}>
+                         <Chip 
+                           label={session.status === 'processing' ? 'Processing...' : session.status} 
+                           size="small" 
+                           color={session.status === 'completed' ? 'success' : 
+                                  session.status === 'processing' ? 'primary' : 
+                                  session.status === 'failed' ? 'error' : 'default'}
+                           icon={session.status === 'processing' ? <CircularProgress size={16} /> : undefined}
+                           sx={{ textTransform: 'capitalize' }}
+                         />
                          <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem' }}>
                            <TimeIcon sx={{ mr: 0.5, fontSize: 12 }} />
                            {formatDate(session.timestamp)}
@@ -449,27 +673,41 @@ const CreateResumeSection = () => {
          onClose={() => {
            setDialogOpen(false);
            setSelectedSession(null);
+           // Clean up any refresh intervals
+           const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
+           if (windowWithCleanup.sessionRefreshCleanup) {
+             windowWithCleanup.sessionRefreshCleanup();
+             windowWithCleanup.sessionRefreshCleanup = undefined;
+           }
          }}
-         maxWidth="md"
+         maxWidth="lg"
          fullWidth
+         PaperProps={{
+           sx: {
+             maxHeight: '90vh',
+             minHeight: '600px'
+           }
+         }}
          TransitionProps={{
            timeout: 300
          }}
        >
         <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Typography variant="h6">Resume Session Details</Typography>
+          Resume Session Details
           {selectedSession && (
             <Chip 
               label={selectedSession.status === 'completed' && selectedSession.workflowResult 
                 ? `${selectedSession.workflowResult.score}/100` 
                 : selectedSession.status} 
               size="small" 
-              color={selectedSession.status === 'completed' ? 'success' : 'default'}
+              color={selectedSession.status === 'completed' ? 'success' : 
+                     selectedSession.status === 'processing' ? 'primary' : 
+                     selectedSession.status === 'failed' ? 'error' : 'default'}
               sx={{ textTransform: 'capitalize' }}
             />
           )}
         </DialogTitle>
-                 <DialogContent sx={{ minHeight: '400px' }}>
+                 <DialogContent sx={{ minHeight: '500px', maxHeight: '70vh' }}>
            {dialogLoading ? (
              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
                <CircularProgress />
@@ -545,44 +783,52 @@ const CreateResumeSection = () => {
               </Paper>
 
               {/* Tabs */}
-              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 2 }}>
+              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
                 <Tabs 
                   value={activeTab} 
                   onChange={handleTabChange}
                   sx={{
+                    minHeight: '40px',
                     '& .MuiTab-root': {
                       color: 'text.secondary',
+                      minHeight: '40px',
+                      padding: '6px 12px',
+                      fontSize: '0.875rem',
+                      textTransform: 'none',
+                      fontWeight: 500,
                       '&.Mui-selected': {
-                        color: 'primary.main'
+                        color: 'primary.main',
+                        fontWeight: 600
                       }
                     },
                     '& .MuiTabs-indicator': {
-                      backgroundColor: 'primary.main'
+                      backgroundColor: 'primary.main',
+                      height: '2px'
                     }
                   }}
                 >
                   <Tab 
-                    icon={<DescriptionIcon />} 
+                    icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
                     label="Job Description" 
                     iconPosition="start"
                   />
                   {selectedSession.tailoredResume && (
                     <Tab 
-                      icon={<DataObjectIcon />} 
+                      icon={<DataObjectIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
                       label="JSON Output" 
                       iconPosition="start"
                     />
                   )}
                   {selectedSession.latexFilePath && (
                     <Tab 
-                      icon={<CodeIcon />} 
+                      icon={<CodeIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
                       label="Generated LaTeX" 
                       iconPosition="start"
                     />
                   )}
                   {selectedSession.status === 'completed' && selectedSession.workflowResult && (
                     <Tab 
-                      icon={<DescriptionIcon />} 
+                      icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
                       label="Feedback" 
                       iconPosition="start"
                     />
@@ -591,7 +837,7 @@ const CreateResumeSection = () => {
               </Box>
 
               {/* Tab Content */}
-              <Box sx={{ minHeight: '250px' }}>
+              <Box sx={{ minHeight: '350px' }}>
                 {/* Job Description Tab */}
                 {activeTab === 0 && (
                   <Paper 
@@ -599,8 +845,8 @@ const CreateResumeSection = () => {
                     sx={{ 
                       p: 1.5, 
                       background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                      minHeight: 250,
-                      maxHeight: 350, 
+                      minHeight: 350,
+                      maxHeight: 450, 
                       overflow: 'auto',
                       border: '1px solid rgba(255, 255, 255, 0.12)',
                       borderRadius: 2,
@@ -645,8 +891,8 @@ const CreateResumeSection = () => {
                     sx={{ 
                       p: 1.5, 
                       background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 150, 243, 0.03) 100%)',
-                      minHeight: 250,
-                      maxHeight: 350, 
+                      minHeight: 350,
+                      maxHeight: 450, 
                       overflow: 'auto',
                       border: '1px solid rgba(33, 150, 243, 0.25)',
                       borderRadius: 2,
@@ -690,8 +936,8 @@ const CreateResumeSection = () => {
                     sx={{ 
                       p: 1.5, 
                       background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.03) 100%)',
-                      minHeight: 250,
-                      maxHeight: 350, 
+                      minHeight: 350,
+                      maxHeight: 450, 
                       overflow: 'auto',
                       border: '1px solid rgba(76, 175, 80, 0.25)',
                       borderRadius: 2,
@@ -735,8 +981,8 @@ const CreateResumeSection = () => {
                     sx={{ 
                       p: 1.5, 
                       background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.03) 100%)',
-                      minHeight: 250,
-                      maxHeight: 350, 
+                      minHeight: 350,
+                      maxHeight: 450, 
                       overflow: 'auto',
                       border: '1px solid rgba(102, 126, 234, 0.25)',
                       borderRadius: 2,
@@ -836,7 +1082,7 @@ const CreateResumeSection = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {workflowLoading ? 'Processing...' : 
+              {workflowLoading ? 'Processing Resume (1-2 min)...' : 
                downloadLoading ? 'Generating...' : 
                selectedSession?.status === 'completed' ? 'Generate LaTeX' : 'Start Resume Workflow'}
             </Button>

@@ -321,7 +321,8 @@ def finalize_and_print_json(state):
     full_final_json["jobDescription"] = state["job_description"]
     full_final_json["status"] = "processed"
     
-    console.print(json.dumps(full_final_json, indent=2))
+    # Removed verbose JSON output - using summary instead
+    console.print(f"[green]✓ Resume processing completed. Session: {full_final_json.get('sessionId', 'N/A')}[/green]")
     return {"tailored_resume_data": full_final_json}
 
 

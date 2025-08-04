@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,13 +8,59 @@ import os
 import asyncio
 from datetime import datetime
 import uuid
+from concurrent.futures import ThreadPoolExecutor
+import re
 from agent import workflow
+from auth_routes import authRouter
+from auth_middleware import verifyFirebaseToken, optionalAuth
+from database_operations import dbOps
 
 app = FastAPI(
     title="Resume Forge API",
     description="AI-powered resume tailoring service",
     version="1.0.0"
 )
+
+# Thread pool for CPU-intensive background tasks
+thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="workflow_")
+
+def generate_resume_filename(person_name: str, company_name: str, position: str, session_id: str, extension: str) -> str:
+    """Generate resume filename using person name, company name and position, with spaces replaced by underscores"""
+    try:
+        # Clean and format person name, company name and position
+        clean_person = re.sub(r'[^\w\s-]', '', person_name.strip()) if person_name else ""
+        clean_company = re.sub(r'[^\w\s-]', '', company_name.strip()) if company_name else ""
+        clean_position = re.sub(r'[^\w\s-]', '', position.strip()) if position else ""
+        
+        # Replace spaces with underscores and remove multiple underscores
+        clean_person = re.sub(r'\s+', '_', clean_person)
+        clean_company = re.sub(r'\s+', '_', clean_company)
+        clean_position = re.sub(r'\s+', '_', clean_position)
+        
+        # Build filename parts
+        filename_parts = []
+        if clean_person:
+            filename_parts.append(clean_person)
+        if clean_company:
+            filename_parts.append(clean_company)
+        if clean_position:
+            filename_parts.append(clean_position)
+        
+        # If we have person/company/position, use them; otherwise fallback to session_id
+        if filename_parts:
+            filename = "_".join(filename_parts)
+            # Limit filename length to avoid filesystem issues
+            if len(filename) > 100:
+                filename = filename[:100]
+        else:
+            filename = f"resume_{session_id}"
+        
+        return f"{filename}.{extension}"
+    
+    except Exception as e:
+        print(f"Error generating filename: {e}")
+        # Fallback to session-based naming
+        return f"resume_{session_id}.{extension}"
 
 # Add CORS middleware
 app.add_middleware(
@@ -24,6 +70,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include auth routes
+app.include_router(authRouter)
 
 # Request/Response Models
 class JobDescriptionRequest(BaseModel):
@@ -111,14 +160,15 @@ async def rootEndpoint():
     return {"message": "Resume Forge API is running", "status": "healthy"}
 
 @app.get("/parseResume", response_model=ResumeParseResponse)
-async def parseResumeEndpoint():
-    """Load resume data from JSON file or create empty structure"""
+async def parseResumeEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Load user resume data from Firebase or create empty structure"""
     try:
-        json_path = "./resume_data.json"
+        # Get user data from Firebase
+        userData = dbOps.getUser(userId)
         
-        # Check if JSON file exists, if not create empty structure
-        if not os.path.exists(json_path):
-            empty_data = {
+        if not userData or not userData.get('profile'):
+            # Return empty profile structure
+            emptyProfile = {
                 "personalInfo": {
                     "name": "",
                     "email": "",
@@ -129,9 +179,10 @@ async def parseResumeEndpoint():
                 },
                 "certifications": [],
                 "technicalSkillsCategories": [],
-            "workExperience": [],
-            "projects": [],
+                "workExperience": [],
+                "projects": [],
                 "education": [],
+                "invisibleKeywords": "",
                 "metadata": {
                     "lastUpdated": "",
                     "version": "1.0",
@@ -139,71 +190,53 @@ async def parseResumeEndpoint():
                 }
             }
             
-            with open(json_path, 'w', encoding='utf-8') as file:
-                json.dump(empty_data, file, indent=2, ensure_ascii=False)
-            
-            empty_data["invisibleKeywords"] = ""
-            
             return ResumeParseResponse(
                 success=True,
-                resumeData=empty_data,
+                resumeData=emptyProfile,
                 message="New profile created - please fill in your information"
             )
         
-        # Load existing JSON data
-        with open(json_path, 'r', encoding='utf-8') as file:
-            resume_data = json.load(file)
+        # Return user's profile data
+        profileData = userData['profile']
         
-        # Ensure invisibleKeywords field exists
-        if "invisibleKeywords" not in resume_data:
-            resume_data["invisibleKeywords"] = ""
+        # Add invisibleKeywords if not present
+        if "invisibleKeywords" not in profileData:
+            profileData["invisibleKeywords"] = ""
+            
+        # Add metadata if not present
+        if "metadata" not in profileData:
+            profileData["metadata"] = {
+                "lastUpdated": userData.get('metadata', {}).get('lastUpdated', ''),
+                "version": "1.0",
+                "created": userData.get('metadata', {}).get('created', '')
+            }
         
         return ResumeParseResponse(
             success=True,
-            resumeData=resume_data,
+            resumeData=profileData,
             message="Resume data loaded successfully"
         )
         
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to load resume data: {str(e)}")
+        print(f"Parse resume error: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to parse resume: {str(e)}")
 
 @app.post("/updateResume", response_model=ResumeUpdateResponse)
-async def updateResumeEndpoint(request: ResumeUpdateRequest):
-    """Save resume data to JSON file and optionally generate LaTeX"""
+async def updateResumeEndpoint(request: ResumeUpdateRequest, userId: str = Depends(verifyFirebaseToken)):
+    """Save user resume data to Firebase"""
     try:
-        json_path = "./resume_data.json"
         resumeData = request.resumeData
         
-        # Add metadata
-        if "metadata" not in resumeData:
-            resumeData["metadata"] = {}
+        # Update user profile in Firebase
+        success = dbOps.updateUserProfile(userId, resumeData)
         
-        resumeData["metadata"]["lastUpdated"] = datetime.now().isoformat()
-        if "version" not in resumeData["metadata"]:
-            resumeData["metadata"]["version"] = "1.0"
-        if "created" not in resumeData["metadata"]:
-            resumeData["metadata"]["created"] = datetime.now().isoformat()
-        
-        # Save to JSON file
-        with open(json_path, 'w', encoding='utf-8') as f:
-            json.dump(resumeData, f, indent=2, ensure_ascii=False)
-        
-        # LaTeX file generation commented out - only updating JSON
-        # try:
-        #     from resume_templates import generate_complete_resume_template
-        #     complete_resume_content = generate_complete_resume_template(resumeData)
-        #     
-        #     resumeFilePath = "template/resume.tex"
-        #     with open(resumeFilePath, 'w', encoding='utf-8') as f:
-        #         f.write(complete_resume_content)
-        # except Exception as latex_error:
-        #     print(f"Warning: Failed to generate LaTeX file: {str(latex_error)}")
-        #     # Don't fail the entire operation if LaTeX generation fails
-        
-        return ResumeUpdateResponse(
-            success=True,
-            message="Resume data saved successfully to JSON"
-        )
+        if success:
+            return ResumeUpdateResponse(
+                success=True,
+                message="Resume data saved successfully to Firebase"
+            )
+        else:
+            raise HTTPException(status_code=500, detail="Failed to save resume data to Firebase")
         
     except Exception as e:
         print(f"Error saving resume data: {str(e)}")
@@ -404,40 +437,36 @@ async def initializeSessionEndpoint(request: JobDescriptionRequest):
         print(f"Error in initializeSession: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to initialize session: {str(e)}")
 
-@app.post("/fullWorkflow", response_model=WorkflowResponse)
-async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks: BackgroundTasks):
-    """Run the complete resume tailoring workflow"""
+def run_workflow_sync(userId: str, sessionId: str):
+    """Synchronous workflow function to run in thread pool"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{request.sessionId}.json"
+        print(f"Starting background workflow for session: {sessionId}")
         
-        if not os.path.exists(sessions_dir):
-            raise HTTPException(status_code=404, detail="Sessions directory not found")
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, sessionId)
+        if not session_data:
+            print(f"Session not found during background processing: {sessionId}")
+            return
         
-        if not os.path.exists(session_file_path):
-            raise HTTPException(status_code=404, detail="Resume session not found")
-        
-        with open(session_file_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
-        
+        # Get user profile data from Firebase
+        user_data = dbOps.getUser(userId)
         resume_data = {}
-        if os.path.exists("resume_data.json"):
-            try:
-                with open("resume_data.json", 'r', encoding='utf-8') as f:
-                    resume_data = json.load(f)
-            except Exception as e:
-                print(f"Warning: Could not load resume_data.json: {e}")
-                resume_data = {}
+        if user_data and user_data.get("profile"):
+            resume_data = user_data["profile"]
+        else:
+            print(f"Warning: No profile data found for user: {userId}")
+            resume_data = {}
 
         job_description = session_data.get("jobDescription", "")
         
         combined_data = {
-            "sessionId": request.sessionId,
+            "sessionId": sessionId,
             "jobDescription": job_description,
             **resume_data
         }
         
         try:
+            # Run the CPU-intensive workflow
             result = workflow({"resume_data": combined_data})
             
             score = result.get("score", 0.0)
@@ -445,24 +474,29 @@ async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks
             position = result.get("position", "")
             tailored_resume = result.get("tailored_resume_data", {})
             
-            session_data["workflowResult"] = {
-                "score": score,
-                "company_name": company_name,
-                "position": position,
-                "location": result.get("location", ""),
-                "feedback": result.get("feedback", ""),
-                "downsides": result.get("downsides", ""),
-                "iteration_count": result.get("iteration_count", 0)
-            }
-            session_data["tailoredResume"] = tailored_resume.get("resumeData", {})
-            session_data["status"] = "completed"
-            session_data["completedAt"] = datetime.now().isoformat()
-            session_data["score"] = score
-            session_data["companyName"] = company_name
-            session_data["position"] = position
+            print(f"Workflow completed for session {sessionId}: Score {score}/100, Company: {company_name}, Position: {position}")
             
-            with open(session_file_path, 'w', encoding='utf-8') as f:
-                json.dump(session_data, f, indent=2, ensure_ascii=False)
+            # Update session data in Firebase
+            updateData = {
+                "workflowResult": {
+                    "score": score,
+                    "company_name": company_name,
+                    "position": position,
+                    "location": result.get("location", ""),
+                    "feedback": result.get("feedback", ""),
+                    "downsides": result.get("downsides", ""),
+                    "iteration_count": result.get("iteration_count", 0)
+                },
+                "tailoredResume": tailored_resume.get("resumeData", {}),
+                "status": "completed",
+                "completedAt": datetime.now().isoformat(),
+                "score": score,
+                "companyName": company_name,
+                "position": position
+            }
+            
+            dbOps.updateSession(userId, sessionId, updateData)
+            print(f"Workflow completed successfully for session: {sessionId}")
             
             try:
                 from resume_templates import generate_complete_resume_template
@@ -473,87 +507,120 @@ async def fullWorkflowEndpoint(request: WorkflowSessionRequest, background_tasks
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
                 
-                latex_filename = f"resume_{request.sessionId}.tex"
+                # Generate filename based on person name, company and position
+                person_name = resume_data.get("personalInfo", {}).get("name", "")
+                company_name = session_data.get("companyName", "")
+                position = session_data.get("position", "")
+                latex_filename = generate_resume_filename(person_name, company_name, position, sessionId, "tex")
                 latex_file_path = os.path.join(output_dir, latex_filename)
                 
                 with open(latex_file_path, 'w', encoding='utf-8') as f:
                     f.write(latex_content)
                 
-                session_data["latexFilePath"] = latex_file_path
-                session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
-                
-                with open(session_file_path, 'w', encoding='utf-8') as f:
-                    json.dump(session_data, f, indent=2, ensure_ascii=False)
+                # Update session with LaTeX file path in Firebase
+                latexUpdateData = {
+                    "latexFilePath": latex_file_path,
+                    "latexContent": latex_content
+                }
+                dbOps.updateSession(userId, sessionId, latexUpdateData)
+                print(f"LaTeX generated for session: {sessionId}")
                     
             except Exception as latex_error:
-                print(f"Warning: LaTeX generation failed: {str(latex_error)}")
-            
-            index_path = "create_resume_index.json"
-            if os.path.exists(index_path):
-                with open(index_path, 'r', encoding='utf-8') as f:
-                    index_data = json.load(f)
-                
-                for session in index_data["sessions"]:
-                    if session["sessionId"] == request.sessionId:
-                        session["status"] = "completed"
-                        session["score"] = score
-                        session["companyName"] = company_name
-                        session["position"] = position
-                        break
-                
-                index_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
-                
-                with open(index_path, 'w', encoding='utf-8') as f:
-                    json.dump(index_data, f, indent=2, ensure_ascii=False)
-            
-            return WorkflowResponse(
-                success=True,
-                finalScore=result.get("score", 0.0),
-                pdfPath=None,
-                iterationCount=result.get("iteration_count", 0),
-                message="Workflow completed successfully"
-            )
+                print(f"Warning: LaTeX generation failed for session {sessionId}: {str(latex_error)}")
             
         except Exception as workflow_error:
-            error_data = {
+            print(f"Workflow failed for session {sessionId}: {str(workflow_error)}")
+            # Update session with error information in Firebase
+            errorUpdateData = {
+                "status": "failed",
                 "error": str(workflow_error),
-                "timestamp": datetime.now().isoformat(),
-                "sessionId": request.sessionId
+                "failedAt": datetime.now().isoformat()
             }
-            
-            error_file_path = f"create_resume_sessions/{request.sessionId}_error.json"
-            with open(error_file_path, 'w', encoding='utf-8') as f:
-                json.dump(error_data, f, indent=2, ensure_ascii=False)
-            
+            dbOps.updateSession(userId, sessionId, errorUpdateData)
+        
+    except Exception as e:
+        print(f"Background workflow error for session {sessionId}: {str(e)}")
+        # Update session with error information
+        errorUpdateData = {
+            "status": "failed",
+            "error": str(e),
+            "failedAt": datetime.now().isoformat()
+        }
+        dbOps.updateSession(userId, sessionId, errorUpdateData)
+
+async def run_workflow_background(userId: str, sessionId: str):
+    """Async wrapper to run workflow in thread pool"""
+    loop = asyncio.get_event_loop()
+    await loop.run_in_executor(thread_pool, run_workflow_sync, userId, sessionId)
+
+@app.post("/fullWorkflow", response_model=WorkflowResponse)
+async def fullWorkflowEndpoint(request: WorkflowSessionRequest, userId: str = Depends(verifyFirebaseToken)):
+    """Start resume tailoring workflow in background"""
+    try:
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, request.sessionId)
+        
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        # Check if already processing
+        if session_data.get("status") == "processing":
             return WorkflowResponse(
-                success=False,
+                success=True,
                 finalScore=0.0,
                 pdfPath=None,
                 iterationCount=0,
-                message=f"Workflow failed: {str(workflow_error)}"
+                message="Workflow is already in progress"
             )
         
+        # Immediately update status to processing
+        processingUpdateData = {
+            "status": "processing",
+            "startedAt": datetime.now().isoformat()
+        }
+        dbOps.updateSession(userId, request.sessionId, processingUpdateData)
+        
+        # Start background workflow in thread pool (truly async)
+        asyncio.create_task(run_workflow_background(userId, request.sessionId))
+        
+        print(f"Workflow started in background thread for session: {request.sessionId}")
+        
+        return WorkflowResponse(
+            success=True,
+            finalScore=0.0,
+            pdfPath=None,
+            iterationCount=0,
+            message="Workflow started successfully. Check status for updates."
+        )
+        
     except Exception as e:
-        print(f"Error in fullWorkflow: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Workflow failed: {str(e)}")
+        print(f"Error starting workflow: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to start workflow: {str(e)}")
 
 @app.get("/sessionStatus/{sessionId}")
-async def getSessionStatusEndpoint(sessionId: str):
-    """Get current status of a workflow session"""
+async def getSessionStatusEndpoint(sessionId: str, userId: str = Depends(verifyFirebaseToken)):
+    """Get current status of a workflow session from Firebase"""
     try:
-        if sessionId not in workflowStates:
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, sessionId)
+        
+        if not session_data:
             raise HTTPException(status_code=404, detail="Session not found")
-            
-        state = workflowStates[sessionId]
+        
+        workflow_result = session_data.get("workflowResult", {})
         
         return {
             "sessionId": sessionId,
-            "companyName": state.get("company_name", ""),
-            "position": state.get("position", ""),
-            "currentScore": state.get("score", 0),
-            "iterationCount": state.get("iteration_count", 0),
-            "hasPdf": state.get("pdf_path") is not None,
-            "status": "completed" if state.get("pdf_path") else "in_progress"
+            "status": session_data.get("status", "created"),
+            "companyName": session_data.get("companyName", ""),
+            "position": session_data.get("position", ""),
+            "currentScore": session_data.get("score", 0),
+            "iterationCount": workflow_result.get("iteration_count", 0),
+            "hasPdf": session_data.get("pdfFilePath") is not None,
+            "hasLatex": session_data.get("latexFilePath") is not None,
+            "startedAt": session_data.get("startedAt", ""),
+            "completedAt": session_data.get("completedAt", ""),
+            "error": session_data.get("error", "")
         }
         
     except Exception as e:
@@ -574,98 +641,53 @@ async def deleteSessionEndpoint(sessionId: str):
         print(f"Error in deleteSession: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete session: {str(e)}")
 
-# Create Resume Endpoints
+# Create Resume Endpoints  
 @app.post("/createResumeSession", response_model=CreateResumeResponse)
-async def createResumeSessionEndpoint(request: CreateResumeRequest):
+async def createResumeSessionEndpoint(request: CreateResumeRequest, userId: str = Depends(verifyFirebaseToken)):
     """Create a new resume session with job description"""
     try:
-        # Generate unique session ID
-        session_id = str(uuid.uuid4())
-        timestamp = datetime.now().isoformat()
+        # Create session in Firebase
+        sessionId = dbOps.createSession(userId, request.jobDescription)
         
-        # Create session data (without redundant resumeData)
-        session_data = {
-            "sessionId": session_id,
-            "jobDescription": request.jobDescription,
-            "timestamp": timestamp,
-            "status": "created",
-            "metadata": {
-                "created": timestamp,
-                "lastUpdated": timestamp,
-                "wordCount": len(request.jobDescription.split()),
-                "characterCount": len(request.jobDescription)
-            }
-        }
-        
-        # Ensure create_resume_sessions directory exists
-        sessions_dir = "create_resume_sessions"
-        if not os.path.exists(sessions_dir):
-            os.makedirs(sessions_dir)
-        
-        # Save session to individual file
-        session_file_path = f"{sessions_dir}/{session_id}.json"
-        with open(session_file_path, 'w', encoding='utf-8') as f:
-            json.dump(session_data, f, indent=2, ensure_ascii=False)
-        
-        # Update index file
-        index_path = "create_resume_index.json"
-        if os.path.exists(index_path):
-            with open(index_path, 'r', encoding='utf-8') as f:
-                index_data = json.load(f)
+        if sessionId:
+            return CreateResumeResponse(
+                success=True,
+                sessionId=sessionId,
+                message="Resume session created successfully",
+                timestamp=datetime.now().isoformat()
+            )
         else:
-            index_data = {"sessions": [], "metadata": {"created": timestamp, "lastUpdated": "", "totalSessions": 0}}
-        
-        # Add session to index
-        session_summary = {
-            "sessionId": session_id,
-            "timestamp": timestamp,
-            "filePath": session_file_path,
-            "status": "created",
-            "preview": request.jobDescription[:200] + "..." if len(request.jobDescription) > 200 else request.jobDescription
-        }
-        
-        index_data["sessions"].insert(0, session_summary)  # Add to beginning (newest first)
-        index_data["metadata"]["lastUpdated"] = timestamp
-        index_data["metadata"]["totalSessions"] = len(index_data["sessions"])
-        
-        if not index_data["metadata"]["created"]:
-            index_data["metadata"]["created"] = timestamp
-        
-        # Save updated index
-        with open(index_path, 'w', encoding='utf-8') as f:
-            json.dump(index_data, f, indent=2, ensure_ascii=False)
-        
-        return CreateResumeResponse(
-            success=True,
-            sessionId=session_id,
-            message="Resume session created successfully",
-            timestamp=timestamp
-        )
+            raise HTTPException(status_code=500, detail="Failed to create session in Firebase")
         
     except Exception as e:
         print(f"Error creating resume session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create resume session: {str(e)}")
 
 @app.get("/getResumeSessions", response_model=GetSessionsResponse)
-async def getResumeSessionsEndpoint():
-    """Get all resume sessions"""
+async def getResumeSessionsEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Get all resume sessions for user"""
     try:
-        index_path = "create_resume_index.json"
+        sessions = dbOps.getAllSessions(userId)
         
-        if not os.path.exists(index_path):
-            return GetSessionsResponse(
-                success=True,
-                sessions=[],
-                totalSessions=0
-            )
-        
-        with open(index_path, 'r', encoding='utf-8') as f:
-            index_data = json.load(f)
+        # Convert sessions to expected format
+        sessionList = []
+        for session in sessions:
+            sessionSummary = {
+                "sessionId": session.get("sessionId", ""),
+                "timestamp": session.get("timestamp", ""),
+                "filePath": f"/sessions/{session.get('sessionId', '')}",  # Firebase path reference
+                "status": session.get("status", ""),
+                "preview": session.get("jobDescription", "")[:200] + "..." if len(session.get("jobDescription", "")) > 200 else session.get("jobDescription", ""),
+                "score": session.get("score", 0),
+                "companyName": session.get("companyName", ""),
+                "position": session.get("position", "")
+            }
+            sessionList.append(sessionSummary)
         
         return GetSessionsResponse(
             success=True,
-            sessions=index_data.get("sessions", []),
-            totalSessions=index_data.get("metadata", {}).get("totalSessions", 0)
+            sessions=sessionList,
+            totalSessions=len(sessionList)
         )
         
     except Exception as e:
@@ -673,82 +695,102 @@ async def getResumeSessionsEndpoint():
         raise HTTPException(status_code=500, detail=f"Failed to fetch resume sessions: {str(e)}")
 
 @app.get("/getResumeSession/{session_id}")
-async def getResumeSessionEndpoint(session_id: str):
+async def getResumeSessionEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    """Get specific resume session from Firebase"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{session_id}.json"
+        # Get session from Firebase
+        sessionData = dbOps.getSession(userId, session_id)
         
-        if not os.path.exists(sessions_dir):
-            raise HTTPException(status_code=404, detail="Sessions directory not found")
-        
-        if not os.path.exists(session_file_path):
+        if not sessionData:
             raise HTTPException(status_code=404, detail="Resume session not found")
         
-        with open(session_file_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
-        
-        if session_data.get("latexFilePath") and os.path.exists(session_data["latexFilePath"]):
-            with open(session_data["latexFilePath"], 'r', encoding='utf-8') as f:
-                session_data["latexContent"] = f.read()
+        # If there's latex content stored as a file path, try to read it
+        if sessionData.get("latexFilePath") and os.path.exists(sessionData["latexFilePath"]):
+            with open(sessionData["latexFilePath"], 'r', encoding='utf-8') as f:
+                sessionData["latexContent"] = f.read()
         
         return {
             "success": True,
-            "sessionData": session_data
+            "sessionData": sessionData
         }
         
-    except FileNotFoundError:
-        raise HTTPException(status_code=404, detail="Resume session not found")
+    except HTTPException:
+        raise
     except Exception as e:
+        print(f"Error in getResumeSession: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to fetch resume session: {str(e)}")
 
 @app.delete("/deleteResumeSession/{session_id}")
-async def deleteResumeSessionEndpoint(session_id: str):
-    """Delete a specific resume session"""
+async def deleteResumeSessionEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    """Delete a specific resume session from Firebase"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{session_id}.json"
+        # Get session data BEFORE deleting to determine proper filename for cleanup
+        session_for_cleanup = dbOps.getSession(userId, session_id)
         
-        # Remove session file
-        if os.path.exists(session_file_path):
-            os.remove(session_file_path)
+        # Delete session from Firebase
+        success = dbOps.deleteSession(userId, session_id)
         
-        # Update index
-        index_path = "create_resume_index.json"
-        if os.path.exists(index_path):
-            with open(index_path, 'r', encoding='utf-8') as f:
-                index_data = json.load(f)
+        if not success:
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        # Clean up any associated files (LaTeX, PDF)
+        try:
+            if session_for_cleanup:
+                person_name = session_for_cleanup.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
+                company_name = session_for_cleanup.get("companyName", "")
+                position = session_for_cleanup.get("position", "")
+                
+                output_dir = "output"
+                latex_filename = generate_resume_filename(person_name, company_name, position, session_id, "tex")
+                pdf_filename = generate_resume_filename(person_name, company_name, position, session_id, "pdf")
+                
+                latex_file = os.path.join(output_dir, latex_filename)
+                pdf_file = os.path.join(output_dir, pdf_filename)
+                
+                if os.path.exists(latex_file):
+                    os.remove(latex_file)
+                    print(f"Removed LaTeX file: {latex_file}")
+                
+                if os.path.exists(pdf_file):
+                    os.remove(pdf_file)
+                    print(f"Removed PDF file: {pdf_file}")
             
-            # Remove session from index
-            index_data["sessions"] = [s for s in index_data["sessions"] if s["sessionId"] != session_id]
-            index_data["metadata"]["totalSessions"] = len(index_data["sessions"])
-            index_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
+            # Fallback cleanup with old naming pattern
+            output_dir = "output"
+            fallback_latex = os.path.join(output_dir, f"resume_{session_id}.tex")
+            fallback_pdf = os.path.join(output_dir, f"resume_{session_id}.pdf")
             
-            with open(index_path, 'w', encoding='utf-8') as f:
-                json.dump(index_data, f, indent=2, ensure_ascii=False)
+            if os.path.exists(fallback_latex):
+                os.remove(fallback_latex)
+                print(f"Removed fallback LaTeX file: {fallback_latex}")
+            
+            if os.path.exists(fallback_pdf):
+                os.remove(fallback_pdf)
+                print(f"Removed fallback PDF file: {fallback_pdf}")
+                
+        except Exception as cleanup_error:
+            print(f"Warning: File cleanup failed: {str(cleanup_error)}")
         
         return {
             "success": True,
             "message": "Resume session deleted successfully"
         }
         
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"Error deleting resume session: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to delete resume session: {str(e)}")
 
 @app.post("/generateLatex/{session_id}", response_model=GenerateLatexResponse)
-async def generateLatexEndpoint(session_id: str):
+async def generateLatexEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    """Generate LaTeX file from Firebase session data"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{session_id}.json"
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, session_id)
         
-        if not os.path.exists(sessions_dir):
-            raise HTTPException(status_code=404, detail="Sessions directory not found")
-        
-        if not os.path.exists(session_file_path):
+        if not session_data:
             raise HTTPException(status_code=404, detail="Resume session not found")
-        
-        with open(session_file_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
         
         if session_data.get("status") != "completed" or not session_data.get("tailoredResume"):
             raise HTTPException(status_code=400, detail="Session not completed or no tailored resume data available")
@@ -761,17 +803,22 @@ async def generateLatexEndpoint(session_id: str):
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
         
-        latex_filename = f"resume_{session_id}.tex"
+        # Generate filename based on person name, company and position
+        person_name = session_data.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
+        company_name = session_data.get("companyName", "")
+        position = session_data.get("position", "")
+        latex_filename = generate_resume_filename(person_name, company_name, position, session_id, "tex")
         latex_file_path = os.path.join(output_dir, latex_filename)
         
         with open(latex_file_path, 'w', encoding='utf-8') as f:
             f.write(latex_content)
         
-        session_data["latexFilePath"] = latex_file_path
-        session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
-        
-        with open(session_file_path, 'w', encoding='utf-8') as f:
-            json.dump(session_data, f, indent=2, ensure_ascii=False)
+        # Update session in Firebase with LaTeX file path
+        updateData = {
+            "latexFilePath": latex_file_path,
+            "latexContent": latex_content
+        }
+        dbOps.updateSession(userId, session_id, updateData)
         
         return GenerateLatexResponse(
             success=True,
@@ -780,19 +827,18 @@ async def generateLatexEndpoint(session_id: str):
         )
         
     except Exception as e:
+        print(f"Error generating LaTeX: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate LaTeX file: {str(e)}")
 
 @app.get("/downloadPDF/{session_id}")
-async def downloadPDFEndpoint(session_id: str):
+async def downloadPDFEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    """Download PDF from Firebase session data"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{session_id}.json"
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, session_id)
         
-        if not os.path.exists(session_file_path):
+        if not session_data:
             raise HTTPException(status_code=404, detail="Resume session not found")
-        
-        with open(session_file_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
         
         latex_file_path = session_data.get("latexFilePath")
         if not latex_file_path or not os.path.exists(latex_file_path):
@@ -806,17 +852,21 @@ async def downloadPDFEndpoint(session_id: str):
         except Exception as compile_error:
             raise HTTPException(status_code=500, detail=f"LaTeX compilation failed: {str(compile_error)}")
         
-        pdf_filename = f"resume_{session_id}.pdf"
+        # Generate PDF filename based on person name, company and position
+        person_name = session_data.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
+        company_name = session_data.get("companyName", "")
+        position = session_data.get("position", "")
+        pdf_filename = generate_resume_filename(person_name, company_name, position, session_id, "pdf")
         pdf_file_path = os.path.join(output_dir, pdf_filename)
         
         if not os.path.exists(pdf_file_path):
             raise HTTPException(status_code=500, detail="PDF generation failed. The LaTeX file could not be compiled to PDF. Please check the LaTeX content for errors.")
         
-        session_data["pdfFilePath"] = pdf_file_path
-        session_data["metadata"]["lastUpdated"] = datetime.now().isoformat()
-        
-        with open(session_file_path, 'w', encoding='utf-8') as f:
-            json.dump(session_data, f, indent=2, ensure_ascii=False)
+        # Update session in Firebase with PDF file path
+        updateData = {
+            "pdfFilePath": pdf_file_path
+        }
+        dbOps.updateSession(userId, session_id, updateData)
         
         return FileResponse(
             path=pdf_file_path,
@@ -827,25 +877,28 @@ async def downloadPDFEndpoint(session_id: str):
     except HTTPException:
         raise
     except Exception as e:
+        print(f"Error downloading PDF: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to download PDF: {str(e)}")
 
 @app.get("/downloadLatex/{session_id}")
-async def downloadLatexEndpoint(session_id: str):
+async def downloadLatexEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    """Download LaTeX file from Firebase session data"""
     try:
-        sessions_dir = "create_resume_sessions"
-        session_file_path = f"{sessions_dir}/{session_id}.json"
+        # Get session data from Firebase
+        session_data = dbOps.getSession(userId, session_id)
         
-        if not os.path.exists(session_file_path):
+        if not session_data:
             raise HTTPException(status_code=404, detail="Resume session not found")
-        
-        with open(session_file_path, 'r', encoding='utf-8') as f:
-            session_data = json.load(f)
         
         latex_file_path = session_data.get("latexFilePath")
         if not latex_file_path or not os.path.exists(latex_file_path):
             raise HTTPException(status_code=404, detail="LaTeX file not found")
         
-        latex_filename = f"resume_{session_id}.tex"
+        # Generate LaTeX filename based on person name, company and position
+        person_name = session_data.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
+        company_name = session_data.get("companyName", "")
+        position = session_data.get("position", "")  
+        latex_filename = generate_resume_filename(person_name, company_name, position, session_id, "tex")
         
         return FileResponse(
             path=latex_file_path,
@@ -854,6 +907,7 @@ async def downloadLatexEndpoint(session_id: str):
         )
         
     except Exception as e:
+        print(f"Error downloading LaTeX: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to download LaTeX: {str(e)}")
 
 if __name__ == "__main__":
