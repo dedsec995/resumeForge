@@ -361,68 +361,69 @@ const CreateResumeSection = () => {
 
     try {
       setDownloadPDFLoading(true);
-              const response = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
-
-      if (response.data.success) {
-        toast.success('LaTeX file generated successfully!');
-        await handleViewSession(selectedSession.sessionId);
-      } else {
+      
+      // First, ensure LaTeX file exists
+      let latexResponse;
+      try {
+        latexResponse = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
+        if (latexResponse.data.success) {
+          toast.success('LaTeX file generated successfully!');
+          await handleViewSession(selectedSession.sessionId);
+        } else {
+          throw new Error('Failed to generate LaTeX file');
+        }
+      } catch (latexError) {
+        console.error('Error generating LaTeX file:', latexError);
         toast.error('Failed to generate LaTeX file');
+        return;
+      }
+
+      // Then try to download the PDF
+      try {
+        const pdfResponse = await apiClient.get(`/downloadPDF/${selectedSession.sessionId}`, {
+          responseType: 'blob'
+        });
+
+        // Generate filename based on person name, company and position
+        const generateFilename = () => {
+          const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+          const companyName = selectedSession.companyName || '';
+          const position = selectedSession.position || '';
+          
+          if (personName || companyName || position) {
+            const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+            const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+            const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+            const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
+            return `${parts.join('_')}.pdf`;
+          }
+          return `resume_${selectedSession.sessionId}.pdf`;
+        };
+
+        const url = window.URL.createObjectURL(new Blob([pdfResponse.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', generateFilename());
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+        
+        toast.success('PDF downloaded successfully!');
+        await handleViewSession(selectedSession.sessionId);
+      } catch (pdfError) {
+        console.error('Error downloading PDF:', pdfError);
+        toast.error('Failed to download PDF. Please try again.');
       }
     } catch (error) {
-      console.error('Error generating LaTeX file:', error);
-      toast.error('Failed to generate LaTeX file');
+      console.error('Error in PDF download process:', error);
+      toast.error('Failed to process PDF download');
     } finally {
       setDownloadPDFLoading(false);
     }
   };
 
-  const handleDownloadPDFFile = async () => {
-    if (!selectedSession?.latexFilePath) {
-      toast.error('No LaTeX file available for download');
-      return;
-    }
 
-    try {
-      setDownloadPDFLoading(true);
-              const response = await apiClient.get(`/downloadPDF/${selectedSession.sessionId}`, {
-        responseType: 'blob'
-      });
-
-      // Generate filename based on person name, company and position
-      const generateFilename = () => {
-        const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
-        const companyName = selectedSession.companyName || '';
-        const position = selectedSession.position || '';
-        
-        if (personName || companyName || position) {
-          const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
-          return `${parts.join('_')}.pdf`;
-        }
-        return `resume_${selectedSession.sessionId}.pdf`;
-      };
-
-      const url = window.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', generateFilename());
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      
-      toast.success('PDF downloaded successfully!');
-      await handleViewSession(selectedSession.sessionId);
-    } catch (error) {
-      console.error('Error downloading PDF:', error);
-      toast.error('Failed to download PDF');
-    } finally {
-      setDownloadPDFLoading(false);
-    }
-  };
 
   const handleDownloadLatexFile = async () => {
     if (!selectedSession?.latexFilePath) {
@@ -1090,7 +1091,7 @@ const CreateResumeSection = () => {
           ) : (
             <Button 
               variant="contained" 
-              onClick={handleDownloadPDFFile}
+              onClick={handleDownloadPDF}
               disabled={downloadPDFLoading || downloadLatexLoading}
               startIcon={downloadPDFLoading ? <CircularProgress size={16} /> : null}
               sx={{ 
@@ -1112,7 +1113,7 @@ const CreateResumeSection = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {downloadPDFLoading ? 'Downloading...' : 'Download PDF'}
+              {downloadPDFLoading ? 'Generating & Downloading...' : 'Download PDF'}
             </Button>
           )}
           

@@ -803,7 +803,33 @@ async def downloadPDFEndpoint(session_id: str, userId: str = Depends(verifyFireb
         
         latex_file_path = session_data.get("latexFilePath")
         if not latex_file_path or not os.path.exists(latex_file_path):
-            raise HTTPException(status_code=404, detail="LaTeX file not found. Please generate LaTeX first.")
+            print(f"LaTeX file not found for session {session_id}, generating it first...")
+            if session_data.get("status") != "completed" or not session_data.get("tailoredResume"):
+                raise HTTPException(status_code=400, detail="Session not completed or no tailored resume data available")
+            
+            from resume_templates import generate_complete_resume_template
+            
+            latex_content = generate_complete_resume_template(session_data["tailoredResume"])
+            
+            output_dir = "output"
+            if not os.path.exists(output_dir):
+                os.makedirs(output_dir)
+            
+            person_name = session_data.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
+            company_name = session_data.get("companyName", "")
+            position = session_data.get("position", "")
+            latex_filename = generate_resume_filename(person_name, company_name, position, session_id, "tex")
+            latex_file_path = os.path.join(output_dir, latex_filename)
+            
+            with open(latex_file_path, 'w', encoding='utf-8') as f:
+                f.write(latex_content)
+            
+            updateData = {
+                "latexFilePath": latex_file_path,
+                "latexContent": latex_content
+            }
+            dbOps.updateSession(userId, session_id, updateData)
+            print(f"LaTeX file generated successfully: {latex_file_path}")
         
         from latex2pdf import compile_latex
         output_dir = os.path.dirname(latex_file_path)
@@ -811,6 +837,7 @@ async def downloadPDFEndpoint(session_id: str, userId: str = Depends(verifyFireb
         try:
             compile_latex(latex_file_path, output_dir)
         except Exception as compile_error:
+            print(f"LaTeX compilation failed: {str(compile_error)}")
             raise HTTPException(status_code=500, detail=f"LaTeX compilation failed: {str(compile_error)}")
         
         person_name = session_data.get("tailoredResume", {}).get("personalInfo", {}).get("name", "")
@@ -820,9 +847,11 @@ async def downloadPDFEndpoint(session_id: str, userId: str = Depends(verifyFireb
         pdf_file_path = os.path.join(output_dir, pdf_filename)
         
         if not os.path.exists(pdf_file_path):
+            print(f"PDF file not found after compilation: {pdf_file_path}")
             raise HTTPException(status_code=500, detail="PDF generation failed. The LaTeX file could not be compiled to PDF. Please check the LaTeX content for errors.")
         
         dbOps.updateSession(userId, session_id, {"pdfFilePath": pdf_file_path})
+        print(f"PDF generated successfully: {pdf_file_path}")
         
         return FileResponse(
             path=pdf_file_path,

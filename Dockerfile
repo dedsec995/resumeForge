@@ -41,8 +41,8 @@ COPY . .
 # Create output directory
 RUN mkdir -p output
 
-# Create non-root user for security
-RUN useradd -m -u 1000 appuser && chown -R appuser:appuser /app
+# Create non-root user for security (matching host user UID)
+RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port

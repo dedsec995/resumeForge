@@ -3,7 +3,9 @@ import { auth } from '../firebase-config';
 
 // Create axios instance
 const apiClient = axios.create({
-  baseURL: 'http://localhost:8002',
+  baseURL: process.env.NODE_ENV === 'production' 
+    ? 'https://resumeforge.thatinsaneguy.com/api'  // Production - use nginx proxy
+    : 'http://localhost:8002', // Development
   timeout: 10000,
 });
 
