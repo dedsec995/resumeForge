@@ -1,0 +1,54 @@
+# Git
+.git
+.gitignore
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.env
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+agent_log.txt
+
+# Temporary files
+*.tmp
+*.temp
+
+# Documentation
+README.md
+*.md
+
+# Frontend (if present)
+resume-forge-frontend/
+
+# Development files
+rmv.sh
+graph.png
+
+# Backup files
+*.bak
+bakup_*
+
+# Session files
+create_resume_session/
+delete/
+
+# Keep output directory structure but not contents
+output/*
+!output/.gitkeep 

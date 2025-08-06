@@ -1,0 +1,24 @@
+services:
+  resume-forge-backend:
+    build: .
+    container_name: resume-forge-backend
+    ports:
+      - "8002:8002"
+    env_file:
+      - .env
+    volumes:
+      - ./output:/app/output
+      - ./firebase.json:/app/firebase.json:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - resume-forge-network
+
+networks:
+  resume-forge-network:
+    driver: bridge 
