@@ -80,7 +80,8 @@ const CreateResumeSection = () => {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [downloadLoading, setDownloadLoading] = useState(false);
+  const [downloadPDFLoading, setDownloadPDFLoading] = useState(false);
+  const [downloadLatexLoading, setDownloadLatexLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
 
   // Load existing sessions on component mount
@@ -359,7 +360,7 @@ const CreateResumeSection = () => {
     }
 
     try {
-      setDownloadLoading(true);
+      setDownloadPDFLoading(true);
               const response = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
 
       if (response.data.success) {
@@ -372,7 +373,7 @@ const CreateResumeSection = () => {
       console.error('Error generating LaTeX file:', error);
       toast.error('Failed to generate LaTeX file');
     } finally {
-      setDownloadLoading(false);
+      setDownloadPDFLoading(false);
     }
   };
 
@@ -383,7 +384,7 @@ const CreateResumeSection = () => {
     }
 
     try {
-      setDownloadLoading(true);
+      setDownloadPDFLoading(true);
               const response = await apiClient.get(`/downloadPDF/${selectedSession.sessionId}`, {
         responseType: 'blob'
       });
@@ -419,7 +420,7 @@ const CreateResumeSection = () => {
       console.error('Error downloading PDF:', error);
       toast.error('Failed to download PDF');
     } finally {
-      setDownloadLoading(false);
+      setDownloadPDFLoading(false);
     }
   };
 
@@ -430,7 +431,7 @@ const CreateResumeSection = () => {
     }
 
     try {
-      setDownloadLoading(true);
+      setDownloadLatexLoading(true);
               const response = await apiClient.get(`/downloadLatex/${selectedSession.sessionId}`, {
         responseType: 'blob'
       });
@@ -465,7 +466,7 @@ const CreateResumeSection = () => {
       console.error('Error downloading LaTeX:', error);
       toast.error('Failed to download LaTeX file');
     } finally {
-      setDownloadLoading(false);
+      setDownloadLatexLoading(false);
     }
   };
 
@@ -473,7 +474,7 @@ const CreateResumeSection = () => {
     return new Date(timestamp).toLocaleString();
   };
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
   };
 
@@ -1061,8 +1062,8 @@ const CreateResumeSection = () => {
             <Button 
               variant="contained" 
               onClick={selectedSession?.status === 'completed' ? handleDownloadPDF : handleStartWorkflow}
-              disabled={workflowLoading || downloadLoading}
-              startIcon={(workflowLoading || downloadLoading) ? <CircularProgress size={16} /> : null}
+              disabled={workflowLoading || downloadPDFLoading}
+              startIcon={(workflowLoading || downloadPDFLoading) ? <CircularProgress size={16} /> : null}
               sx={{ 
                 mr: 'auto',
                 px: 4,
@@ -1083,15 +1084,15 @@ const CreateResumeSection = () => {
               }}
             >
               {workflowLoading ? 'Processing Resume (1-2 min)...' : 
-               downloadLoading ? 'Generating...' : 
+               downloadPDFLoading ? 'Generating...' : 
                selectedSession?.status === 'completed' ? 'Generate LaTeX' : 'Start Resume Workflow'}
             </Button>
           ) : (
             <Button 
               variant="contained" 
               onClick={handleDownloadPDFFile}
-              disabled={downloadLoading}
-              startIcon={downloadLoading ? <CircularProgress size={16} /> : null}
+              disabled={downloadPDFLoading || downloadLatexLoading}
+              startIcon={downloadPDFLoading ? <CircularProgress size={16} /> : null}
               sx={{ 
                 mr: 'auto',
                 px: 4,
@@ -1111,7 +1112,7 @@ const CreateResumeSection = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {downloadLoading ? 'Downloading...' : 'Download PDF'}
+              {downloadPDFLoading ? 'Downloading...' : 'Download PDF'}
             </Button>
           )}
           
@@ -1119,8 +1120,8 @@ const CreateResumeSection = () => {
             <Button 
               variant="outlined" 
               onClick={handleDownloadLatexFile}
-              disabled={downloadLoading}
-              startIcon={downloadLoading ? <CircularProgress size={16} /> : null}
+              disabled={downloadPDFLoading || downloadLatexLoading}
+              startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
               sx={{ 
                 px: 3,
                 py: 1.5,
@@ -1134,7 +1135,7 @@ const CreateResumeSection = () => {
                 transition: 'all 0.3s ease'
               }}
             >
-              {downloadLoading ? 'Downloading...' : 'Download LaTeX'}
+              {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
             </Button>
           )}
           

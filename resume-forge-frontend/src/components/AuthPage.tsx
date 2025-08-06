@@ -50,7 +50,7 @@ const AuthPage: React.FC = () => {
 
   const { login, signup } = useAuth();
 
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+  const handleTabChange = (_event: React.SyntheticEvent, newValue: number) => {
     setActiveTab(newValue);
     setError('');
     setSuccess('');

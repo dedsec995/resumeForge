@@ -8,7 +8,6 @@ import {
   CircularProgress,
   TextField,
   IconButton,
-  Alert,
   Tab,
   Tabs,
   Paper,
@@ -548,7 +547,7 @@ const ProfileSection = () => {
                     value={(() => {
                       const bulletPoints = Array.isArray(job.bulletPoints) ? job.bulletPoints.join('\n') : (job.bulletPoints || '');
                       // Add bullet points to display if they don't already exist
-                      return bulletPoints.split('\n').map(line => {
+                      return bulletPoints.split('\n').map((line: string) => {
                         const trimmed = line.trim();
                         return trimmed && !trimmed.startsWith('•') ? `• ${trimmed}` : trimmed;
                       }).join('\n');
@@ -729,7 +728,7 @@ const ProfileSection = () => {
                     value={(() => {
                       const bulletPoints = Array.isArray(project.bulletPoints) ? project.bulletPoints.join('\n') : (project.bulletPoints || '');
                       // Add bullet points to display if they don't already exist
-                      return bulletPoints.split('\n').map(line => {
+                      return bulletPoints.split('\n').map((line: string) => {
                         const trimmed = line.trim();
                         return trimmed && !trimmed.startsWith('•') ? `• ${trimmed}` : trimmed;
                       }).join('\n');
