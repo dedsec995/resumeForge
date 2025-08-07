@@ -32,7 +32,8 @@ import {
   WorkOutline as ResumeIcon,
   ArrowForward as ArrowIcon,
   Psychology as AIIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  Refresh as RefreshIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
@@ -88,6 +89,7 @@ const CreateResumeSection = () => {
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [downloadPDFLoading, setDownloadPDFLoading] = useState(false);
   const [downloadLatexLoading, setDownloadLatexLoading] = useState(false);
+  const [regenerateLatexLoading, setRegenerateLatexLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
@@ -491,6 +493,33 @@ const CreateResumeSection = () => {
       toast.error('Failed to download LaTeX file');
     } finally {
       setDownloadLatexLoading(false);
+    }
+  };
+
+  const handleRegenerateLatex = async () => {
+    if (!selectedSession?.sessionId) return;
+    
+    setRegenerateLatexLoading(true);
+    try {
+      // Call the generateLaTeX endpoint to regenerate LaTeX using latest data
+      const response = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
+      
+      if (response.data.success) {
+        // Refresh the session data to get the updated LaTeX content
+        const sessionResponse = await apiClient.get(`/getResumeSession/${selectedSession.sessionId}`);
+        if (sessionResponse.data.success && sessionResponse.data.sessionData) {
+          setSelectedSession(sessionResponse.data.sessionData);
+        }
+        
+        toast.success('LaTeX regenerated successfully!');
+      } else {
+        toast.error('Failed to regenerate LaTeX');
+      }
+    } catch (error) {
+      console.error('Error regenerating LaTeX:', error);
+      toast.error('Failed to regenerate LaTeX');
+    } finally {
+      setRegenerateLatexLoading(false);
     }
   };
 
@@ -1271,7 +1300,7 @@ const CreateResumeSection = () => {
                 </Box>
 
                 {/* Tab Content */}
-                <Box sx={{ height: 'calc(100% - 200px)', display: 'flex', flexDirection: 'column' }}>
+                <Box sx={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
                   {/* Job Description Tab */}
                   {activeTab === 0 && (
                     <Paper 
@@ -1279,7 +1308,7 @@ const CreateResumeSection = () => {
                       sx={{ 
                         p: 2, 
                         background: 'rgba(15, 23, 42, 0.4)',
-                        flex: 1,
+                        height: '100%',
                         overflow: 'auto',
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
@@ -1324,7 +1353,7 @@ const CreateResumeSection = () => {
                       sx={{ 
                         p: 2, 
                         background: 'rgba(15, 23, 42, 0.4)',
-                        flex: 1,
+                        height: '100%',
                         overflow: 'auto',
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
@@ -1368,7 +1397,7 @@ const CreateResumeSection = () => {
                       sx={{ 
                         p: 2, 
                         background: 'rgba(15, 23, 42, 0.4)',
-                        flex: 1,
+                        height: '100%',
                         overflow: 'auto',
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
@@ -1412,7 +1441,7 @@ const CreateResumeSection = () => {
                       sx={{ 
                         p: 2, 
                         background: 'rgba(15, 23, 42, 0.4)',
-                        flex: 1,
+                        height: '100%',
                         overflow: 'auto',
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
@@ -1546,27 +1575,50 @@ const CreateResumeSection = () => {
             )}
             
             {selectedSession?.latexFilePath && (
-              <Button 
-                variant="outlined" 
-                onClick={handleDownloadLatexFile}
-                disabled={downloadPDFLoading || downloadLatexLoading}
-                startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
-                sx={{ 
-                  px: 3,
-                  py: 1.5,
-                  borderRadius: 2,
-                  border: '1px solid rgba(245, 158, 11, 0.5)',
-                  color: '#F59E0B',
-                  '&:hover': {
-                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                    borderColor: '#F59E0B',
-                    transform: 'translateY(-1px)'
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
-              </Button>
+              <>
+                <Button 
+                  variant="outlined" 
+                  onClick={handleRegenerateLatex}
+                  disabled={downloadPDFLoading || downloadLatexLoading || regenerateLatexLoading}
+                  startIcon={regenerateLatexLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
+                  sx={{ 
+                    px: 3,
+                    py: 1.5,
+                    borderRadius: 2,
+                    border: '1px solid rgba(99, 102, 241, 0.5)',
+                    color: '#6366F1',
+                    '&:hover': {
+                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                      borderColor: '#6366F1',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {regenerateLatexLoading ? 'Regenerating...' : 'Regenerate LaTeX'}
+                </Button>
+                <Button 
+                  variant="outlined" 
+                  onClick={handleDownloadLatexFile}
+                  disabled={downloadPDFLoading || downloadLatexLoading || regenerateLatexLoading}
+                  startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
+                  sx={{ 
+                    px: 3,
+                    py: 1.5,
+                    borderRadius: 2,
+                    border: '1px solid rgba(245, 158, 11, 0.5)',
+                    color: '#F59E0B',
+                    '&:hover': {
+                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                      borderColor: '#F59E0B',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.3s ease'
+                  }}
+                >
+                  {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
+                </Button>
+              </>
             )}
             
             <Button 

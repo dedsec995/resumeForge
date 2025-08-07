@@ -18,6 +18,7 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 console = Console()
 
+
 class AgentState(TypedDict):
     resume_data: Dict[str, Any]
     job_description: str
@@ -30,21 +31,36 @@ class AgentState(TypedDict):
     downsides: str
     iteration_count: int
 
+
 def get_initial_data(state):
-    console.print(Panel("Loading initial resume data...", title="Setup", border_style="green"))
+    console.print(
+        Panel("Loading initial resume data...", title="Setup", border_style="green")
+    )
     resume_data = state.get("resume_data")
     job_description = resume_data.get("jobDescription")
-    tailored_resume_data = {k: v for k, v in resume_data.items() if k != "jobDescription"}
+    tailored_resume_data = {
+        k: v for k, v in resume_data.items() if k != "jobDescription"
+    }
     return {
         "resume_data": resume_data,
         "job_description": job_description,
         "tailored_resume_data": tailored_resume_data,
         "iteration_count": 0,
-}
+    }
+
 
 def extract_info(state):
-    console.print(Panel("Extracting Company, Position, and Location...", title="Progress", border_style="blue"))
-    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
+    console.print(
+        Panel(
+            "Extracting Company, Position, and Location...",
+            title="Progress",
+            border_style="blue",
+        )
+    )
+    llm = ChatGoogleGenerativeAI(
+        temperature=0, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
 
     prompt = f"""From the following job description, extract the company name, the position title, and the job location.
                 Format the location as "City, ST" (e.g., "Los Angeles, CA", "New York, NY").
@@ -61,7 +77,9 @@ def extract_info(state):
         position = data["position"]
         location = data.get("location", "Open to Relocation")
     except (json.JSONDecodeError, KeyError):
-        console.print("[bold red]Error: Could not extract company, position, and location in expected JSON format. Setting to defaults.[/bold red]")
+        console.print(
+            "[bold red]Error: Could not extract company, position, and location in expected JSON format. Setting to defaults.[/bold red]"
+        )
         company = "Not Found"
         position = "Not Found"
         location = "Open to Relocation"
@@ -70,14 +88,26 @@ def extract_info(state):
     console.log(location)
     return {"company_name": company, "position": position, "location": location}
 
-def edit_technical_skills(state):
-    console.print(Panel("Editing Technical Skills...", title="Progress", border_style="blue"))
-    llm = ChatOpenAI(temperature=0.6, model="gpt-4", api_key=OPENAI_API_KEY)
 
-    original_skills_section = state["tailored_resume_data"].get("technicalSkillsCategories")
+def edit_technical_skills(state):
+    console.print(
+        Panel("Editing Technical Skills...", title="Progress", border_style="blue")
+    )
+    llm = ChatGoogleGenerativeAI(
+        temperature=0.6, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0.6, model="gpt-4", api_key=OPENAI_API_KEY)
+
+    original_skills_section = state["tailored_resume_data"].get(
+        "technicalSkillsCategories"
+    )
 
     feedback_context = ""
-    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+    if (
+        state.get("feedback")
+        and state.get("downsides")
+        and state.get("iteration_count", 0) > 0
+    ):
         feedback_context = f"""
                     **Previous Feedback and Context:**
                     - **Feedback from previous iteration:** {state.get("feedback", "")}
@@ -116,25 +146,36 @@ def edit_technical_skills(state):
         updated_resume_data["technicalSkillsCategories"] = new_skills_section
         return {"tailored_resume_data": updated_resume_data}
     except json.JSONDecodeError:
-        console.print("[bold yellow]Warning: Failed to extract JSON from LLM response for Technical Skills. Skipping update.[/bold yellow]")
+        console.print(
+            "[bold yellow]Warning: Failed to extract JSON from LLM response for Technical Skills. Skipping update.[/bold yellow]"
+        )
         return {"tailored_resume_data": state["tailored_resume_data"]}
+
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
-    llm = ChatOpenAI(temperature=0.7, model="gpt-4", api_key=OPENAI_API_KEY)
+    llm = ChatGroq(
+        temperature=0.7, model_name="llama-3.3-70b-versatile", api_key=GROQ_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0.7, model="gpt-4", api_key=OPENAI_API_KEY)
 
-    original_experience_section = state["tailored_resume_data"].get("workExperience", [])
+    original_experience_section = state["tailored_resume_data"].get(
+        "workExperience", []
+    )
 
     feedback_context = ""
-    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+    if (
+        state.get("feedback")
+        and state.get("downsides")
+        and state.get("iteration_count", 0) > 0
+    ):
         feedback_context = f"""
             **Previous Feedback and Context:**
             - **Feedback from previous iteration:** {state.get("feedback", "")}
             - **Identified downsides to address:** {state.get("downsides", "")}
             - **Current iteration:** {state.get("iteration_count", 0)}
             
-            **Here is entire resume for your reference:** 
-            {json.dumps(state["tailored_resume_data"], indent=2)}
+            **Here is entire resume for your reference:**
 
             Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
         """
@@ -172,25 +213,34 @@ def edit_experience(state):
         updated_resume_data["workExperience"] = new_experience_section
         return {"tailored_resume_data": updated_resume_data}
     except json.JSONDecodeError:
-        console.print("[bold yellow]Warning: Failed to extract JSON from LLM response for Work Experience. Skipping update.[/bold yellow]")
+        console.print(
+            "[bold yellow]Warning: Failed to extract JSON from LLM response for Work Experience. Skipping update.[/bold yellow]"
+        )
         return {"tailored_resume_data": state["tailored_resume_data"]}
+
 
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
-    llm = ChatOpenAI(temperature=0.3, model="gpt-4", api_key=OPENAI_API_KEY)
+    llm = ChatGroq(
+        temperature=0.3, model_name="llama-3.3-70b-versatile", api_key=GROQ_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0.3, model="gpt-4", api_key=OPENAI_API_KEY)
 
     original_projects_section = state["tailored_resume_data"].get("projects", [])
 
     feedback_context = ""
-    if state.get("feedback") and state.get("downsides") and state.get("iteration_count", 0) > 0:
+    if (
+        state.get("feedback")
+        and state.get("downsides")
+        and state.get("iteration_count", 0) > 0
+    ):
         feedback_context = f"""
             **Previous Feedback and Context:**
             - **Feedback from previous iteration:** {state.get("feedback", "")}
             - **Identified downsides to address:** {state.get("downsides", "")}
             - **Current iteration:** {state.get("iteration_count", 0)}
 
-            **Here is entire resume for your reference:** 
-            {json.dumps(state["tailored_resume_data"], indent=2)}
+            **Here is entire resume for your reference:**
             Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
         """
 
@@ -226,13 +276,21 @@ def edit_projects(state):
         updated_resume_data["projects"] = new_projects_section
         return {"tailored_resume_data": updated_resume_data}
     except json.JSONDecodeError:
-        console.print("[bold yellow]Warning: Failed to extract JSON from LLM response for Projects. Skipping update.[/bold yellow]")
+        console.print(
+            "[bold yellow]Warning: Failed to extract JSON from LLM response for Projects. Skipping update.[/bold yellow]"
+        )
         return {"tailored_resume_data": state["tailored_resume_data"]}
 
+
 def judge_resume_quality(state):
-    console.print(Panel("Judging Resume Quality...", title="Progress", border_style="blue"))
+    console.print(
+        Panel("Judging Resume Quality...", title="Progress", border_style="blue")
+    )
     # llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
-    llm = ChatOpenAI(temperature=0.1, model="gpt-4", api_key=OPENAI_API_KEY)
+    llm = ChatGoogleGenerativeAI(
+        temperature=0.1, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0.1, model="gpt-4", api_key=OPENAI_API_KEY)
     iteration_count = state.get("iteration_count", 0) + 1
 
     prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided JSON resume is tailored to the given job description. Assign a score from 0 to 100, where 100 is perfectly tailored.
@@ -266,7 +324,9 @@ def judge_resume_quality(state):
         feedback = data.get("feedback", "No specific feedback provided.")
         downsides = data.get("downsides", "No specific downsides provided.")
     else:
-        console.print("[bold red]Error: Could not parse LLM feedback. Defaulting score to 0 and providing generic feedback.[/bold red]")
+        console.print(
+            "[bold red]Error: Could not parse LLM feedback. Defaulting score to 0 and providing generic feedback.[/bold red]"
+        )
         score = 0.0
         feedback = "LLM feedback parsing failed. Please check the LLM response format."
         downsides = "Failed to parse LLM feedback."
@@ -275,13 +335,25 @@ def judge_resume_quality(state):
     console.print(f"[bold yellow]Feedback: {feedback}[/bold yellow]")
     console.print(f"[bold red]Downsides: {downsides}[/bold red]")
 
-    return {"score": score, "feedback": feedback, "iteration_count": iteration_count, "downsides": downsides}
+    return {
+        "score": score,
+        "feedback": feedback,
+        "iteration_count": iteration_count,
+        "downsides": downsides,
+    }
+
 
 def keywords_editor(state):
-    console.print(Panel("Finding and embedding keywords...", title="Progress", border_style="blue"))
-    # llm = ChatGoogleGenerativeAI(temperature=0, model="gemini-1.5-flash", google_api_key=GOOGLE_API_KEY)
-    llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
-    
+    console.print(
+        Panel(
+            "Finding and embedding keywords...", title="Progress", border_style="blue"
+        )
+    )
+    llm = ChatGoogleGenerativeAI(
+        temperature=0, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    )
+    # llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
+
     job_description = state["job_description"]
     resume_data = state["tailored_resume_data"]
 
@@ -303,36 +375,59 @@ def keywords_editor(state):
     response = llm.invoke(prompt)
     keywords_data = extract_and_parse_json(response.content)
     if not keywords_data or "keywords" not in keywords_data:
-        console.print("[bold yellow]Warning: Could not parse keywords from LLM response. Keywords not embedded.[/bold yellow]")
+        console.print(
+            "[bold yellow]Warning: Could not parse keywords from LLM response. Keywords not embedded.[/bold yellow]"
+        )
         return {"tailored_resume_data": resume_data}
 
     keywords = ", ".join(keywords_data["keywords"])
     updated_resume_data = resume_data.copy()
     updated_resume_data["invisibleKeywords"] = keywords
-    
+
     return {"tailored_resume_data": updated_resume_data}
 
+
 def finalize_and_print_json(state):
-    console.print(Panel("Finalizing Processed Resume...", title="Complete", border_style="green"))
+    console.print(
+        Panel("Finalizing Processed Resume...", title="Complete", border_style="green")
+    )
     final_json = state["tailored_resume_data"]
-    
+
     full_final_json = state["resume_data"].copy()
     full_final_json["resumeData"] = final_json
     full_final_json["jobDescription"] = state["job_description"]
     full_final_json["status"] = "processed"
-    
+
+    # Include location in the final output
+    full_final_json["location"] = state.get("location", "Open to Relocation")
+
     # Removed verbose JSON output - using summary instead
-    console.print(f"[green]✓ Resume processing completed. Session: {full_final_json.get('sessionId', 'N/A')}[/green]")
+    console.print(
+        f"[green]✓ Resume processing completed. Session: {full_final_json.get('sessionId', 'N/A')}[/green]"
+    )
     return {"tailored_resume_data": full_final_json}
 
 
 def decide_after_judging(state):
     if state["score"] < 80 and state["iteration_count"] < 3:
-        console.print(Panel(f"Score {state['score']}/100 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}", title="Decision", border_style="red"))
+        console.print(
+            Panel(
+                f"Score {state['score']}/100 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}",
+                title="Decision",
+                border_style="red",
+            )
+        )
         return "edit_technical_skills"
     else:
-        console.print(Panel(f"Score {state['score']}/100 is sufficient or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}", title="Decision", border_style="green"))
+        console.print(
+            Panel(
+                f"Score {state['score']}/100 is sufficient or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}",
+                title="Decision",
+                border_style="green",
+            )
+        )
         return "keywords_editor"
+
 
 def workflow(inputs):
     workflow = StateGraph(AgentState)
@@ -359,13 +454,11 @@ def workflow(inputs):
         {
             "edit_technical_skills": "edit_technical_skills",
             "keywords_editor": "keywords_editor",
-        }
+        },
     )
-    workflow.add_edge("keywords_editor","finalize_and_print_json")
+    workflow.add_edge("keywords_editor", "finalize_and_print_json")
     workflow.add_edge("finalize_and_print_json", END)
 
     app = workflow.compile()
     result = app.invoke(inputs)
     return result
-
-
