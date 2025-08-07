@@ -16,6 +16,8 @@ import {
   CircularProgress,
   Alert,
   Fade,
+  Grow,
+  Slide,
   IconButton,
   Tabs,
   Tab
@@ -26,7 +28,11 @@ import {
   AccessTime as TimeIcon,
   Description as DescriptionIcon,
   Code as CodeIcon,
-  DataObject as DataObjectIcon
+  DataObject as DataObjectIcon,
+  WorkOutline as ResumeIcon,
+  ArrowForward as ArrowIcon,
+  Psychology as AIIcon,
+  Star as StarIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
@@ -83,6 +89,8 @@ const CreateResumeSection = () => {
   const [downloadPDFLoading, setDownloadPDFLoading] = useState(false);
   const [downloadLatexLoading, setDownloadLatexLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [showNewResumeForm, setShowNewResumeForm] = useState(false);
+  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
 
   // Load existing sessions on component mount
   useEffect(() => {
@@ -92,9 +100,19 @@ const CreateResumeSection = () => {
   const loadSessions = async () => {
     try {
       setLoading(true);
-              const response = await apiClient.get('/getResumeSessions');
+      const response = await apiClient.get('/getResumeSessions');
       if (response.data.success) {
-        setSessions(response.data.sessions);
+        const sessionsData = response.data.sessions;
+        setSessions(sessionsData);
+        
+        // Check if this is a first-time user
+        if (sessionsData.length === 0) {
+          setIsFirstTimeUser(true);
+          setShowNewResumeForm(true);
+        } else {
+          setIsFirstTimeUser(false);
+          setShowNewResumeForm(false);
+        }
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
@@ -146,20 +164,25 @@ const CreateResumeSection = () => {
                   setWorkflowLoading(false);
                   toast.success(`Resume processing completed! Final score: ${statusResponse.data.currentScore}/100`);
                   
-                  // Refresh the sessions list to show updated status
-                  loadSessions();
-                  
-                  // If the modal is open for this session, refresh the session data
-                  if (selectedSession && selectedSession.sessionId === sessionId) {
-                    try {
-                      const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
-                      if (sessionResponse.data.success && sessionResponse.data.sessionData) {
-                        setSelectedSession(sessionResponse.data.sessionData);
-                      }
-                    } catch (refreshError) {
-                      console.error('Error refreshing session data:', refreshError);
-                    }
-                  }
+                          // Refresh the sessions list to show updated status
+        loadSessions();
+        
+        // Hide the form after successful submission for returning users
+        if (!isFirstTimeUser) {
+          setShowNewResumeForm(false);
+        }
+        
+        // If the modal is open for this session, refresh the session data
+        if (selectedSession && selectedSession.sessionId === sessionId) {
+          try {
+            const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+            if (sessionResponse.data.success && sessionResponse.data.sessionData) {
+              setSelectedSession(sessionResponse.data.sessionData);
+            }
+          } catch (refreshError) {
+            console.error('Error refreshing session data:', refreshError);
+          }
+        }
                   
                 } else if (status === 'failed') {
                   clearInterval(pollInterval);
@@ -200,7 +223,7 @@ const CreateResumeSection = () => {
           toast.error('Failed to start automatic processing. You can start it manually.');
         }
         
-        loadSessions(); // Refresh the sessions list
+        loadSessions(); // Refresh the sessions list and update form visibility
       } else {
         toast.error('Failed to create resume session');
       }
@@ -479,687 +502,1107 @@ const CreateResumeSection = () => {
     setActiveTab(newValue);
   };
 
+  const handleToggleNewResumeForm = () => {
+    setShowNewResumeForm(!showNewResumeForm);
+  };
+
   return (
-    <Container maxWidth="lg" sx={{ py: 2 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" component="h1" gutterBottom sx={{ fontWeight: 600, color: 'primary.main' }}>
-          Create Resume
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Paste a job description to automatically create and process your tailored resume
-        </Typography>
-      </Box>
+    <Box sx={{ 
+      minHeight: '100vh',
+      background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%)',
+      py: 4
+    }}>
+      <Container maxWidth="xl">
+        {/* Header */}
+        <Fade in timeout={800}>
+          <Box sx={{ mb: 6 }}>
+            <Grow in timeout={1000}>
+              <Box sx={{ 
+                display: 'flex', 
+                alignItems: 'flex-start', 
+                justifyContent: 'space-between',
+                mb: 4,
+                flexWrap: { xs: 'wrap', md: 'nowrap' },
+                gap: 3
+              }}>
+                {/* Left side - Title and subtitle */}
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center',
+                    mb: 2,
+                    cursor: 'pointer',
+                    transition: 'transform 0.3s ease-in-out',
+                    '&:hover': {
+                      transform: 'scale(1.02)'
+                    }
+                  }}>
+                    <ResumeIcon sx={{ 
+                      fontSize: { xs: 48, md: 56 }, 
+                      color: '#6366F1',
+                      filter: 'drop-shadow(0 0 12px rgba(99, 102, 241, 0.5))',
+                      mr: 2,
+                      animation: 'pulse 2s infinite',
+                      flexShrink: 0
+                    }} />
+                    <Typography 
+                      variant="h2" 
+                      component="h1" 
+                      sx={{ 
+                        fontWeight: 700, 
+                        color: '#F8FAFC',
+                        fontSize: { xs: '2.5rem', md: '3rem', lg: '3.5rem' },
+                        letterSpacing: '-0.02em',
+                        background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                        backgroundClip: 'text',
+                        WebkitBackgroundClip: 'text',
+                        WebkitTextFillColor: 'transparent',
+                        filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.3))',
+                        lineHeight: 1.1
+                      }}
+                    >
+                      Create Resume
+                    </Typography>
+                  </Box>
 
-      {/* Global Processing Indicator */}
-      {workflowLoading && (
-        <Alert 
-          severity="info" 
-          sx={{ mb: 3 }}
-          icon={<CircularProgress size={20} />}
-        >
-          <Typography variant="body2">
-            <strong>Processing Resume...</strong> We're analyzing the job description, tailoring your resume, and generating LaTeX files. This may take a few minutes.
-          </Typography>
-        </Alert>
-      )}
+                  <Slide direction="up" in timeout={1200}>
+                    <Typography 
+                      variant="h5" 
+                      component="h2" 
+                      sx={{ 
+                        color: '#E2E8F0',
+                        lineHeight: 1.4,
+                        fontSize: { xs: '1.1rem', md: '1.3rem' },
+                        opacity: 0.9,
+                        fontWeight: 400,
+                        pl: { xs: 0, md: 7 } // Align with the title text (icon width + margin)
+                      }}
+                    >
+                      Paste a job description to automatically create and process your tailored resume
+                    </Typography>
+                  </Slide>
+                </Box>
 
-      {/* Job Description Input Form */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <AddIcon sx={{ mr: 1 }} />
-          New Resume (Auto-Process)
-        </Typography>
-
-        <TextField
-          fullWidth
-          multiline
-          rows={4}
-          label="Job Description"
-          value={jobDescription}
-          onChange={(e) => setJobDescription(e.target.value)}
-          placeholder="Paste the job description here..."
-          sx={{ mb: 2 }}
-          helperText={`${jobDescription.length} characters, ${jobDescription.split(' ').filter(word => word.length > 0).length} words`}
-        />
-
-        <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-          <Button
-            variant="contained"
-            size="large"
-            onClick={handleSubmit}
-            disabled={submitting || workflowLoading || !jobDescription.trim()}
-            startIcon={submitting || workflowLoading ? <CircularProgress size={20} /> : <AddIcon />}
-            sx={{ px: 4 }}
-          >
-            {submitting ? 'Creating Session...' : workflowLoading ? 'Processing Resume...' : 'Create & Process Resume'}
-          </Button>
-        </Box>
-      </Paper>
-
-      {/* Sessions List */}
-      <Box>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-          <DescriptionIcon sx={{ mr: 1 }} />
-          Resume Sessions ({sessions.length})
-        </Typography>
-
-        {loading ? (
-          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-            <CircularProgress />
+                {/* Right side - Create New Resume button (only when form is hidden and user has sessions) */}
+                {!showNewResumeForm && !isFirstTimeUser && (
+                  <Fade in timeout={600}>
+                    <Box sx={{ flexShrink: 0 }}>
+                      <Button
+                        variant="outlined"
+                        size="large"
+                        onClick={handleToggleNewResumeForm}
+                        startIcon={<AddIcon />}
+                        sx={{ 
+                          px: 4,
+                          py: 2,
+                          fontSize: '1rem',
+                          fontWeight: 600,
+                          border: '2px solid rgba(99, 102, 241, 0.4)',
+                          color: '#6366F1',
+                          borderRadius: 3,
+                          background: 'rgba(99, 102, 241, 0.05)',
+                          backdropFilter: 'blur(10px)',
+                          whiteSpace: 'nowrap',
+                          '&:hover': {
+                            borderColor: '#6366F1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            transform: 'translateY(-2px)',
+                            boxShadow: '0 8px 25px rgba(99, 102, 241, 0.3)'
+                          },
+                          transition: 'all 0.3s ease-in-out',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          '&::before': {
+                            content: '""',
+                            position: 'absolute',
+                            top: 0,
+                            left: '-100%',
+                            width: '100%',
+                            height: '100%',
+                            background: 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent)',
+                            transition: 'left 0.5s',
+                          },
+                          '&:hover::before': {
+                            left: '100%',
+                          }
+                        }}
+                      >
+                        Create New Resume
+                      </Button>
+                    </Box>
+                  </Fade>
+                )}
+              </Box>
+            </Grow>
           </Box>
-        ) : sessions.length === 0 ? (
-          <Alert severity="info" sx={{ mb: 2 }}>
-            No resume sessions created yet. Create your first session above!
-          </Alert>
-        ) : (
-          <Grid container spacing={2}>
-            {sessions.map((session, index) => (
-              <Grid item xs={12} md={6} lg={4} key={session.sessionId}>
-                 <Fade in={true} timeout={300 + index * 100}>
-                   <Card 
-                     sx={{ 
-                       height: '100%', 
-                       display: 'flex', 
-                       flexDirection: 'column', 
-                       cursor: 'pointer',
-                       '&:hover': {
-                         bgcolor: 'rgba(255, 255, 255, 0.02)',
-                         transform: 'translateY(-1px)',
-                         boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)'
-                       },
-                       transition: 'all 0.2s ease-in-out'
-                     }}
-                     onClick={() => handleViewSession(session.sessionId)}
-                   >
-                     <CardContent sx={{ flexGrow: 1, p: 2, pb: 1 }}>
-                       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                         <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                           <DescriptionIcon sx={{ mr: 1, color: 'primary.main', flexShrink: 0 }} />
-                           <Box sx={{ flex: 1, minWidth: 0 }}>
-                             <Typography 
-                               variant="h6" 
-                               component="div" 
-                               sx={{ 
-                                 fontWeight: 600, 
-                                 mb: 0.5,
-                                 overflow: 'hidden',
-                                 textOverflow: 'ellipsis',
-                                 whiteSpace: 'nowrap'
-                               }}
-                             >
-                               {session.status === 'completed' && session.companyName ? session.companyName : 'Resume Session'}
-                             </Typography>
-                             {session.status === 'completed' && session.position ? (
-                               <Typography 
-                                 variant="body2" 
-                                 sx={{ 
-                                   color: 'text.secondary', 
-                                   fontSize: '0.85rem',
-                                   overflow: 'hidden',
-                                   textOverflow: 'ellipsis',
-                                   whiteSpace: 'nowrap'
-                                 }}
-                               >
-                                 {session.position}
-                               </Typography>
-                             ) : (
-                               <Typography variant="body2" sx={{ color: 'text.secondary', fontSize: '0.85rem' }}>
-                                 Click to edit
-                               </Typography>
-                             )}
-                           </Box>
-                         </Box>
-                         <Box sx={{ flexShrink: 0 }}>
-                           <IconButton
-                             size="small"
-                             color="error"
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleDeleteSession(session.sessionId);
-                             }}
-                             sx={{ 
-                               p: 0.5,
-                               '&:hover': {
-                                 bgcolor: 'rgba(244, 67, 54, 0.1)'
-                               }
-                             }}
-                           >
-                             <DeleteIcon fontSize="small" />
-                           </IconButton>
-                         </Box>
-                       </Box>
-                       
-                       <Box sx={{ flexGrow: 1 }}>
-                         <Typography 
-                           variant="body2" 
-                           sx={{ 
-                             mb: 0, 
-                             lineHeight: 1.4,
-                             p: 1,
-                             borderRadius: 1,
-                             transition: 'background-color 0.2s'
-                           }}
-                         >
-                           {session.preview}
-                         </Typography>
-                       </Box>
-                       
-                       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 1, mb: 0.5 }}>
-                         <Chip 
-                           label={session.status === 'processing' ? 'Processing...' : session.status} 
-                           size="small" 
-                           color={session.status === 'completed' ? 'success' : 
-                                  session.status === 'processing' ? 'primary' : 
-                                  session.status === 'failed' ? 'error' : 'default'}
-                           icon={session.status === 'processing' ? <CircularProgress size={16} /> : undefined}
-                           sx={{ textTransform: 'capitalize' }}
-                         />
-                         <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', fontSize: '0.75rem' }}>
-                           <TimeIcon sx={{ mr: 0.5, fontSize: 12 }} />
-                           {formatDate(session.timestamp)}
-                         </Typography>
-                       </Box>
-                     </CardContent>
-                   </Card>
-                 </Fade>
-              </Grid>
-            ))}
-          </Grid>
+        </Fade>
+
+        {/* Global Processing Indicator */}
+        {workflowLoading && (
+          <Fade in timeout={800}>
+            <Alert 
+              severity="info" 
+              sx={{ 
+                mb: 4,
+                background: 'rgba(30, 41, 59, 0.8)',
+                border: '1px solid rgba(99, 102, 241, 0.3)',
+                backdropFilter: 'blur(10px)',
+                borderRadius: 2,
+                '& .MuiAlert-icon': {
+                  color: '#6366F1'
+                }
+              }}
+              icon={<CircularProgress size={20} sx={{ color: '#6366F1' }} />}
+            >
+              <Typography variant="body2" sx={{ color: '#F8FAFC' }}>
+                <strong>Processing Resume...</strong> We're analyzing the job description, tailoring your resume, and generating LaTeX files. This may take a few minutes.
+              </Typography>
+            </Alert>
+          </Fade>
         )}
-      </Box>
 
-             {/* Session Details Dialog */}
-       <Dialog 
-         open={dialogOpen} 
-         onClose={() => {
-           setDialogOpen(false);
-           setSelectedSession(null);
-           // Clean up any refresh intervals
-           const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
-           if (windowWithCleanup.sessionRefreshCleanup) {
-             windowWithCleanup.sessionRefreshCleanup();
-             windowWithCleanup.sessionRefreshCleanup = undefined;
-           }
-         }}
-         maxWidth="lg"
-         fullWidth
-         PaperProps={{
-           sx: {
-             maxHeight: '90vh',
-             minHeight: '600px'
-           }
-         }}
-         TransitionProps={{
-           timeout: 300
-         }}
-       >
-        <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          Resume Session Details
-          {selectedSession && (
-            <Chip 
-              label={selectedSession.status === 'completed' && selectedSession.workflowResult 
-                ? `${selectedSession.workflowResult.score}/100` 
-                : selectedSession.status} 
-              size="small" 
-              color={selectedSession.status === 'completed' ? 'success' : 
-                     selectedSession.status === 'processing' ? 'primary' : 
-                     selectedSession.status === 'failed' ? 'error' : 'default'}
-              sx={{ textTransform: 'capitalize' }}
-            />
-          )}
-        </DialogTitle>
-                 <DialogContent sx={{ minHeight: '500px', maxHeight: '70vh' }}>
-           {dialogLoading ? (
-             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-               <CircularProgress />
-             </Box>
-           ) : selectedSession ? (
-            <Box>
-              {/* Session Info */}
-              <Paper 
-                variant="outlined" 
-                sx={{ 
-                  p: 2, 
-                  mb: 2, 
-                  background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                  border: '1px solid rgba(255, 255, 255, 0.1)',
-                  borderRadius: 2,
-                  backdropFilter: 'blur(10px)'
-                }}
-              >
-                <Grid container spacing={2}>
-                  <Grid item xs={12} sm={6}>
-                    <Box>
-                      {selectedSession.status === 'completed' && selectedSession.workflowResult ? (
-                        <>
-                          <Typography variant="h5" sx={{ 
-                            fontWeight: 700, 
-                            background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
-                            backgroundClip: 'text',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            mb: 0.5
-                          }}>
-                            {selectedSession.workflowResult.company_name}
-                          </Typography>
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 500, 
-                            color: 'text.secondary',
-                            opacity: 0.9
-                          }}>
-                            {selectedSession.workflowResult.position}
-                          </Typography>
-                        </>
-                      ) : (
-                        <Typography variant="h6" sx={{ 
-                          fontWeight: 600, 
-                          color: 'primary.main',
-                          opacity: 0.8
-                        }}>
-                          Session Created
-                        </Typography>
-                      )}
-                    </Box>
-                  </Grid>
-                  <Grid item xs={12} sm={6}>
-                    <Box sx={{ textAlign: 'right' }}>
-                      <Typography variant="body2" sx={{ 
-                        fontFamily: 'monospace', 
-                        color: 'text.secondary',
-                        opacity: 0.7,
-                        fontSize: '0.75rem'
-                      }}>
-                        {selectedSession.sessionId}
-                      </Typography>
-                      <Typography variant="body2" sx={{ 
-                        color: 'text.secondary',
-                        opacity: 0.8,
-                        mt: 0.5
-                      }}>
-                        {formatDate(selectedSession.timestamp)}
-                      </Typography>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Paper>
-
-              {/* Tabs */}
-              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
-                <Tabs 
-                  value={activeTab} 
-                  onChange={handleTabChange}
-                  sx={{
-                    minHeight: '40px',
-                    '& .MuiTab-root': {
-                      color: 'text.secondary',
-                      minHeight: '40px',
-                      padding: '6px 12px',
-                      fontSize: '0.875rem',
-                      textTransform: 'none',
-                      fontWeight: 500,
-                      '&.Mui-selected': {
-                        color: 'primary.main',
-                        fontWeight: 600
-                      }
-                    },
-                    '& .MuiTabs-indicator': {
-                      backgroundColor: 'primary.main',
-                      height: '2px'
+        {/* Interactive New Resume Section */}
+        <Slide direction="up" in timeout={1400}>
+          <Box sx={{ mb: 4 }}>
+            {/* First Time User Welcome */}
+            {isFirstTimeUser && (
+              <Fade in timeout={800}>
+                <Paper 
+                  elevation={8}
+                  sx={{ 
+                    p: 4, 
+                    mb: 4,
+                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
+                    border: '2px solid rgba(99, 102, 241, 0.3)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: 3,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '4px',
+                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899, #6366F1)',
+                      animation: 'shimmer 2s infinite'
                     }
                   }}
                 >
-                  <Tab 
-                    icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                    label="Job Description" 
-                    iconPosition="start"
-                  />
-                  {selectedSession.tailoredResume && (
-                    <Tab 
-                      icon={<DataObjectIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                      label="JSON Output" 
-                      iconPosition="start"
-                    />
-                  )}
-                  {selectedSession.latexFilePath && (
-                    <Tab 
-                      icon={<CodeIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                      label="Generated LaTeX" 
-                      iconPosition="start"
-                    />
-                  )}
-                  {selectedSession.status === 'completed' && selectedSession.workflowResult && (
-                    <Tab 
-                      icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                      label="Feedback" 
-                      iconPosition="start"
-                    />
-                  )}
-                </Tabs>
-              </Box>
-
-              {/* Tab Content */}
-              <Box sx={{ minHeight: '350px' }}>
-                {/* Job Description Tab */}
-                {activeTab === 0 && (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      p: 1.5, 
-                      background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.02) 100%)',
-                      minHeight: 350,
-                      maxHeight: 450, 
-                      overflow: 'auto',
-                      border: '1px solid rgba(255, 255, 255, 0.12)',
-                      borderRadius: 2,
-                      backdropFilter: 'blur(5px)',
-                      '&::-webkit-scrollbar': {
-                        width: '8px'
-                      },
-                      '&::-webkit-scrollbar-track': {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '4px'
-                      },
-                      '&::-webkit-scrollbar-thumb': {
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        borderRadius: '4px',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.3)'
-                        }
-                      }
-                    }}
-                  >
-                    <Typography 
-                      variant="body2" 
-                      sx={{ 
-                        whiteSpace: 'pre-wrap', 
-                        lineHeight: 1.5,
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: '0.9rem',
-                        fontWeight: 400
-                      }}
-                    >
-                      {selectedSession.jobDescription && selectedSession.jobDescription.trim() 
-                        ? selectedSession.jobDescription 
-                        : 'No job description available'}
+                  <Box sx={{ textAlign: 'center' }}>
+                    <StarIcon sx={{ 
+                      fontSize: 60, 
+                      color: '#6366F1', 
+                      mb: 2,
+                      filter: 'drop-shadow(0 0 12px rgba(99, 102, 241, 0.5))',
+                      animation: 'pulse 2s infinite'
+                    }} />
+                    <Typography variant="h4" sx={{ 
+                      fontWeight: 700, 
+                      color: '#F8FAFC',
+                      mb: 2,
+                      background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                      backgroundClip: 'text',
+                      WebkitBackgroundClip: 'text',
+                      WebkitTextFillColor: 'transparent'
+                    }}>
+                      Welcome to Resume Forge! 🎉
                     </Typography>
-                  </Paper>
-                )}
+                    <Typography variant="h6" sx={{ 
+                      color: '#E2E8F0',
+                      mb: 3,
+                      opacity: 0.9,
+                      lineHeight: 1.5
+                    }}>
+                      Ready to create your first AI-powered tailored resume? 
+                      <br />
+                      Just paste a job description below and watch the magic happen!
+                    </Typography>
+                  </Box>
+                </Paper>
+              </Fade>
+            )}
 
-                {/* JSON Output Tab */}
-                {activeTab === 1 && selectedSession.tailoredResume && (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      p: 1.5, 
-                      background: 'linear-gradient(135deg, rgba(33, 150, 243, 0.08) 0%, rgba(33, 150, 243, 0.03) 100%)',
-                      minHeight: 350,
-                      maxHeight: 450, 
-                      overflow: 'auto',
-                      border: '1px solid rgba(33, 150, 243, 0.25)',
-                      borderRadius: 2,
-                      backdropFilter: 'blur(5px)',
-                      '&::-webkit-scrollbar': {
-                        width: '8px'
-                      },
-                      '&::-webkit-scrollbar-track': {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '4px'
-                      },
-                      '&::-webkit-scrollbar-thumb': {
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        borderRadius: '4px',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.3)'
-                        }
-                      }
-                    }}
-                  >
-                    <pre 
-                      style={{ 
-                        margin: 0, 
-                        fontSize: '11px', 
-                        whiteSpace: 'pre-wrap',
-                        fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                        lineHeight: 1.3,
-                        color: 'rgba(255, 255, 255, 0.85)',
-                        fontWeight: 400
-                      }}
-                    >
-                      {JSON.stringify(selectedSession.tailoredResume, null, 2)}
-                    </pre>
-                  </Paper>
-                )}
-
-                {/* Generated LaTeX Tab */}
-                {activeTab === 2 && selectedSession.latexFilePath && (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      p: 1.5, 
-                      background: 'linear-gradient(135deg, rgba(76, 175, 80, 0.08) 0%, rgba(76, 175, 80, 0.03) 100%)',
-                      minHeight: 350,
-                      maxHeight: 450, 
-                      overflow: 'auto',
-                      border: '1px solid rgba(76, 175, 80, 0.25)',
-                      borderRadius: 2,
-                      backdropFilter: 'blur(5px)',
-                      '&::-webkit-scrollbar': {
-                        width: '8px'
-                      },
-                      '&::-webkit-scrollbar-track': {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '4px'
-                      },
-                      '&::-webkit-scrollbar-thumb': {
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        borderRadius: '4px',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.3)'
-                        }
-                      }
-                    }}
-                  >
-                    <pre 
-                      style={{ 
-                        margin: 0, 
-                        fontSize: '11px', 
-                        whiteSpace: 'pre-wrap',
-                        fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                        lineHeight: 1.3,
-                        color: 'rgba(255, 255, 255, 0.85)',
-                        fontWeight: 400
-                      }}
-                    >
-                      {selectedSession.latexContent || 'Loading LaTeX content...'}
-                    </pre>
-                  </Paper>
-                )}
-
-                {/* Feedback Tab */}
-                {activeTab === 3 && selectedSession.status === 'completed' && selectedSession.workflowResult && (
-                  <Paper 
-                    variant="outlined" 
-                    sx={{ 
-                      p: 1.5, 
-                      background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.08) 0%, rgba(118, 75, 162, 0.03) 100%)',
-                      minHeight: 350,
-                      maxHeight: 450, 
-                      overflow: 'auto',
-                      border: '1px solid rgba(102, 126, 234, 0.25)',
-                      borderRadius: 2,
-                      backdropFilter: 'blur(5px)',
-                      '&::-webkit-scrollbar': {
-                        width: '8px'
-                      },
-                      '&::-webkit-scrollbar-track': {
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        borderRadius: '4px'
-                      },
-                      '&::-webkit-scrollbar-thumb': {
-                        background: 'rgba(255, 255, 255, 0.2)',
-                        borderRadius: '4px',
-                        '&:hover': {
-                          background: 'rgba(255, 255, 255, 0.3)'
-                        }
-                      }
-                    }}
-                  >
-                    <Box>
-                      <Typography variant="h6" sx={{ 
-                        fontWeight: 600,
-                        color: 'primary.main',
-                        mb: 1.5,
-                        fontSize: '1rem'
-                      }}>
-                        💡 Feedback
+            {/* New Resume Form - Hidden by default if user has sessions */}
+            {showNewResumeForm && (
+              <Fade in timeout={600}>
+                <Paper 
+                  elevation={8}
+                  sx={{ 
+                    p: 4, 
+                    mb: 4,
+                    background: 'rgba(30, 41, 59, 0.8)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    backdropFilter: 'blur(20px)',
+                    borderRadius: 3,
+                    position: 'relative',
+                    overflow: 'hidden',
+                    '&::before': {
+                      content: '""',
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: '3px',
+                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899)',
+                      animation: 'shimmer 3s infinite'
+                    }
+                  }}
+                >
+                  <Box sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    justifyContent: 'space-between',
+                    mb: 3,
+                    pb: 2,
+                    borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
+                  }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                      <AIIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
+                      <Typography variant="h5" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                        New Resume (Auto-Process)
                       </Typography>
-                      <Typography variant="body2" sx={{ 
-                        whiteSpace: 'pre-wrap', 
-                        lineHeight: 1.5,
-                        color: 'rgba(255, 255, 255, 0.9)',
-                        fontSize: '0.9rem',
-                        mb: 2
-                      }}>
-                        {selectedSession.workflowResult.feedback}
-                      </Typography>
-                      
-                      {selectedSession.workflowResult.downsides && (
-                        <>
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 600,
-                            color: 'warning.main',
-                            mb: 1.5,
-                            fontSize: '1rem'
-                          }}>
-                            🔧 Areas for Improvement
-                          </Typography>
-                          <Typography variant="body2" sx={{ 
-                            whiteSpace: 'pre-wrap', 
-                            lineHeight: 1.5,
-                            color: 'rgba(255, 255, 255, 0.9)',
-                            fontSize: '0.9rem'
-                          }}>
-                            {selectedSession.workflowResult.downsides}
-                          </Typography>
-                        </>
-                      )}
                     </Box>
-                  </Paper>
-                )}
-              </Box>
-              
-            </Box>
-          ) : (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-              <Typography variant="body1" color="text.secondary">
-                No session data available
+                    {!isFirstTimeUser && (
+                      <IconButton
+                        onClick={handleToggleNewResumeForm}
+                        sx={{ 
+                          color: '#94A3B8',
+                          '&:hover': {
+                            color: '#6366F1',
+                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            transform: 'scale(1.1)'
+                          },
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                      >
+                        <DeleteIcon />
+                      </IconButton>
+                    )}
+                  </Box>
+
+                  <TextField
+                    fullWidth
+                    multiline
+                    rows={4}
+                    label="Job Description"
+                    value={jobDescription}
+                    onChange={(e) => setJobDescription(e.target.value)}
+                    placeholder="Paste the job description here..."
+                    sx={{ 
+                      mb: 3,
+                      '& .MuiOutlinedInput-root': {
+                        backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                        borderRadius: 2,
+                        '& fieldset': {
+                          borderColor: 'rgba(99, 102, 241, 0.3)',
+                        },
+                        '&:hover fieldset': {
+                          borderColor: '#6366F1',
+                        },
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#6366F1',
+                        },
+                      },
+                      '& .MuiInputLabel-root': {
+                        color: '#94A3B8',
+                        '&.Mui-focused': {
+                          color: '#6366F1',
+                        },
+                      },
+                      '& .MuiInputBase-input': {
+                        color: '#F8FAFC',
+                      },
+                      '& .MuiFormHelperText-root': {
+                        color: '#64748B',
+                      },
+                    }}
+                    helperText={`${jobDescription.length} characters, ${jobDescription.split(' ').filter(word => word.length > 0).length} words`}
+                  />
+
+                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
+                    <Button
+                      variant="contained"
+                      size="large"
+                      onClick={handleSubmit}
+                      disabled={submitting || workflowLoading || !jobDescription.trim()}
+                      startIcon={submitting || workflowLoading ? <CircularProgress size={20} /> : <AddIcon />}
+                      endIcon={!submitting && !workflowLoading ? <ArrowIcon /> : null}
+                      sx={{ 
+                        px: 4,
+                        py: 1.5,
+                        fontSize: '1.1rem',
+                        fontWeight: 600,
+                        background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                        boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
+                        borderRadius: 2,
+                        '&:hover': {
+                          background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
+                          boxShadow: '0 8px 25px rgba(99, 102, 241, 0.5)',
+                          transform: 'translateY(-2px)'
+                        },
+                        '&:disabled': {
+                          background: 'rgba(99, 102, 241, 0.3)',
+                          transform: 'none'
+                        },
+                        transition: 'all 0.3s ease-in-out',
+                        position: 'relative',
+                        overflow: 'hidden',
+                        '&::before': {
+                          content: '""',
+                          position: 'absolute',
+                          top: 0,
+                          left: '-100%',
+                          width: '100%',
+                          height: '100%',
+                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                          transition: 'left 0.5s',
+                        },
+                        '&:hover::before': {
+                          left: '100%',
+                        }
+                      }}
+                    >
+                      {submitting ? 'Creating Session...' : workflowLoading ? 'Processing Resume...' : 'Create & Process Resume'}
+                    </Button>
+                  </Box>
+                </Paper>
+              </Fade>
+            )}
+
+            
+          </Box>
+        </Slide>
+
+        {/* Sessions List */}
+        <Slide direction="up" in timeout={1600}>
+          <Box>
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              mb: 4,
+              pb: 2,
+              borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
+            }}>
+              <DescriptionIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
+              <Typography variant="h4" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                Resume Sessions ({sessions.length})
               </Typography>
             </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2, pt: 1.5 }}>
-          {!selectedSession?.latexFilePath ? (
+
+            {loading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                <CircularProgress 
+                  size={60} 
+                  sx={{ 
+                    color: '#6366F1',
+                    filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
+                  }} 
+                />
+              </Box>
+            ) : sessions.length === 0 ? (
+              <Paper 
+                elevation={4}
+                sx={{ 
+                  p: 4,
+                  textAlign: 'center',
+                  background: 'rgba(30, 41, 59, 0.6)',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  borderRadius: 3
+                }}
+              >
+                <StarIcon sx={{ fontSize: 60, color: '#6366F1', mb: 2, opacity: 0.7 }} />
+                <Typography variant="h6" sx={{ color: '#F8FAFC', mb: 1 }}>
+                  {isFirstTimeUser ? 'No resume sessions yet' : 'All sessions cleared'}
+                </Typography>
+                <Typography variant="body1" sx={{ color: '#94A3B8' }}>
+                  {isFirstTimeUser ? 'Create your first session above to get started!' : 'Click the button above to create a new resume!'}
+                </Typography>
+              </Paper>
+            ) : (
+              <Grid container spacing={3}>
+                {sessions.map((session, index) => (
+                  <Grid item xs={12} md={6} lg={4} key={session.sessionId}>
+                    <Fade in={true} timeout={300 + index * 100}>
+                      <Card 
+                        elevation={4}
+                        sx={{ 
+                          height: '100%', 
+                          display: 'flex', 
+                          flexDirection: 'column', 
+                          cursor: 'pointer',
+                          background: 'rgba(30, 41, 59, 0.8)',
+                          border: '1px solid rgba(99, 102, 241, 0.2)',
+                          backdropFilter: 'blur(20px)',
+                          borderRadius: 3,
+                          transition: 'all 0.3s ease-in-out',
+                          '&:hover': {
+                            borderColor: 'rgba(99, 102, 241, 0.4)',
+                            transform: 'translateY(-4px)',
+                            boxShadow: '0 8px 25px rgba(99, 102, 241, 0.3)'
+                          }
+                        }}
+                        onClick={() => handleViewSession(session.sessionId)}
+                      >
+                        <CardContent sx={{ flexGrow: 1, p: 3, pb: 2 }}>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                              <DescriptionIcon sx={{ mr: 1, color: '#6366F1', flexShrink: 0 }} />
+                              <Box sx={{ flex: 1, minWidth: 0 }}>
+                                <Typography 
+                                  variant="h6" 
+                                  component="div" 
+                                  sx={{ 
+                                    fontWeight: 600, 
+                                    mb: 0.5,
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    whiteSpace: 'nowrap',
+                                    color: '#F8FAFC'
+                                  }}
+                                >
+                                  {session.status === 'completed' && session.companyName ? session.companyName : 'Resume Session'}
+                                </Typography>
+                                {session.status === 'completed' && session.position ? (
+                                  <Typography 
+                                    variant="body2" 
+                                    sx={{ 
+                                      color: '#94A3B8', 
+                                      fontSize: '0.85rem',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                      whiteSpace: 'nowrap'
+                                    }}
+                                  >
+                                    {session.position}
+                                  </Typography>
+                                ) : (
+                                  <Typography variant="body2" sx={{ color: '#94A3B8', fontSize: '0.85rem' }}>
+                                    Click to edit
+                                  </Typography>
+                                )}
+                              </Box>
+                            </Box>
+                            <Box sx={{ flexShrink: 0 }}>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteSession(session.sessionId);
+                                }}
+                                sx={{ 
+                                  p: 0.5,
+                                  color: '#EF4444',
+                                  '&:hover': {
+                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                                    transform: 'scale(1.1)'
+                                  },
+                                  transition: 'all 0.2s ease-in-out'
+                                }}
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
+                          </Box>
+                          
+                          <Box sx={{ flexGrow: 1 }}>
+                            <Typography 
+                              variant="body2" 
+                              sx={{ 
+                                mb: 0, 
+                                lineHeight: 1.4,
+                                p: 1.5,
+                                borderRadius: 2,
+                                backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                                color: '#E2E8F0',
+                                fontSize: '0.85rem'
+                              }}
+                            >
+                              {session.preview}
+                            </Typography>
+                          </Box>
+                          
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 0.5 }}>
+                            <Chip 
+                              label={session.status === 'processing' ? 'Processing...' : session.status} 
+                              size="small" 
+                              color={session.status === 'completed' ? 'success' : 
+                                     session.status === 'processing' ? 'primary' : 
+                                     session.status === 'failed' ? 'error' : 'default'}
+                              icon={session.status === 'processing' ? <CircularProgress size={16} /> : undefined}
+                              sx={{ 
+                                textTransform: 'capitalize',
+                                backgroundColor: session.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' :
+                                               session.status === 'processing' ? 'rgba(99, 102, 241, 0.1)' :
+                                               session.status === 'failed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(148, 163, 184, 0.1)',
+                                color: session.status === 'completed' ? '#22C55E' :
+                                       session.status === 'processing' ? '#6366F1' :
+                                       session.status === 'failed' ? '#EF4444' : '#94A3B8',
+                                border: '1px solid',
+                                borderColor: session.status === 'completed' ? 'rgba(34, 197, 94, 0.3)' :
+                                            session.status === 'processing' ? 'rgba(99, 102, 241, 0.3)' :
+                                            session.status === 'failed' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(148, 163, 184, 0.3)'
+                              }}
+                            />
+                            <Typography variant="caption" sx={{ 
+                              display: 'flex', 
+                              alignItems: 'center', 
+                              fontSize: '0.75rem',
+                              color: '#64748B'
+                            }}>
+                              <TimeIcon sx={{ mr: 0.5, fontSize: 12 }} />
+                              {formatDate(session.timestamp)}
+                            </Typography>
+                          </Box>
+                        </CardContent>
+                      </Card>
+                    </Fade>
+                  </Grid>
+                ))}
+              </Grid>
+            )}
+          </Box>
+        </Slide>
+
+        {/* Session Details Dialog */}
+        <Dialog 
+          open={dialogOpen} 
+          onClose={() => {
+            setDialogOpen(false);
+            setSelectedSession(null);
+            // Clean up any refresh intervals
+            const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
+            if (windowWithCleanup.sessionRefreshCleanup) {
+              windowWithCleanup.sessionRefreshCleanup();
+              windowWithCleanup.sessionRefreshCleanup = undefined;
+            }
+          }}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              maxHeight: '90vh',
+              minHeight: '600px',
+              background: 'rgba(30, 41, 59, 0.95)',
+              border: '1px solid rgba(99, 102, 241, 0.2)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: 3
+            }
+          }}
+          TransitionProps={{
+            timeout: 300
+          }}
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            color: '#F8FAFC',
+            borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
+            pb: 2
+          }}>
+            Resume Session Details
+            {selectedSession && (
+              <Chip 
+                label={selectedSession.status === 'completed' && selectedSession.workflowResult 
+                  ? `${selectedSession.workflowResult.score}/100` 
+                  : selectedSession.status} 
+                size="small" 
+                color={selectedSession.status === 'completed' ? 'success' : 
+                       selectedSession.status === 'processing' ? 'primary' : 
+                       selectedSession.status === 'failed' ? 'error' : 'default'}
+                sx={{ 
+                  textTransform: 'capitalize',
+                  backgroundColor: selectedSession.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' :
+                                   selectedSession.status === 'processing' ? 'rgba(99, 102, 241, 0.1)' :
+                                   selectedSession.status === 'failed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(148, 163, 184, 0.1)',
+                  color: selectedSession.status === 'completed' ? '#22C55E' :
+                         selectedSession.status === 'processing' ? '#6366F1' :
+                         selectedSession.status === 'failed' ? '#EF4444' : '#94A3B8',
+                  border: '1px solid',
+                  borderColor: selectedSession.status === 'completed' ? 'rgba(34, 197, 94, 0.3)' :
+                              selectedSession.status === 'processing' ? 'rgba(99, 102, 241, 0.3)' :
+                              selectedSession.status === 'failed' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(148, 163, 184, 0.3)'
+                }}
+              />
+            )}
+          </DialogTitle>
+          <DialogContent sx={{ height: 'calc(90vh - 200px)', p: 3, overflow: 'hidden' }}>
+            {dialogLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                <CircularProgress 
+                  size={60} 
+                  sx={{ 
+                    color: '#6366F1',
+                    filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
+                  }} 
+                />
+              </Box>
+            ) : selectedSession ? (
+              <Box>
+                {/* Session Info */}
+                <Paper 
+                  elevation={4}
+                  sx={{ 
+                    p: 3, 
+                    mb: 3, 
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    border: '1px solid rgba(99, 102, 241, 0.2)',
+                    borderRadius: 2,
+                    backdropFilter: 'blur(10px)'
+                  }}
+                >
+                  <Grid container spacing={3}>
+                    <Grid item xs={12} sm={6}>
+                      <Box>
+                        {selectedSession.status === 'completed' && selectedSession.workflowResult ? (
+                          <>
+                            <Typography variant="h5" sx={{ 
+                              fontWeight: 700, 
+                              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                              backgroundClip: 'text',
+                              WebkitBackgroundClip: 'text',
+                              WebkitTextFillColor: 'transparent',
+                              mb: 0.5
+                            }}>
+                              {selectedSession.workflowResult.company_name}
+                            </Typography>
+                            <Typography variant="h6" sx={{ 
+                              fontWeight: 500, 
+                              color: '#94A3B8',
+                              opacity: 0.9
+                            }}>
+                              {selectedSession.workflowResult.position}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="h6" sx={{ 
+                            fontWeight: 600, 
+                            color: '#6366F1',
+                            opacity: 0.8
+                          }}>
+                            Session Created
+                          </Typography>
+                        )}
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} sm={6}>
+                      <Box sx={{ textAlign: 'right' }}>
+                        <Typography variant="body2" sx={{ 
+                          fontFamily: 'monospace', 
+                          color: '#64748B',
+                          opacity: 0.7,
+                          fontSize: '0.75rem'
+                        }}>
+                          {selectedSession.sessionId}
+                        </Typography>
+                        <Typography variant="body2" sx={{ 
+                          color: '#94A3B8',
+                          opacity: 0.8,
+                          mt: 0.5
+                        }}>
+                          {formatDate(selectedSession.timestamp)}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                </Paper>
+
+                {/* Tabs */}
+                <Box sx={{ borderBottom: 1, borderColor: 'rgba(99, 102, 241, 0.2)', mb: 2 }}>
+                  <Tabs 
+                    value={activeTab} 
+                    onChange={handleTabChange}
+                    sx={{
+                      minHeight: '48px',
+                      '& .MuiTab-root': {
+                        color: '#94A3B8',
+                        minHeight: '48px',
+                        padding: '8px 16px',
+                        fontSize: '0.875rem',
+                        textTransform: 'none',
+                        fontWeight: 500,
+                        transition: 'all 0.3s ease-in-out',
+                        '&.Mui-selected': {
+                          color: '#6366F1',
+                          fontWeight: 600
+                        },
+                        '&:hover': {
+                          color: '#E2E8F0',
+                          backgroundColor: 'rgba(99, 102, 241, 0.1)'
+                        }
+                      },
+                      '& .MuiTabs-indicator': {
+                        backgroundColor: '#6366F1',
+                        height: '3px',
+                        borderRadius: '2px 2px 0 0'
+                      }
+                    }}
+                  >
+                    <Tab 
+                      icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                      label="Job Description" 
+                      iconPosition="start"
+                    />
+                    {selectedSession.tailoredResume && (
+                      <Tab 
+                        icon={<DataObjectIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                        label="JSON Output" 
+                        iconPosition="start"
+                      />
+                    )}
+                    {selectedSession.latexFilePath && (
+                      <Tab 
+                        icon={<CodeIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                        label="Generated LaTeX" 
+                        iconPosition="start"
+                      />
+                    )}
+                    {selectedSession.status === 'completed' && selectedSession.workflowResult && (
+                      <Tab 
+                        icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                        label="Feedback" 
+                        iconPosition="start"
+                      />
+                    )}
+                  </Tabs>
+                </Box>
+
+                {/* Tab Content */}
+                <Box sx={{ height: 'calc(100% - 200px)', display: 'flex', flexDirection: 'column' }}>
+                  {/* Job Description Tab */}
+                  {activeTab === 0 && (
+                    <Paper 
+                      elevation={4}
+                      sx={{ 
+                        p: 2, 
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        flex: 1,
+                        overflow: 'auto',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(5px)',
+                        '&::-webkit-scrollbar': {
+                          width: '8px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'rgba(15, 23, 42, 0.3)',
+                          borderRadius: '4px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: 'rgba(99, 102, 241, 0.3)',
+                          borderRadius: '4px',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.5)'
+                          }
+                        }
+                      }}
+                    >
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          whiteSpace: 'pre-wrap', 
+                          lineHeight: 1.5,
+                          color: '#E2E8F0',
+                          fontSize: '0.9rem',
+                          fontWeight: 400
+                        }}
+                      >
+                        {selectedSession.jobDescription && selectedSession.jobDescription.trim() 
+                          ? selectedSession.jobDescription 
+                          : 'No job description available'}
+                      </Typography>
+                    </Paper>
+                  )}
+
+                  {/* JSON Output Tab */}
+                  {activeTab === 1 && selectedSession.tailoredResume && (
+                    <Paper 
+                      elevation={4}
+                      sx={{ 
+                        p: 2, 
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        flex: 1,
+                        overflow: 'auto',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(5px)',
+                        '&::-webkit-scrollbar': {
+                          width: '8px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'rgba(15, 23, 42, 0.3)',
+                          borderRadius: '4px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: 'rgba(99, 102, 241, 0.3)',
+                          borderRadius: '4px',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.5)'
+                          }
+                        }
+                      }}
+                    >
+                      <pre 
+                        style={{ 
+                          margin: 0, 
+                          fontSize: '11px', 
+                          whiteSpace: 'pre-wrap',
+                          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+                          lineHeight: 1.3,
+                          color: '#E2E8F0',
+                          fontWeight: 400
+                        }}
+                      >
+                        {JSON.stringify(selectedSession.tailoredResume, null, 2)}
+                      </pre>
+                    </Paper>
+                  )}
+
+                  {/* Generated LaTeX Tab */}
+                  {activeTab === 2 && selectedSession.latexFilePath && (
+                    <Paper 
+                      elevation={4}
+                      sx={{ 
+                        p: 2, 
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        flex: 1,
+                        overflow: 'auto',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(5px)',
+                        '&::-webkit-scrollbar': {
+                          width: '8px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'rgba(15, 23, 42, 0.3)',
+                          borderRadius: '4px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: 'rgba(99, 102, 241, 0.3)',
+                          borderRadius: '4px',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.5)'
+                          }
+                        }
+                      }}
+                    >
+                      <pre 
+                        style={{ 
+                          margin: 0, 
+                          fontSize: '11px', 
+                          whiteSpace: 'pre-wrap',
+                          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
+                          lineHeight: 1.3,
+                          color: '#E2E8F0',
+                          fontWeight: 400
+                        }}
+                      >
+                        {selectedSession.latexContent || 'Loading LaTeX content...'}
+                      </pre>
+                    </Paper>
+                  )}
+
+                  {/* Feedback Tab */}
+                  {activeTab === 3 && selectedSession.status === 'completed' && selectedSession.workflowResult && (
+                    <Paper 
+                      elevation={4}
+                      sx={{ 
+                        p: 2, 
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        flex: 1,
+                        overflow: 'auto',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(5px)',
+                        '&::-webkit-scrollbar': {
+                          width: '8px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'rgba(15, 23, 42, 0.3)',
+                          borderRadius: '4px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: 'rgba(99, 102, 241, 0.3)',
+                          borderRadius: '4px',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.5)'
+                          }
+                        }
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="h6" sx={{ 
+                          fontWeight: 600,
+                          color: '#6366F1',
+                          mb: 1.5,
+                          fontSize: '1rem'
+                        }}>
+                          💡 Feedback
+                        </Typography>
+                        <Typography variant="body2" sx={{ 
+                          whiteSpace: 'pre-wrap', 
+                          lineHeight: 1.5,
+                          color: '#E2E8F0',
+                          fontSize: '0.9rem',
+                          mb: 2
+                        }}>
+                          {selectedSession.workflowResult.feedback}
+                        </Typography>
+                        
+                        {selectedSession.workflowResult.downsides && (
+                          <>
+                            <Typography variant="h6" sx={{ 
+                              fontWeight: 600,
+                              color: '#F59E0B',
+                              mb: 1.5,
+                              fontSize: '1rem'
+                            }}>
+                              🔧 Areas for Improvement
+                            </Typography>
+                            <Typography variant="body2" sx={{ 
+                              whiteSpace: 'pre-wrap', 
+                              lineHeight: 1.5,
+                              color: '#E2E8F0',
+                              fontSize: '0.9rem'
+                            }}>
+                              {selectedSession.workflowResult.downsides}
+                            </Typography>
+                          </>
+                        )}
+                      </Box>
+                    </Paper>
+                  )}
+                </Box>
+                
+              </Box>
+            ) : (
+              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
+                <Typography variant="body1" sx={{ color: '#94A3B8' }}>
+                  No session data available
+                </Typography>
+              </Box>
+            )}
+          </DialogContent>
+          <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid rgba(99, 102, 241, 0.2)' }}>
+            {!selectedSession?.latexFilePath ? (
+              <Button 
+                variant="contained" 
+                onClick={selectedSession?.status === 'completed' ? handleDownloadPDF : handleStartWorkflow}
+                disabled={workflowLoading || downloadPDFLoading}
+                startIcon={(workflowLoading || downloadPDFLoading) ? <CircularProgress size={16} /> : null}
+                sx={{ 
+                  mr: 'auto',
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: 2,
+                  background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
+                    boxShadow: '0 6px 20px rgba(99, 102, 241, 0.6)',
+                    transform: 'translateY(-1px)'
+                  },
+                  '&:disabled': {
+                    background: 'rgba(99, 102, 241, 0.3)',
+                    transform: 'none'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {workflowLoading ? 'Processing Resume (1-2 min)...' : 
+                 downloadPDFLoading ? 'Generating...' : 
+                 selectedSession?.status === 'completed' ? 'Generate LaTeX' : 'Start Resume Workflow'}
+              </Button>
+            ) : (
+              <Button 
+                variant="contained" 
+                onClick={handleDownloadPDF}
+                disabled={downloadPDFLoading || downloadLatexLoading}
+                startIcon={downloadPDFLoading ? <CircularProgress size={16} /> : null}
+                sx={{ 
+                  mr: 'auto',
+                  px: 4,
+                  py: 1.5,
+                  borderRadius: 2,
+                  background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',
+                  boxShadow: '0 4px 15px rgba(34, 197, 94, 0.4)',
+                  '&:hover': {
+                    background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
+                    boxShadow: '0 6px 20px rgba(34, 197, 94, 0.6)',
+                    transform: 'translateY(-1px)'
+                  },
+                  '&:disabled': {
+                    background: 'rgba(34, 197, 94, 0.3)',
+                    transform: 'none'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {downloadPDFLoading ? 'Generating & Downloading...' : 'Download PDF'}
+              </Button>
+            )}
+            
+            {selectedSession?.latexFilePath && (
+              <Button 
+                variant="outlined" 
+                onClick={handleDownloadLatexFile}
+                disabled={downloadPDFLoading || downloadLatexLoading}
+                startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
+                sx={{ 
+                  px: 3,
+                  py: 1.5,
+                  borderRadius: 2,
+                  border: '1px solid rgba(245, 158, 11, 0.5)',
+                  color: '#F59E0B',
+                  '&:hover': {
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    borderColor: '#F59E0B',
+                    transform: 'translateY(-1px)'
+                  },
+                  transition: 'all 0.3s ease'
+                }}
+              >
+                {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
+              </Button>
+            )}
+            
             <Button 
-              variant="contained" 
-              onClick={selectedSession?.status === 'completed' ? handleDownloadPDF : handleStartWorkflow}
-              disabled={workflowLoading || downloadPDFLoading}
-              startIcon={(workflowLoading || downloadPDFLoading) ? <CircularProgress size={16} /> : null}
-              sx={{ 
-                mr: 'auto',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
-                boxShadow: '0 4px 15px rgba(102, 126, 234, 0.4)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #5a6fd8 0%, #6a4190 100%)',
-                  boxShadow: '0 6px 20px rgba(102, 126, 234, 0.6)',
-                  transform: 'translateY(-1px)'
-                },
-                '&:disabled': {
-                  background: 'linear-gradient(45deg, #667eea 0%, #764ba2 100%)',
-                  opacity: 0.6
-                },
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {workflowLoading ? 'Processing Resume (1-2 min)...' : 
-               downloadPDFLoading ? 'Generating...' : 
-               selectedSession?.status === 'completed' ? 'Generate LaTeX' : 'Start Resume Workflow'}
-            </Button>
-          ) : (
-            <Button 
-              variant="contained" 
-              onClick={handleDownloadPDF}
-              disabled={downloadPDFLoading || downloadLatexLoading}
-              startIcon={downloadPDFLoading ? <CircularProgress size={16} /> : null}
-              sx={{ 
-                mr: 'auto',
-                px: 4,
-                py: 1.5,
-                borderRadius: 2,
-                background: 'linear-gradient(45deg, #4caf50 0%, #45a049 100%)',
-                boxShadow: '0 4px 15px rgba(76, 175, 80, 0.4)',
-                '&:hover': {
-                  background: 'linear-gradient(45deg, #45a049 0%, #3d8b40 100%)',
-                  boxShadow: '0 6px 20px rgba(76, 175, 80, 0.6)',
-                  transform: 'translateY(-1px)'
-                },
-                '&:disabled': {
-                  background: 'linear-gradient(45deg, #4caf50 0%, #45a049 100%)',
-                  opacity: 0.6
-                },
-                transition: 'all 0.3s ease'
-              }}
-            >
-              {downloadPDFLoading ? 'Generating & Downloading...' : 'Download PDF'}
-            </Button>
-          )}
-          
-          {selectedSession?.latexFilePath && (
-            <Button 
-              variant="outlined" 
-              onClick={handleDownloadLatexFile}
-              disabled={downloadPDFLoading || downloadLatexLoading}
-              startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
+              onClick={() => setDialogOpen(false)}
               sx={{ 
                 px: 3,
                 py: 1.5,
                 borderRadius: 2,
-                border: '1px solid rgba(255, 152, 0, 0.5)',
-                color: '#ff9800',
+                border: '1px solid rgba(148, 163, 184, 0.3)',
+                color: '#94A3B8',
                 '&:hover': {
-                  backgroundColor: 'rgba(255, 152, 0, 0.1)',
-                  borderColor: '#ff9800'
+                  backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                  borderColor: 'rgba(148, 163, 184, 0.5)',
+                  transform: 'translateY(-1px)'
                 },
                 transition: 'all 0.3s ease'
               }}
             >
-              {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
+              Close
             </Button>
-          )}
-          
-          <Button 
-            onClick={() => setDialogOpen(false)}
-            sx={{ 
-              px: 3,
-              py: 1.5,
-              borderRadius: 2,
-              border: '1px solid rgba(255, 255, 255, 0.2)',
-              color: 'text.secondary',
-              '&:hover': {
-                backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                borderColor: 'rgba(255, 255, 255, 0.3)'
-              },
-              transition: 'all 0.3s ease'
-            }}
-          >
-            Close
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Container>
+          </DialogActions>
+        </Dialog>
+      </Container>
+
+      <style>{`
+        @keyframes pulse {
+          0%, 100% { transform: scale(1); }
+          50% { transform: scale(1.05); }
+        }
+        
+        @keyframes shimmer {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(100%); }
+        }
+      `}</style>
+    </Box>
   );
 };
 

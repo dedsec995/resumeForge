@@ -7,6 +7,7 @@ import LandingPage from './components/LandingPage';
 import ProfileSection from './components/ProfileSection';
 import CreateResumeSection from './components/CreateResumeSection';
 import AboutUsSection from './components/AboutUsSection';
+import AuthPage from './components/AuthPage';
 import { AuthProvider } from './contexts/AuthContext';
 import '@fontsource/roboto/300.css';
 import '@fontsource/roboto/400.css';
@@ -37,6 +38,7 @@ function App() {
               <Route path="create-resume" element={<CreateResumeSection />} />
               <Route path="about" element={<AboutUsSection />} />
             </Route>
+            <Route path="/auth" element={<AuthPage />} />
           </Routes>
         </Router>
       </AuthProvider>
