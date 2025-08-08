@@ -38,10 +38,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create output directory
-RUN mkdir -p output
+# Create output directory with proper permissions
+RUN mkdir -p output && chmod 777 output
 
-# Create non-root user for security (matching host user UID)
+# Create non-root user for security
 RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 

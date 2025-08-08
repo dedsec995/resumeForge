@@ -9,6 +9,7 @@ services:
     volumes:
       - ./output:/app/output
       - ./firebase.json:/app/firebase.json:ro
+    user: "1001:1001"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8002/"]

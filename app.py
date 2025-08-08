@@ -98,7 +98,6 @@ class CompanyPositionResponse(BaseModel):
 
 
 class ResumeUpdateResponse(BaseModel):
-    tailoredResume: str
     success: bool
     message: str
 
@@ -132,11 +131,6 @@ class ResumeParseResponse(BaseModel):
 
 class ResumeUpdateRequest(BaseModel):
     resumeData: Dict[str, Any]
-
-
-class ResumeUpdateResponse(BaseModel):
-    success: bool
-    message: str
 
 
 # Create Resume Models
@@ -192,10 +186,6 @@ class GetApiConfigResponse(BaseModel):
     message: str
 
 
-# Global state storage (in production, use Redis or database)
-workflowStates: Dict[str, Dict[str, Any]] = {}
-
-
 @app.get("/")
 async def rootEndpoint():
     """Health check endpoint"""
@@ -210,13 +200,14 @@ async def getGlobalCounterEndpoint():
         return {
             "success": True,
             "totalJobDescriptions": globalCounter,
-            "message": "Global counter retrieved successfully"
+            "message": "Global counter retrieved successfully",
         }
     except Exception as e:
         print(f"Error getting global counter: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get global counter: {str(e)}"
         )
+
 
 @app.get("/individualCounter")
 async def getIndividualCounterEndpoint(userId: str = Depends(verifyFirebaseToken)):
@@ -226,13 +217,14 @@ async def getIndividualCounterEndpoint(userId: str = Depends(verifyFirebaseToken
         return {
             "success": True,
             "individualJobDescriptions": individualCounter,
-            "message": "Individual counter retrieved successfully"
+            "message": "Individual counter retrieved successfully",
         }
     except Exception as e:
         print(f"Error getting individual counter: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get individual counter: {str(e)}"
         )
+
 
 # RBAC Endpoints
 @app.get("/rbac/status")
@@ -242,14 +234,14 @@ async def getRBACStatusEndpoint():
         users_without_tier = dbOps.getUsersWithoutAccountTier()
         total_users = len(dbOps.db.collection("users").stream())
         users_with_tier = total_users - len(users_without_tier)
-        
+
         return {
             "success": True,
             "totalUsers": total_users,
             "usersWithAccountTier": users_with_tier,
             "usersWithoutAccountTier": len(users_without_tier),
             "rbacImplementationComplete": len(users_without_tier) == 0,
-            "message": "RBAC status retrieved successfully"
+            "message": "RBAC status retrieved successfully",
         }
     except Exception as e:
         print(f"Error getting RBAC status: {str(e)}")
@@ -257,36 +249,37 @@ async def getRBACStatusEndpoint():
             status_code=500, detail=f"Failed to get RBAC status: {str(e)}"
         )
 
+
 @app.post("/rbac/update-existing-users")
 async def updateExistingUsersRBACEndpoint():
     """Update all existing users to have accountTier: 'FREE'"""
     try:
         users_without_tier = dbOps.getUsersWithoutAccountTier()
-        
+
         if not users_without_tier:
             return {
                 "success": True,
                 "message": "All users already have accountTier field",
                 "updatedCount": 0,
-                "skippedCount": 0
+                "skippedCount": 0,
             }
-        
+
         updated_count = 0
         failed_count = 0
-        
+
         for user in users_without_tier:
             success = dbOps.updateUserAccountTier(user["userId"], "FREE")
             if success:
                 updated_count += 1
             else:
                 failed_count += 1
-        
+
         return {
             "success": True,
             "message": f"Updated {updated_count} users with accountTier: FREE",
             "updatedCount": updated_count,
             "failedCount": failed_count,
-            "totalProcessed": len(users_without_tier)
+            "totalProcessed": len(users_without_tier),
         }
     except Exception as e:
         print(f"Error updating existing users RBAC: {str(e)}")
@@ -401,196 +394,6 @@ async def extractCompanyInfoEndpoint(request: JobDescriptionRequest):
         )
 
 
-@app.post("/editTechnicalSkills", response_model=ResumeUpdateResponse)
-async def editTechnicalSkillsEndpoint(sessionId: str):
-    """Edit technical skills section based on job description"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        result = edit_technical_skills(state)
-
-        workflowStates[sessionId].update(result)
-
-        return ResumeUpdateResponse(
-            tailoredResume=result["tailored_resume"],
-            success=True,
-            message="Technical skills updated successfully",
-        )
-
-    except Exception as e:
-        print(f"Error in editTechnicalSkills: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to edit technical skills: {str(e)}"
-        )
-
-
-@app.post("/editExperience", response_model=ResumeUpdateResponse)
-async def editExperienceEndpoint(sessionId: str):
-    """Edit work experience section using STAR/XYZ framework"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        result = edit_experience(state)
-
-        workflowStates[sessionId].update(result)
-
-        return ResumeUpdateResponse(
-            tailoredResume=result["tailored_resume"],
-            success=True,
-            message="Experience section updated successfully",
-        )
-
-    except Exception as e:
-        print(f"Error in editExperience: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to edit experience: {str(e)}"
-        )
-
-
-@app.post("/editProjects", response_model=ResumeUpdateResponse)
-async def editProjectsEndpoint(sessionId: str):
-    """Edit projects section with achievement-oriented descriptions"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        result = edit_projects(state)
-
-        workflowStates[sessionId].update(result)
-
-        return ResumeUpdateResponse(
-            tailoredResume=result["tailored_resume"],
-            success=True,
-            message="Projects section updated successfully",
-        )
-
-    except Exception as e:
-        print(f"Error in editProjects: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to edit projects: {str(e)}"
-        )
-
-
-@app.post("/judgeQuality", response_model=QualityScoreResponse)
-async def judgeQualityEndpoint(sessionId: str):
-    """Evaluate resume quality and provide feedback"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        result = judge_resume_quality(state)
-
-        workflowStates[sessionId].update(result)
-
-        return QualityScoreResponse(
-            score=result["score"],
-            feedback=result["feedback"],
-            downsides=result["downsides"],
-            iterationCount=result["iteration_count"],
-        )
-
-    except Exception as e:
-        print(f"Error in judgeQuality: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to judge quality: {str(e)}"
-        )
-
-
-@app.post("/compileResume", response_model=CompileResponse)
-async def compileResumeEndpoint(sessionId: str):
-    """Compile LaTeX resume to PDF"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        result = compile_resume(state)
-
-        workflowStates[sessionId].update(result)
-
-        success = result["pdf_path"] is not None
-        message = (
-            "Resume compiled successfully" if success else "Failed to compile resume"
-        )
-
-        return CompileResponse(
-            pdfPath=result["pdf_path"], success=success, message=message
-        )
-
-    except Exception as e:
-        print(f"Error in compileResume: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to compile resume: {str(e)}"
-        )
-
-
-@app.get("/downloadResume/{sessionId}")
-async def downloadResumeEndpoint(sessionId: str):
-    """Download the compiled PDF resume"""
-    try:
-        if sessionId not in workflowStates:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-        state = workflowStates[sessionId]
-        pdfPath = state.get("pdf_path")
-
-        if not pdfPath or not os.path.exists(pdfPath):
-            raise HTTPException(status_code=404, detail="PDF file not found")
-
-        return FileResponse(
-            path=pdfPath,
-            media_type="application/pdf",
-            filename=os.path.basename(pdfPath),
-        )
-
-    except Exception as e:
-        print(f"Error in downloadResume: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to download resume: {str(e)}"
-        )
-
-
-@app.post("/initializeSession")
-async def initializeSessionEndpoint(request: JobDescriptionRequest):
-    """Initialize a new workflow session"""
-    try:
-        import uuid
-
-        sessionId = str(uuid.uuid4())
-
-        from agent import get_resume_content
-
-        resumeContent = get_resume_content()
-
-        workflowStates[sessionId] = {
-            "job_description": request.jobDescription,
-            "resume": resumeContent,
-            "tailored_resume": resumeContent,
-            "company_name": "",
-            "position": "",
-            "iteration_count": 0,
-            "score": 0.0,
-            "feedback": "",
-            "downsides": "",
-            "pdf_path": None,
-        }
-
-        print(f"Session {sessionId} initialized successfully")
-        return {"sessionId": sessionId, "message": "Session initialized successfully"}
-
-    except Exception as e:
-        print(f"Error in initializeSession: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to initialize session: {str(e)}"
-        )
-
-
 def run_workflow_sync(userId: str, sessionId: str):
     """Synchronous workflow function to run in thread pool"""
     try:
@@ -610,7 +413,7 @@ def run_workflow_sync(userId: str, sessionId: str):
             resume_data = {}
 
         job_description = session_data.get("jobDescription", "")
-        
+
         # Get user tier
         user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
         print(f"User {userId} tier: {user_tier}")
@@ -626,9 +429,9 @@ def run_workflow_sync(userId: str, sessionId: str):
             workflow_input = {
                 "resume_data": combined_data,
                 "user_id": userId,
-                "user_tier": user_tier
+                "user_tier": user_tier,
             }
-            
+
             result = workflow(workflow_input)
 
             score = result.get("score", 0.0)
@@ -701,7 +504,7 @@ def run_workflow_sync(userId: str, sessionId: str):
         except Exception as workflow_error:
             error_msg = str(workflow_error)
             print(f"Workflow failed for session {sessionId}: {error_msg}")
-            
+
             # Handle API key errors specifically
             if "API_KEY_ERROR" in error_msg:
                 errorUpdateData = {
@@ -724,7 +527,7 @@ def run_workflow_sync(userId: str, sessionId: str):
                     "errorType": "WORKFLOW_ERROR",
                     "failedAt": datetime.now().isoformat(),
                 }
-            
+
             dbOps.updateSession(userId, sessionId, errorUpdateData)
 
     except Exception as e:
@@ -824,23 +627,6 @@ async def getSessionStatusEndpoint(
         print(f"Error in getSessionStatus: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get session status: {str(e)}"
-        )
-
-
-@app.delete("/session/{sessionId}")
-async def deleteSessionEndpoint(sessionId: str):
-    """Clean up session data"""
-    try:
-        if sessionId in workflowStates:
-            del workflowStates[sessionId]
-            return {"message": "Session deleted successfully"}
-        else:
-            raise HTTPException(status_code=404, detail="Session not found")
-
-    except Exception as e:
-        print(f"Error in deleteSession: {str(e)}")
-        raise HTTPException(
-            status_code=500, detail=f"Failed to delete session: {str(e)}"
         )
 
 
@@ -1241,19 +1027,16 @@ async def updateApiConfigEndpoint(
     """Save user API configuration to Firebase"""
     try:
         from datetime import datetime
-        
-        apiData = {
-            "apiKey": request.apiKey,
-            "timestamp": datetime.now().isoformat()
-        }
+
+        apiData = {"apiKey": request.apiKey, "timestamp": datetime.now().isoformat()}
 
         success = dbOps.updateUserApiConfig(userId, apiData)
 
         if success:
             return ApiConfigResponse(
-                success=True, 
+                success=True,
                 message="API configuration saved successfully",
-                lastUpdated=apiData["timestamp"]
+                lastUpdated=apiData["timestamp"],
             )
         else:
             raise HTTPException(
@@ -1263,6 +1046,7 @@ async def updateApiConfigEndpoint(
     except Exception as e:
         print(f"Error saving API config: {str(e)}")
         import traceback
+
         traceback.print_exc()
         raise HTTPException(
             status_code=500, detail=f"Failed to save API configuration: {str(e)}"
@@ -1277,22 +1061,20 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
 
         if apiData is None:
             return GetApiConfigResponse(
-                success=True,
-                apiData={},
-                message="No API configuration found"
+                success=True, apiData={}, message="No API configuration found"
             )
 
         # Don't return the actual API key for security
         safeApiData = {
             "hasApiKey": bool(apiData.get("apiKey")),
             "timestamp": apiData.get("timestamp", ""),
-            "lastUpdated": apiData.get("timestamp", "")
+            "lastUpdated": apiData.get("timestamp", ""),
         }
 
         return GetApiConfigResponse(
             success=True,
             apiData=safeApiData,
-            message="API configuration retrieved successfully"
+            message="API configuration retrieved successfully",
         )
 
     except Exception as e:
@@ -1300,6 +1082,8 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
         raise HTTPException(
             status_code=500, detail=f"Failed to get API configuration: {str(e)}"
         )
+
+
 if __name__ == "__main__":
     import uvicorn
 
