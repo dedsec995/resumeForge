@@ -10,7 +10,7 @@ from datetime import datetime
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 import re
-from agent import workflow
+from agent import workflow, extract_info
 from auth_routes import authRouter
 from auth_middleware import verifyFirebaseToken, optionalAuth
 from database_operations import dbOps
@@ -175,6 +175,23 @@ class GenerateLatexResponse(BaseModel):
     message: str
 
 
+# API Config Models
+class ApiConfigRequest(BaseModel):
+    apiKey: str
+
+
+class ApiConfigResponse(BaseModel):
+    success: bool
+    message: str
+    lastUpdated: Optional[str] = None
+
+
+class GetApiConfigResponse(BaseModel):
+    success: bool
+    apiData: Dict[str, Any]
+    message: str
+
+
 # Global state storage (in production, use Redis or database)
 workflowStates: Dict[str, Dict[str, Any]] = {}
 
@@ -199,6 +216,82 @@ async def getGlobalCounterEndpoint():
         print(f"Error getting global counter: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get global counter: {str(e)}"
+        )
+
+@app.get("/individualCounter")
+async def getIndividualCounterEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Get the individual job description counter for the authenticated user"""
+    try:
+        individualCounter = dbOps.getIndividualCounter(userId)
+        return {
+            "success": True,
+            "individualJobDescriptions": individualCounter,
+            "message": "Individual counter retrieved successfully"
+        }
+    except Exception as e:
+        print(f"Error getting individual counter: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get individual counter: {str(e)}"
+        )
+
+# RBAC Endpoints
+@app.get("/rbac/status")
+async def getRBACStatusEndpoint():
+    """Get RBAC status - check how many users have accountTier field"""
+    try:
+        users_without_tier = dbOps.getUsersWithoutAccountTier()
+        total_users = len(dbOps.db.collection("users").stream())
+        users_with_tier = total_users - len(users_without_tier)
+        
+        return {
+            "success": True,
+            "totalUsers": total_users,
+            "usersWithAccountTier": users_with_tier,
+            "usersWithoutAccountTier": len(users_without_tier),
+            "rbacImplementationComplete": len(users_without_tier) == 0,
+            "message": "RBAC status retrieved successfully"
+        }
+    except Exception as e:
+        print(f"Error getting RBAC status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get RBAC status: {str(e)}"
+        )
+
+@app.post("/rbac/update-existing-users")
+async def updateExistingUsersRBACEndpoint():
+    """Update all existing users to have accountTier: 'FREE'"""
+    try:
+        users_without_tier = dbOps.getUsersWithoutAccountTier()
+        
+        if not users_without_tier:
+            return {
+                "success": True,
+                "message": "All users already have accountTier field",
+                "updatedCount": 0,
+                "skippedCount": 0
+            }
+        
+        updated_count = 0
+        failed_count = 0
+        
+        for user in users_without_tier:
+            success = dbOps.updateUserAccountTier(user["userId"], "FREE")
+            if success:
+                updated_count += 1
+            else:
+                failed_count += 1
+        
+        return {
+            "success": True,
+            "message": f"Updated {updated_count} users with accountTier: FREE",
+            "updatedCount": updated_count,
+            "failedCount": failed_count,
+            "totalProcessed": len(users_without_tier)
+        }
+    except Exception as e:
+        print(f"Error updating existing users RBAC: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to update existing users RBAC: {str(e)}"
         )
 
 
@@ -1104,6 +1197,73 @@ async def downloadLatexEndpoint(
         )
 
 
+# API Config Endpoints
+@app.post("/apiConfig", response_model=ApiConfigResponse)
+async def updateApiConfigEndpoint(
+    request: ApiConfigRequest, userId: str = Depends(verifyFirebaseToken)
+):
+    """Save user API configuration to Firebase"""
+    try:
+        from datetime import datetime
+        
+        apiData = {
+            "apiKey": request.apiKey,
+            "timestamp": datetime.now().isoformat()
+        }
+
+        success = dbOps.updateUserApiConfig(userId, apiData)
+
+        if success:
+            return ApiConfigResponse(
+                success=True, 
+                message="API configuration saved successfully",
+                lastUpdated=apiData["timestamp"]
+            )
+        else:
+            raise HTTPException(
+                status_code=500, detail="Failed to save API configuration to Firebase"
+            )
+
+    except Exception as e:
+        print(f"Error saving API config: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500, detail=f"Failed to save API configuration: {str(e)}"
+        )
+
+
+@app.get("/apiConfig", response_model=GetApiConfigResponse)
+async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Get user API configuration from Firebase"""
+    try:
+        apiData = dbOps.getUserApiConfig(userId)
+
+        if apiData is None:
+            return GetApiConfigResponse(
+                success=True,
+                apiData={},
+                message="No API configuration found"
+            )
+
+        # Don't return the actual API key for security
+        safeApiData = {
+            "hasApiKey": bool(apiData.get("apiKey")),
+            "timestamp": apiData.get("timestamp", ""),
+            "lastUpdated": apiData.get("timestamp", "")
+        }
+
+        return GetApiConfigResponse(
+            success=True,
+            apiData=safeApiData,
+            message="API configuration retrieved successfully"
+        )
+
+    except Exception as e:
+        print(f"Error getting API config: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get API configuration: {str(e)}"
+        )
 if __name__ == "__main__":
     import uvicorn
 

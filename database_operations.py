@@ -51,6 +51,8 @@ class DatabaseOperations:
                 "userId": userId,
                 "email": email,
                 "displayName": displayName or email.split("@")[0],
+                "accountTier": "FREE",  # Default tier for all new users
+                "individualJobDescriptionCounter": 0,  # Individual counter for this user
                 "profile": {
                     "personalInfo": {
                         "name": "",
@@ -188,6 +190,9 @@ class DatabaseOperations:
             # Increment global counter (this persists even when sessions are deleted)
             self.incrementGlobalCounter()
 
+            # Increment individual counter for this user
+            self.incrementIndividualCounter(userId)
+
             print(f"Session created: {sessionId}")
             return sessionId
         except Exception as e:
@@ -270,6 +275,145 @@ class DatabaseOperations:
             return True
         except Exception as e:
             print(f"Error deleting session: {e}")
+            return False
+
+    def updateUserAccountTier(self, userId, accountTier):
+        """Update user's account tier"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+            userRef.update({
+                "accountTier": accountTier,
+                "metadata.lastUpdated": firestore.SERVER_TIMESTAMP
+            })
+            print(f"User {userId} account tier updated to: {accountTier}")
+            return True
+        except Exception as e:
+            print(f"Error updating user account tier: {e}")
+            return False
+
+    def getUsersWithoutAccountTier(self):
+        """Get all users without accountTier field"""
+        try:
+            users_ref = self.db.collection("users")
+            users = users_ref.stream()
+            
+            users_without_tier = []
+            for user in users:
+                user_data = user.to_dict()
+                if "accountTier" not in user_data:
+                    users_without_tier.append({
+                        "userId": user.id,
+                        "email": user_data.get("email", ""),
+                        "displayName": user_data.get("displayName", "")
+                    })
+            
+            return users_without_tier
+        except Exception as e:
+            print(f"Error getting users without accountTier: {e}")
+            return []
+
+    def updateUserApiConfig(self, userId, apiData):
+        """Update user API configuration data"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+
+            # Check if document exists first
+            if not userRef.get().exists:
+                print(f"User document not found for API config update: {userId}")
+                return False
+
+            updateData = {
+                "apiData": apiData,
+                "metadata.lastUpdated": firestore.SERVER_TIMESTAMP,
+            }
+
+            userRef.update(updateData)
+            print(f"API config updated for user: {userId}")
+            return True
+        except Exception as e:
+            print(f"Error updating API config: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def getUserApiConfig(self, userId):
+        """Get user API configuration data"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+            userDoc = userRef.get()
+            
+            if not userDoc.exists:
+                print(f"User document not found: {userId}")
+                return None
+            
+            userData = userDoc.to_dict()
+            return userData.get("apiData", {})
+        except Exception as e:
+            print(f"Error getting user API config: {e}")
+            return None
+
+    # Individual Counter Operations
+    def getIndividualCounter(self, userId):
+        """Get the individual job description counter for a user"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+            userDoc = userRef.get()
+            
+            if userDoc.exists:
+                userData = userDoc.to_dict()
+                return userData.get("individualJobDescriptionCounter", 0)
+            return 0
+        except Exception as e:
+            print(f"Error getting individual counter for user {userId}: {e}")
+            return 0
+
+    def incrementIndividualCounter(self, userId):
+        """Increment the individual job description counter for a user"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+            userRef.update({
+                "individualJobDescriptionCounter": firestore.Increment(1),
+                "metadata.lastUpdated": firestore.SERVER_TIMESTAMP
+            })
+            print(f"Individual counter incremented for user: {userId}")
+            return True
+        except Exception as e:
+            print(f"Error incrementing individual counter for user {userId}: {e}")
+            return False
+
+    def getUsersWithoutIndividualCounter(self):
+        """Get all users without individualJobDescriptionCounter field"""
+        try:
+            users_ref = self.db.collection("users")
+            users = users_ref.stream()
+            
+            users_without_counter = []
+            for user in users:
+                user_data = user.to_dict()
+                if "individualJobDescriptionCounter" not in user_data:
+                    users_without_counter.append({
+                        "userId": user.id,
+                        "email": user_data.get("email", ""),
+                        "displayName": user_data.get("displayName", "")
+                    })
+            
+            return users_without_counter
+        except Exception as e:
+            print(f"Error getting users without individual counter: {e}")
+            return []
+
+    def updateUserIndividualCounter(self, userId, counterValue=0):
+        """Update user's individual counter to a specific value"""
+        try:
+            userRef = self.db.collection("users").document(userId)
+            userRef.update({
+                "individualJobDescriptionCounter": counterValue,
+                "metadata.lastUpdated": firestore.SERVER_TIMESTAMP
+            })
+            print(f"User {userId} individual counter updated to: {counterValue}")
+            return True
+        except Exception as e:
+            print(f"Error updating user individual counter: {e}")
             return False
 
 

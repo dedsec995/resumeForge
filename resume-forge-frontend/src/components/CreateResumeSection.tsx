@@ -33,7 +33,8 @@ import {
   ArrowForward as ArrowIcon,
   Psychology as AIIcon,
   Star as StarIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
@@ -94,11 +95,13 @@ const CreateResumeSection = () => {
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
+  const [individualCounter, setIndividualCounter] = useState(0);
 
   // Load existing sessions on component mount
   useEffect(() => {
     loadSessions();
     loadGlobalCounter();
+    loadIndividualCounter();
   }, []);
 
   const loadGlobalCounter = async () => {
@@ -109,6 +112,17 @@ const CreateResumeSection = () => {
       }
     } catch (error) {
       console.error('Error loading global counter:', error);
+    }
+  };
+
+  const loadIndividualCounter = async () => {
+    try {
+      const response = await apiClient.get('/individualCounter');
+      if (response.data.success) {
+        setIndividualCounter(response.data.individualJobDescriptions);
+      }
+    } catch (error) {
+      console.error('Error loading individual counter:', error);
     }
   };
 
@@ -182,6 +196,7 @@ const CreateResumeSection = () => {
                           // Refresh the sessions list to show updated status
         loadSessions();
         loadGlobalCounter(); // Refresh the global counter
+        loadIndividualCounter(); // Refresh the individual counter
         
         // Hide the form after successful submission for returning users
         if (!isFirstTimeUser) {
@@ -208,6 +223,7 @@ const CreateResumeSection = () => {
                   // Refresh the sessions list
                   loadSessions();
                   loadGlobalCounter(); // Refresh the global counter
+                  loadIndividualCounter(); // Refresh the individual counter
                   
                 } else if (status === 'processing') {
                   // Still processing, continue polling
@@ -229,6 +245,7 @@ const CreateResumeSection = () => {
               toast.error('Processing timeout. Please check the session manually.');
               loadSessions();
               loadGlobalCounter(); // Refresh the global counter
+              loadIndividualCounter(); // Refresh the individual counter
             }, 600000); // 10 minutes
             
           } else {
@@ -243,6 +260,7 @@ const CreateResumeSection = () => {
         
         loadSessions(); // Refresh the sessions list and update form visibility
         loadGlobalCounter(); // Refresh the global counter
+        loadIndividualCounter(); // Refresh the individual counter
       } else {
         toast.error('Failed to create resume session');
       }
@@ -554,6 +572,16 @@ const CreateResumeSection = () => {
     setShowNewResumeForm(!showNewResumeForm);
   };
 
+  const handleCopyToClipboard = async (content: string, type: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      toast.success(`${type} copied to clipboard!`);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      toast.error('Failed to copy to clipboard');
+    }
+  };
+
   return (
     <Box sx={{ 
       minHeight: '100vh',
@@ -614,20 +642,87 @@ const CreateResumeSection = () => {
                   </Box>
 
                   <Slide direction="up" in timeout={1200}>
-                    <Typography 
-                      variant="h5" 
-                      component="h2" 
-                      sx={{ 
-                        color: '#E2E8F0',
-                        lineHeight: 1.4,
-                        fontSize: { xs: '1.1rem', md: '1.3rem' },
-                        opacity: 0.9,
-                        fontWeight: 400,
-                        pl: { xs: 0, md: 7 } // Align with the title text (icon width + margin)
-                      }}
-                    >
-                      Paste a job description to automatically create and process your tailored resume: {globalCounter.toLocaleString()}
-                    </Typography>
+                    <Box sx={{ pl: { xs: 0, md: 7 } }}> {/* Align with the title text (icon width + margin) */}
+                      <Typography
+                        variant="h5"
+                        component="h2"
+                        sx={{
+                          color: '#E2E8F0',
+                          lineHeight: 1.4,
+                          fontSize: { xs: '1.1rem', md: '1.3rem' },
+                          opacity: 0.9,
+                          fontWeight: 400,
+                          mb: 1
+                        }}
+                      >
+                        Paste a job description to automatically create and process your tailored resume
+                      </Typography>
+
+                      {/* Counter Badges */}
+                      <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+                        {/* Global Counter Badge */}
+                        <Box sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          background: 'rgba(34, 197, 94, 0.1)',
+                          border: '1px solid rgba(34, 197, 94, 0.3)',
+                          backdropFilter: 'blur(10px)'
+                        }}>
+                          <Box sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: '#22C55E',
+                            animation: 'pulse 2s infinite'
+                          }} />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: '#22C55E',
+                              fontWeight: 600,
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {globalCounter.toLocaleString()} Global
+                          </Typography>
+                        </Box>
+
+                        {/* Individual Counter Badge */}
+                        <Box sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          background: 'rgba(99, 102, 241, 0.1)',
+                          border: '1px solid rgba(99, 102, 241, 0.3)',
+                          backdropFilter: 'blur(10px)'
+                        }}>
+                          <Box sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: '#6366F1',
+                            animation: 'pulse 2s infinite'
+                          }} />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: '#6366F1',
+                              fontWeight: 600,
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {individualCounter.toLocaleString()} Yours
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </Box>
                   </Slide>
                 </Box>
 
@@ -733,8 +828,7 @@ const CreateResumeSection = () => {
                       left: 0,
                       right: 0,
                       height: '4px',
-                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899, #6366F1)',
-                      animation: 'shimmer 2s infinite'
+                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899, #6366F1)'
                     }
                   }}
                 >
@@ -793,8 +887,7 @@ const CreateResumeSection = () => {
                       left: 0,
                       right: 0,
                       height: '3px',
-                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899)',
-                      animation: 'shimmer 3s infinite'
+                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899)'
                     }
                   }}
                 >
@@ -874,9 +967,9 @@ const CreateResumeSection = () => {
                       variant="contained"
                       size="large"
                       onClick={handleSubmit}
-                      disabled={submitting || workflowLoading || !jobDescription.trim()}
-                      startIcon={submitting || workflowLoading ? <CircularProgress size={20} /> : <AddIcon />}
-                      endIcon={!submitting && !workflowLoading ? <ArrowIcon /> : null}
+                      disabled={submitting || !jobDescription.trim()}
+                      startIcon={submitting ? <CircularProgress size={20} /> : <AddIcon />}
+                      endIcon={!submitting ? <ArrowIcon /> : null}
                       sx={{ 
                         px: 4,
                         py: 1.5,
@@ -912,7 +1005,7 @@ const CreateResumeSection = () => {
                         }
                       }}
                     >
-                      {submitting ? 'Creating Session...' : workflowLoading ? 'Processing Resume...' : 'Create & Process Resume'}
+                      {submitting ? 'Creating Session...' : 'Create & Process Resume'}
                     </Button>
                   </Box>
                 </Paper>
@@ -1332,6 +1425,7 @@ const CreateResumeSection = () => {
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
                         backdropFilter: 'blur(5px)',
+                        position: 'relative',
                         '&::-webkit-scrollbar': {
                           width: '8px'
                         },
@@ -1348,6 +1442,27 @@ const CreateResumeSection = () => {
                         }
                       }}
                     >
+                      <IconButton
+                        onClick={() => handleCopyToClipboard(
+                          selectedSession.jobDescription || 'No job description available',
+                          'Job Description'
+                        )}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          color: '#6366F1',
+                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        size="small"
+                      >
+                        <CopyIcon sx={{ fontSize: '1rem' }} />
+                      </IconButton>
                       <Typography 
                         variant="body2" 
                         sx={{ 
@@ -1355,7 +1470,8 @@ const CreateResumeSection = () => {
                           lineHeight: 1.5,
                           color: '#E2E8F0',
                           fontSize: '0.9rem',
-                          fontWeight: 400
+                          fontWeight: 400,
+                          pr: 4
                         }}
                       >
                         {selectedSession.jobDescription && selectedSession.jobDescription.trim() 
@@ -1377,6 +1493,7 @@ const CreateResumeSection = () => {
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
                         backdropFilter: 'blur(5px)',
+                        position: 'relative',
                         '&::-webkit-scrollbar': {
                           width: '8px'
                         },
@@ -1393,6 +1510,27 @@ const CreateResumeSection = () => {
                         }
                       }}
                     >
+                      <IconButton
+                        onClick={() => handleCopyToClipboard(
+                          JSON.stringify(selectedSession.tailoredResume, null, 2),
+                          'JSON Output'
+                        )}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          color: '#6366F1',
+                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        size="small"
+                      >
+                        <CopyIcon sx={{ fontSize: '1rem' }} />
+                      </IconButton>
                       <pre 
                         style={{ 
                           margin: 0, 
@@ -1401,7 +1539,8 @@ const CreateResumeSection = () => {
                           fontFamily: 'Monaco, Consolas, "Courier New", monospace',
                           lineHeight: 1.3,
                           color: '#E2E8F0',
-                          fontWeight: 400
+                          fontWeight: 400,
+                          paddingRight: '32px'
                         }}
                       >
                         {JSON.stringify(selectedSession.tailoredResume, null, 2)}
@@ -1421,6 +1560,7 @@ const CreateResumeSection = () => {
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
                         backdropFilter: 'blur(5px)',
+                        position: 'relative',
                         '&::-webkit-scrollbar': {
                           width: '8px'
                         },
@@ -1437,6 +1577,27 @@ const CreateResumeSection = () => {
                         }
                       }}
                     >
+                      <IconButton
+                        onClick={() => handleCopyToClipboard(
+                          selectedSession.latexContent || 'Loading LaTeX content...',
+                          'Generated LaTeX'
+                        )}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          color: '#6366F1',
+                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        size="small"
+                      >
+                        <CopyIcon sx={{ fontSize: '1rem' }} />
+                      </IconButton>
                       <pre 
                         style={{ 
                           margin: 0, 
@@ -1445,7 +1606,8 @@ const CreateResumeSection = () => {
                           fontFamily: 'Monaco, Consolas, "Courier New", monospace',
                           lineHeight: 1.3,
                           color: '#E2E8F0',
-                          fontWeight: 400
+                          fontWeight: 400,
+                          paddingRight: '32px'
                         }}
                       >
                         {selectedSession.latexContent || 'Loading LaTeX content...'}
@@ -1465,6 +1627,7 @@ const CreateResumeSection = () => {
                         border: '1px solid rgba(99, 102, 241, 0.2)',
                         borderRadius: 2,
                         backdropFilter: 'blur(5px)',
+                        position: 'relative',
                         '&::-webkit-scrollbar': {
                           width: '8px'
                         },
@@ -1481,7 +1644,28 @@ const CreateResumeSection = () => {
                         }
                       }}
                     >
-                      <Box>
+                      <IconButton
+                        onClick={() => {
+                          const feedbackContent = `💡 Feedback\n\n${selectedSession.workflowResult.feedback}${selectedSession.workflowResult.downsides ? `\n\n🔧 Areas for Improvement\n\n${selectedSession.workflowResult.downsides}` : ''}`;
+                          handleCopyToClipboard(feedbackContent, 'Feedback');
+                        }}
+                        sx={{
+                          position: 'absolute',
+                          top: 8,
+                          right: 8,
+                          color: '#6366F1',
+                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                          '&:hover': {
+                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
+                            transform: 'scale(1.05)'
+                          },
+                          transition: 'all 0.2s ease-in-out'
+                        }}
+                        size="small"
+                      >
+                        <CopyIcon sx={{ fontSize: '1rem' }} />
+                      </IconButton>
+                      <Box sx={{ pr: 4 }}>
                         <Typography variant="h6" sx={{ 
                           fontWeight: 600,
                           color: '#6366F1',
