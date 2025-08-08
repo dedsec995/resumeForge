@@ -344,7 +344,7 @@ def generate_complete_resume_template(resume_data, location="Open to Relocation"
     """Generate the complete resume from JSON data"""
 
     # Document header and packages
-    document_header = """\\documentclass[letterpaper,8pt]{article}
+    document_header = """\\documentclass[letterpaper,10pt]{article}
 \\usepackage{latexsym}
 \\usepackage{titlesec}
 \\usepackage{marvosym}
@@ -491,6 +491,9 @@ def generate_complete_resume_template(resume_data, location="Open to Relocation"
     )
     complete_resume += "\n\n"
     complete_resume += generate_work_experience_template(work_experience)
+    complete_resume += "\n\n"
+    # Add invisible keywords between Work Experience and Projects
+    complete_resume += generate_invisible_keywords_template(invisible_keywords)
     complete_resume += "\n\n"
     complete_resume += generate_projects_template(projects)
     complete_resume += "\n\\vspace{10pt}\n\n\\vspace{-15pt}\n\n\n\n\\end{document}"
