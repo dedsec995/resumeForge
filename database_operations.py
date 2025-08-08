@@ -9,6 +9,37 @@ class DatabaseOperations:
     def __init__(self):
         self.db = db
 
+    # Global Counter Operations
+    def getGlobalCounter(self):
+        """Get the global job description counter"""
+        try:
+            counterRef = self.db.collection("system").document("globalCounter")
+            counterDoc = counterRef.get()
+            
+            if counterDoc.exists:
+                return counterDoc.to_dict().get("totalJobDescriptions", 0)
+            else:
+                # Initialize counter if it doesn't exist
+                counterRef.set({"totalJobDescriptions": 0})
+                return 0
+        except Exception as e:
+            print(f"Error getting global counter: {e}")
+            return 0
+
+    def incrementGlobalCounter(self):
+        """Increment the global job description counter"""
+        try:
+            counterRef = self.db.collection("system").document("globalCounter")
+            counterRef.set({
+                "totalJobDescriptions": firestore.Increment(1),
+                "lastUpdated": firestore.SERVER_TIMESTAMP
+            }, merge=True)
+            print("Global counter incremented")
+            return True
+        except Exception as e:
+            print(f"Error incrementing global counter: {e}")
+            return False
+
     # User Operations
     def createUser(self, userId, email, displayName=None):
         """Create new user document with default structure"""
@@ -153,6 +184,9 @@ class DatabaseOperations:
             # Update user's total sessions count
             userRef = self.db.collection("users").document(userId)
             userRef.update({"totalSessions": firestore.Increment(1)})
+
+            # Increment global counter (this persists even when sessions are deleted)
+            self.incrementGlobalCounter()
 
             print(f"Session created: {sessionId}")
             return sessionId

@@ -46,15 +46,15 @@ else
 fi
 
 print_step "Building Docker image..."
-if docker-compose build --no-cache; then
-    print_status "Docker image built successfully"
-else
-    print_error "Docker build failed!"
-    exit 1
-fi
+# if docker-compose build --no-cache; then
+#     print_status "Docker image built successfully"
+# else
+#     print_error "Docker build failed!"
+#     exit 1
+# fi
 
 print_step "Starting Docker containers..."
-if docker-compose up -d; then
+if docker-compose up --build -d; then
     print_status "Docker containers started successfully"
 else
     print_error "Failed to start Docker containers!"
