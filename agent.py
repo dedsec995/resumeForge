@@ -10,6 +10,17 @@ from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
 from utils import clean_the_text, extract_and_parse_json, parse_keywords_from_json
+from prompts import (
+    EXTRACT_INFO_PROMPT,
+    EDIT_TECHNICAL_SKILLS_PROMPT,
+    EDIT_EXPERIENCE_PROMPT,
+    EDIT_PROJECTS_PROMPT,
+    JUDGE_QUALITY_PROMPT,
+    KEYWORDS_EXTRACTION_PROMPT,
+    FEEDBACK_CONTEXT_TEMPLATE,
+    FEEDBACK_CONTEXT_EXPERIENCE_TEMPLATE,
+    FEEDBACK_CONTEXT_PROJECTS_TEMPLATE,
+)
 
 load_dotenv()
 
@@ -62,14 +73,7 @@ def extract_info(state):
     )
     # llm = ChatOpenAI(temperature=0, model="gpt-3.5-turbo", api_key=OPENAI_API_KEY)
 
-    prompt = f"""From the following job description, extract the company name, the position title, and the job location.
-                Format the location as "City, ST" (e.g., "Los Angeles, CA", "New York, NY").
-                Return ONLY the JSON object, with three keys: "company", "position", and "location". Do NOT include any other text or markdown.
-                If the location is not specified, default to "Open to Relocation".
-
-                Job Description:
-                {state['job_description']}
-            """
+    prompt = EXTRACT_INFO_PROMPT.format(job_description=state["job_description"])
     response = llm.invoke(prompt)
     try:
         data = extract_and_parse_json(response.content)
@@ -108,36 +112,18 @@ def edit_technical_skills(state):
         and state.get("downsides")
         and state.get("iteration_count", 0) > 0
     ):
-        feedback_context = f"""
-                    **Previous Feedback and Context:**
-                    - **Feedback from previous iteration:** {state.get("feedback", "")}
-                    - **Identified downsides to address:** {state.get("downsides", "")}
-                    - **Current iteration:** {state.get("iteration_count", 0)}
+        feedback_context = FEEDBACK_CONTEXT_TEMPLATE.format(
+            feedback=state.get("feedback", ""),
+            downsides=state.get("downsides", ""),
+            iteration_count=state.get("iteration_count", 0),
+            section_name="Technical Skills",
+        )
 
-                    Please specifically address the feedback and downsides mentioned above while making improvements to the Technical Skills section.
-                """
-
-    prompt = f"""You are an elite Resume Architect. Your sole function is to transform a generic JSON resume into a highly targeted application for a specific job description.
-
-            {feedback_context}
-
-            Rewrite the 'technicalSkillsCategories' section of the resume to align with the job description. Follow these rules:
-            - You can use the skills from the job description as a reference to add more skills to the resume.
-            - Add any crucial skills from the job description that are missing.
-            - Remove any skills that are irrelevant to the target job to reduce clutter and improve focus.
-
-            Your output MUST be ONLY the updated JSON for the 'technicalSkillsCategories' section, wrapped in a single block like this: ``json ... ```
-
-            **Job Description:**
-            ---
-            {state['job_description']}
-            ---
-
-            **Original 'technicalSkillsCategories' JSON Section:**
-            ---
-            {json.dumps(original_skills_section, indent=2)}
-            ---
-        """
+    prompt = EDIT_TECHNICAL_SKILLS_PROMPT.format(
+        feedback_context=feedback_context,
+        job_description=state["job_description"],
+        original_skills_section=json.dumps(original_skills_section, indent=2),
+    )
 
     response = llm.invoke(prompt)
     try:
@@ -169,42 +155,18 @@ def edit_experience(state):
         and state.get("downsides")
         and state.get("iteration_count", 0) > 0
     ):
-        feedback_context = f"""
-            **Previous Feedback and Context:**
-            - **Feedback from previous iteration:** {state.get("feedback", "")}
-            - **Identified downsides to address:** {state.get("downsides", "")}
-            - **Current iteration:** {state.get("iteration_count", 0)}
-            
-            **Here is entire resume for your reference:**
+        feedback_context = FEEDBACK_CONTEXT_EXPERIENCE_TEMPLATE.format(
+            feedback=state.get("feedback", ""),
+            downsides=state.get("downsides", ""),
+            iteration_count=state.get("iteration_count", 0),
+            full_resume_data=json.dumps(state["tailored_resume_data"], indent=2),
+        )
 
-            Please specifically address the feedback and downsides mentioned above while making improvements to the Work Experience section.
-        """
-
-    prompt = f"""You are an elite Resume Architect. Your sole function is to transform a JSON resume into a highly targeted application for a specific job description.
-
-        {feedback_context}
-
-        Rewrite the bullet points in the 'workExperience' section of the JSON resume to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-        - Quantify where ever or when ever possible. If the original experience lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
-        - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
-        - To bold keywords, use markdown like **keyword**.
-        - Critical: Only make the change if it makes sense technically or logically.
-        - You can add more details and points if needed to make the experience more relevant to the job description.
-        - If change is needed in the experience to convey the narrative better, then change the entire experience point except the company name and the position title.
-        - Do not Over describe the point e.g. "as mesaured by".
-        - Start with Strong action verb and try to reduce use of articles.
-        Your output MUST be ONLY the updated JSON for the 'workExperience' section, wrapped in a single block like this: ``json ... ```
-
-        **Job Description:**
-        ---
-        {state['job_description']}
-        ---
-
-        **Original 'workExperience' JSON Section:**
-        ---
-        {json.dumps(original_experience_section, indent=2)}
-        ---
-    """
+    prompt = EDIT_EXPERIENCE_PROMPT.format(
+        feedback_context=feedback_context,
+        job_description=state["job_description"],
+        original_experience_section=json.dumps(original_experience_section, indent=2),
+    )
 
     response = llm.invoke(prompt)
     try:
@@ -234,40 +196,18 @@ def edit_projects(state):
         and state.get("downsides")
         and state.get("iteration_count", 0) > 0
     ):
-        feedback_context = f"""
-            **Previous Feedback and Context:**
-            - **Feedback from previous iteration:** {state.get("feedback", "")}
-            - **Identified downsides to address:** {state.get("downsides", "")}
-            - **Current iteration:** {state.get("iteration_count", 0)}
+        feedback_context = FEEDBACK_CONTEXT_PROJECTS_TEMPLATE.format(
+            feedback=state.get("feedback", ""),
+            downsides=state.get("downsides", ""),
+            iteration_count=state.get("iteration_count", 0),
+            full_resume_data=json.dumps(state["tailored_resume_data"], indent=2),
+        )
 
-            **Here is entire resume for your reference:**
-            Please specifically address the feedback and downsides mentioned above while making improvements to the Projects section.
-        """
-
-    prompt = f"""You are an elite Resume Architect. Your sole function is to transform a JSON resume into a highly targeted application for a specific job description.
-
-        {feedback_context}
-
-        Rewrite the bullet points in the 'projects' section of the JSON resume to be achievement-oriented, using the STAR (Situation, Task, Action, Result) or XYZ (Accomplished [X] as measured by [Y], by doing [Z]) framework. Follow these rules:
-        - Quantify where ever or when ever possible. If the original resume lacks metrics, infer and add plausible, impressive metrics that align with the role's responsibilities.
-        - Seamlessly and naturally integrate keywords and concepts from the job description throughout the narrative.
-        - To bold keywords, use markdown like **keyword**.
-        - You can add more details and points if needed to make the project more relevant to the job description.
-        - You can add more points to the existing project if needed to make it more relevant to the job description but make sense and be cohesive.
-        - You cannot change the project title, only the bullet points.
-
-        Your output MUST be ONLY the updated JSON for the 'projects' section, wrapped in a single block like this: ``json ... ```
-
-        **Job Description:**
-        ---
-        {state['job_description']}
-        ---
-
-        **Original 'projects' JSON Section:**
-        ---
-        {json.dumps(original_projects_section, indent=2)}
-        ---
-    """
+    prompt = EDIT_PROJECTS_PROMPT.format(
+        feedback_context=feedback_context,
+        job_description=state["job_description"],
+        original_projects_section=json.dumps(original_projects_section, indent=2),
+    )
 
     response = llm.invoke(prompt)
     try:
@@ -293,28 +233,10 @@ def judge_resume_quality(state):
     # llm = ChatOpenAI(temperature=0.1, model="gpt-4", api_key=OPENAI_API_KEY)
     iteration_count = state.get("iteration_count", 0) + 1
 
-    prompt = f"""You are an expert resume reviewer and critic. Your task is to evaluate how well the provided JSON resume is tailored to the given job description. Assign a score from 0 to 100, where 100 is perfectly tailored.
-                Consider the following:
-                - Relevance of experience and projects only to the job description.
-                - Use of keywords from the job description.
-                - Quantification of achievements (STAR/XYZ method).
-                - Overall impact and alignment with the job requirements.
-                - Judge the overall narrative of the resume and the flow of the resume.
-                - Specify the downsides or drawbacks of the resume and specifically the resume section that can be better aligned with the job description.
-                - Be genuine and honest in your evaluation.
-
-                Provide your evaluation and score in a JSON object with three keys: "score" (float), "feedback" (string), and "downsides" (string).
-
-                **Job Description:**
-                ---
-                {state['job_description']}
-                ---
-
-                **Tailored JSON Resume:**
-                ---
-                {json.dumps(state['tailored_resume_data'], indent=2)}
-                ---
-            """
+    prompt = JUDGE_QUALITY_PROMPT.format(
+        job_description=state["job_description"],
+        tailored_resume_data=json.dumps(state["tailored_resume_data"], indent=2),
+    )
 
     response = llm.invoke(prompt)
     data = extract_and_parse_json(response.content)
@@ -357,21 +279,9 @@ def keywords_editor(state):
     job_description = state["job_description"]
     resume_data = state["tailored_resume_data"]
 
-    prompt = f"""
-    Based on the job description and the resume, identify the 15 most important keywords that align the candidate's skills and experience with the job requirements.
-    The keywords should be single words or short phrases (e.g., "Python", "Data Analysis", "Machine Learning").
-    Return ONLY a JSON object with a single key "keywords" which is a list of these 15 keywords. Do not include any other text, labels, or markdown.
-
-    **Job Description:**
-    ---
-    {job_description}
-    ---
-
-    **Resume JSON:**
-    ---
-    {json.dumps(resume_data, indent=2)}
-    ---
-    """
+    prompt = KEYWORDS_EXTRACTION_PROMPT.format(
+        job_description=job_description, resume_data=json.dumps(resume_data, indent=2)
+    )
     response = llm.invoke(prompt)
     keywords_data = extract_and_parse_json(response.content)
     if not keywords_data or "keywords" not in keywords_data:
