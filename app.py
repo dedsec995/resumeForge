@@ -610,6 +610,10 @@ def run_workflow_sync(userId: str, sessionId: str):
             resume_data = {}
 
         job_description = session_data.get("jobDescription", "")
+        
+        # Get user tier
+        user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
+        print(f"User {userId} tier: {user_tier}")
 
         combined_data = {
             "sessionId": sessionId,
@@ -618,7 +622,14 @@ def run_workflow_sync(userId: str, sessionId: str):
         }
 
         try:
-            result = workflow({"resume_data": combined_data})
+            # Pass user context to workflow
+            workflow_input = {
+                "resume_data": combined_data,
+                "user_id": userId,
+                "user_tier": user_tier
+            }
+            
+            result = workflow(workflow_input)
 
             score = result.get("score", 0.0)
             company_name = result.get("company_name", "")
@@ -688,22 +699,46 @@ def run_workflow_sync(userId: str, sessionId: str):
                 )
 
         except Exception as workflow_error:
-            print(f"Workflow failed for session {sessionId}: {str(workflow_error)}")
-            errorUpdateData = {
-                "status": "failed",
-                "error": str(workflow_error),
-                "failedAt": datetime.now().isoformat(),
-            }
+            error_msg = str(workflow_error)
+            print(f"Workflow failed for session {sessionId}: {error_msg}")
+            
+            # Handle API key errors specifically
+            if "API_KEY_ERROR" in error_msg:
+                errorUpdateData = {
+                    "status": "failed",
+                    "error": "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue.",
+                    "errorType": "API_KEY_ERROR",
+                    "failedAt": datetime.now().isoformat(),
+                }
+            elif "MODEL_ERROR" in error_msg:
+                errorUpdateData = {
+                    "status": "failed",
+                    "error": "MODEL_ERROR: Error occurred in AI model processing.",
+                    "errorType": "MODEL_ERROR",
+                    "failedAt": datetime.now().isoformat(),
+                }
+            else:
+                errorUpdateData = {
+                    "status": "failed",
+                    "error": error_msg,
+                    "errorType": "WORKFLOW_ERROR",
+                    "failedAt": datetime.now().isoformat(),
+                }
+            
             dbOps.updateSession(userId, sessionId, errorUpdateData)
 
     except Exception as e:
-        print(f"Background workflow error for session {sessionId}: {str(e)}")
-        errorUpdateData = {
-            "status": "failed",
-            "error": str(e),
-            "failedAt": datetime.now().isoformat(),
-        }
-        dbOps.updateSession(userId, sessionId, errorUpdateData)
+        print(f"Critical error in run_workflow_sync for session {sessionId}: {str(e)}")
+        try:
+            errorUpdateData = {
+                "status": "failed",
+                "error": f"Critical error: {str(e)}",
+                "errorType": "CRITICAL_ERROR",
+                "failedAt": datetime.now().isoformat(),
+            }
+            dbOps.updateSession(userId, sessionId, errorUpdateData)
+        except Exception as update_error:
+            print(f"Failed to update session with error: {str(update_error)}")
 
 
 async def run_workflow_background(userId: str, sessionId: str):
@@ -782,6 +817,7 @@ async def getSessionStatusEndpoint(
             "startedAt": session_data.get("startedAt", ""),
             "completedAt": session_data.get("completedAt", ""),
             "error": session_data.get("error", ""),
+            "errorType": session_data.get("errorType", ""),
         }
 
     except Exception as e:

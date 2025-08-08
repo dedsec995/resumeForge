@@ -96,12 +96,14 @@ const CreateResumeSection = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
+  const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
 
   // Load existing sessions on component mount
   useEffect(() => {
     loadSessions();
     loadGlobalCounter();
     loadIndividualCounter();
+    loadUserApiConfig();
   }, []);
 
   const loadGlobalCounter = async () => {
@@ -346,6 +348,11 @@ const CreateResumeSection = () => {
       return;
     }
 
+    // Check if user has API key for FREE tier
+    if (!checkApiKeyRequirement()) {
+      return;
+    }
+
     try {
       setWorkflowLoading(true);
       
@@ -376,7 +383,27 @@ const CreateResumeSection = () => {
             } else if (status === 'failed') {
               clearInterval(pollInterval);
               setWorkflowLoading(false);
-              toast.error(`Workflow failed: ${statusResponse.data.error || 'Unknown error'}`);
+              
+              // Handle different error types
+              if (statusResponse.data.errorType === 'API_KEY_ERROR') {
+                toast.error(
+                  'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
+                  { 
+                    duration: 8000,
+                    icon: '🔑'
+                  }
+                );
+              } else if (statusResponse.data.errorType === 'MODEL_ERROR') {
+                toast.error(
+                  'Model Error: There was an issue with the AI model. Please try again later.',
+                  { 
+                    duration: 5000,
+                    icon: '🤖'
+                  }
+                );
+              } else {
+                toast.error(`Workflow failed: ${statusResponse.data.error || 'Unknown error'}`);
+              }
               
               // Refresh the session data to show error status
               await handleViewSession(selectedSession.sessionId);
@@ -411,7 +438,28 @@ const CreateResumeSection = () => {
     } catch (error) {
       console.error('Error starting workflow:', error);
       setWorkflowLoading(false);
-      toast.error('Failed to start resume workflow');
+      
+      // Check if it's an API key error from the response
+      const errorResponse = error as { response?: { data?: { detail?: string } } };
+      if (errorResponse.response?.data?.detail?.includes('API_KEY_ERROR')) {
+        toast.error(
+          'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
+          { 
+            duration: 8000,
+            icon: '🔑'
+          }
+        );
+      } else if (errorResponse.response?.data?.detail?.includes('MODEL_ERROR')) {
+        toast.error(
+          'Model Error: There was an issue with the AI model. Please try again later.',
+          { 
+            duration: 5000,
+            icon: '🤖'
+          }
+        );
+      } else {
+        toast.error('Failed to start resume workflow');
+      }
     }
   };
 
@@ -580,6 +628,31 @@ const CreateResumeSection = () => {
       console.error('Failed to copy to clipboard:', error);
       toast.error('Failed to copy to clipboard');
     }
+  };
+
+  const loadUserApiConfig = async () => {
+    try {
+      const response = await apiClient.get('/apiConfig');
+      if (response.data.success) {
+        setUserApiConfig(response.data.apiData);
+      }
+    } catch (error) {
+      console.error('Error loading API config:', error);
+    }
+  };
+
+  const checkApiKeyRequirement = () => {
+    if (!userApiConfig?.hasApiKey) {
+      toast.error(
+        'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
+        { 
+          duration: 8000,
+          icon: '🔑'
+        }
+      );
+      return false;
+    }
+    return true;
   };
 
   return (
