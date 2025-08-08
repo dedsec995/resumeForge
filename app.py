@@ -185,6 +185,23 @@ async def rootEndpoint():
     return {"message": "Resume Forge API is running", "status": "healthy"}
 
 
+@app.get("/globalCounter")
+async def getGlobalCounterEndpoint():
+    """Get the global job description counter"""
+    try:
+        globalCounter = dbOps.getGlobalCounter()
+        return {
+            "success": True,
+            "totalJobDescriptions": globalCounter,
+            "message": "Global counter retrieved successfully"
+        }
+    except Exception as e:
+        print(f"Error getting global counter: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get global counter: {str(e)}"
+        )
+
+
 @app.get("/parseResume", response_model=ResumeParseResponse)
 async def parseResumeEndpoint(userId: str = Depends(verifyFirebaseToken)):
     """Load user resume data from Firebase or create empty structure"""

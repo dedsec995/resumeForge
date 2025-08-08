@@ -93,11 +93,24 @@ const CreateResumeSection = () => {
   const [activeTab, setActiveTab] = useState(0);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
+  const [globalCounter, setGlobalCounter] = useState(0);
 
   // Load existing sessions on component mount
   useEffect(() => {
     loadSessions();
+    loadGlobalCounter();
   }, []);
+
+  const loadGlobalCounter = async () => {
+    try {
+      const response = await apiClient.get('/globalCounter');
+      if (response.data.success) {
+        setGlobalCounter(response.data.totalJobDescriptions);
+      }
+    } catch (error) {
+      console.error('Error loading global counter:', error);
+    }
+  };
 
   const loadSessions = async () => {
     try {
@@ -168,6 +181,7 @@ const CreateResumeSection = () => {
                   
                           // Refresh the sessions list to show updated status
         loadSessions();
+        loadGlobalCounter(); // Refresh the global counter
         
         // Hide the form after successful submission for returning users
         if (!isFirstTimeUser) {
@@ -193,6 +207,7 @@ const CreateResumeSection = () => {
                   
                   // Refresh the sessions list
                   loadSessions();
+                  loadGlobalCounter(); // Refresh the global counter
                   
                 } else if (status === 'processing') {
                   // Still processing, continue polling
@@ -213,6 +228,7 @@ const CreateResumeSection = () => {
               setWorkflowLoading(false);
               toast.error('Processing timeout. Please check the session manually.');
               loadSessions();
+              loadGlobalCounter(); // Refresh the global counter
             }, 600000); // 10 minutes
             
           } else {
@@ -226,6 +242,7 @@ const CreateResumeSection = () => {
         }
         
         loadSessions(); // Refresh the sessions list and update form visibility
+        loadGlobalCounter(); // Refresh the global counter
       } else {
         toast.error('Failed to create resume session');
       }
@@ -296,6 +313,8 @@ const CreateResumeSection = () => {
       if (response.data.success) {
         toast.success('Session deleted successfully');
         loadSessions(); // Refresh the sessions list
+        // Note: We don't decrement the global counter when deleting sessions
+        // as the global counter represents total job descriptions processed, not current sessions
       }
     } catch (error) {
       console.error('Error deleting session:', error);
@@ -607,7 +626,7 @@ const CreateResumeSection = () => {
                         pl: { xs: 0, md: 7 } // Align with the title text (icon width + margin)
                       }}
                     >
-                      Paste a job description to automatically create and process your tailored resume
+                      Paste a job description to automatically create and process your tailored resume: {globalCounter.toLocaleString()}
                     </Typography>
                   </Slide>
                 </Box>
