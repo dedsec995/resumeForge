@@ -14,6 +14,7 @@ from agent import workflow, extract_info
 from auth_routes import authRouter
 from auth_middleware import verifyFirebaseToken, optionalAuth
 from database_operations import dbOps
+from pipeline_processor import start_pipeline_processor, stop_pipeline_processor, get_pipeline_status, cleanup_on_startup
 
 app = FastAPI(
     title="Resume Forge API",
@@ -23,6 +24,28 @@ app = FastAPI(
 
 # Thread pool for CPU-intensive background tasks
 thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="workflow_")
+
+# Startup event handler
+@app.on_event("startup")
+async def startup_event():
+    """Initialize pipeline processor and cleanup on startup"""
+    print("Starting Resume Forge API...")
+    
+    # Clean up any processing sessions from previous server runs
+    cleanup_count = cleanup_on_startup()
+    print(f"Cleaned up {cleanup_count} processing sessions from previous runs")
+    
+    # Start the pipeline processor
+    start_pipeline_processor()
+    print("Pipeline processor started")
+
+# Shutdown event handler
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Cleanup on shutdown"""
+    print("Shutting down Resume Forge API...")
+    stop_pipeline_processor()
+    print("Pipeline processor stopped")
 
 
 def generate_resume_filename(
@@ -69,6 +92,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
+        "http://localhost:5174",
         "http://localhost:3000",
         "http://127.0.0.1:5173",
         "https://resumeforge.thatinsaneguy.com",
@@ -184,6 +208,16 @@ class GetApiConfigResponse(BaseModel):
     success: bool
     apiData: Dict[str, Any]
     message: str
+
+
+class PipelineStatusResponse(BaseModel):
+    success: bool
+    status: Dict[str, int]
+    message: str
+
+
+class QueueSessionRequest(BaseModel):
+    sessionId: str
 
 
 @app.get("/")
@@ -554,7 +588,7 @@ async def run_workflow_background(userId: str, sessionId: str):
 async def fullWorkflowEndpoint(
     request: WorkflowSessionRequest, userId: str = Depends(verifyFirebaseToken)
 ):
-    """Start resume tailoring workflow in background"""
+    """Queue resume tailoring workflow for processing"""
     try:
         session_data = dbOps.getSession(userId, request.sessionId)
 
@@ -570,28 +604,43 @@ async def fullWorkflowEndpoint(
                 message="Workflow is already in progress",
             )
 
-        processingUpdateData = {
-            "status": "processing",
-            "startedAt": datetime.now().isoformat(),
+        if session_data.get("status") == "queued":
+            return WorkflowResponse(
+                success=True,
+                finalScore=0.0,
+                pdfPath=None,
+                iterationCount=0,
+                message="Workflow is already queued for processing",
+            )
+
+        # Add session to pipeline
+        job_description = session_data.get("jobDescription", "")
+        pipeline_added = dbOps.addToPipeline(userId, request.sessionId, job_description)
+        
+        if not pipeline_added:
+            raise HTTPException(status_code=500, detail="Failed to add session to processing queue")
+
+        # Update session status to queued
+        queuedUpdateData = {
+            "status": "queued",
+            "queuedAt": datetime.now().isoformat(),
         }
-        dbOps.updateSession(userId, request.sessionId, processingUpdateData)
+        dbOps.updateSession(userId, request.sessionId, queuedUpdateData)
 
-        asyncio.create_task(run_workflow_background(userId, request.sessionId))
-
-        print(f"Workflow started in background thread for session: {request.sessionId}")
+        print(f"Session {request.sessionId} queued for processing")
 
         return WorkflowResponse(
             success=True,
             finalScore=0.0,
             pdfPath=None,
             iterationCount=0,
-            message="Workflow started successfully. Check status for updates.",
+            message="Workflow queued successfully. Check status for updates.",
         )
 
     except Exception as e:
-        print(f"Error starting workflow: {str(e)}")
+        print(f"Error queuing workflow: {str(e)}")
         raise HTTPException(
-            status_code=500, detail=f"Failed to start workflow: {str(e)}"
+            status_code=500, detail=f"Failed to queue workflow: {str(e)}"
         )
 
 
@@ -1081,6 +1130,49 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
         print(f"Error getting API config: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get API configuration: {str(e)}"
+        )
+
+
+# Pipeline Management Endpoints
+@app.get("/pipeline/status", response_model=PipelineStatusResponse)
+async def getPipelineStatusEndpoint():
+    """Get current pipeline status"""
+    try:
+        status = get_pipeline_status()
+        return PipelineStatusResponse(
+            success=True,
+            status=status,
+            message="Pipeline status retrieved successfully"
+        )
+    except Exception as e:
+        print(f"Error getting pipeline status: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get pipeline status: {str(e)}"
+        )
+
+
+@app.get("/pipeline/user-sessions", response_model=GetSessionsResponse)
+async def getUserPipelineSessionsEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Get user's active sessions in the pipeline"""
+    try:
+        active_sessions = dbOps.getActivePipelineSessions(userId)
+        
+        # Convert pipeline sessions to the expected format
+        sessions = []
+        for session in active_sessions:
+            session_data = dbOps.getSession(userId, session['sessionId'])
+            if session_data:
+                sessions.append(session_data)
+        
+        return GetSessionsResponse(
+            success=True,
+            sessions=sessions,
+            totalSessions=len(sessions)
+        )
+    except Exception as e:
+        print(f"Error getting user pipeline sessions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get user pipeline sessions: {str(e)}"
         )
 
 

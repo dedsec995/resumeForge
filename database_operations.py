@@ -40,6 +40,161 @@ class DatabaseOperations:
             print(f"Error incrementing global counter: {e}")
             return False
 
+    # Session Pipeline Operations
+
+
+    def addToPipeline(self, userId: str, sessionId: str, jobDescription: str):
+        """Add a session to the processing pipeline"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline").document(sessionId)
+            pipelineData = {
+                "sessionId": sessionId,
+                "userId": userId,
+                "jobDescription": jobDescription,
+                "status": "queued",
+                "addedAt": firestore.SERVER_TIMESTAMP,
+                "startedAt": None,
+                "completedAt": None,
+                "priority": 0,  # Default priority (FIFO)
+                "retryCount": 0,
+                "maxRetries": 3
+            }
+            pipelineRef.set(pipelineData)
+            print(f"Session {sessionId} added to pipeline")
+            return True
+        except Exception as e:
+            print(f"Error adding session to pipeline: {e}")
+            return False
+
+    def getNextSessionFromPipeline(self):
+        """Get the next session from the pipeline (FIFO order)"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline")
+            query = pipelineRef.where("status", "==", "queued")
+            
+            # Get all queued sessions and sort by addedAt timestamp
+            docs = list(query.stream())
+            if not docs:
+                return None
+            
+            # Sort by addedAt timestamp (FIFO)
+            docs.sort(key=lambda doc: doc.get("addedAt") or doc.get("__name__", ""))
+            
+            # Return the oldest one
+            return docs[0].to_dict()
+        except Exception as e:
+            print(f"Error getting next session from pipeline: {e}")
+            return None
+
+    def updatePipelineSessionStatus(self, sessionId: str, status: str, additionalData: dict = None):
+        """Update the status of a session in the pipeline"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline").document(sessionId)
+            updateData = {
+                "status": status,
+                "lastUpdated": firestore.SERVER_TIMESTAMP
+            }
+            
+            if status == "processing":
+                updateData["startedAt"] = firestore.SERVER_TIMESTAMP
+            elif status in ["completed", "failed"]:
+                updateData["completedAt"] = firestore.SERVER_TIMESTAMP
+            
+            if additionalData:
+                updateData.update(additionalData)
+            
+            pipelineRef.update(updateData)
+            print(f"Pipeline session {sessionId} status updated to: {status}")
+            return True
+        except Exception as e:
+            print(f"Error updating pipeline session status: {e}")
+            return False
+
+    def removeFromPipeline(self, sessionId: str):
+        """Remove a session from the pipeline"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline").document(sessionId)
+            pipelineRef.delete()
+            print(f"Session {sessionId} removed from pipeline")
+            return True
+        except Exception as e:
+            print(f"Error removing session from pipeline: {e}")
+            return False
+
+    def getPipelineStatus(self):
+        """Get current pipeline status"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline")
+            
+            # Get counts for different statuses
+            queued_query = pipelineRef.where("status", "==", "queued")
+            processing_query = pipelineRef.where("status", "==", "processing")
+            
+            queued_count = len(list(queued_query.stream()))
+            processing_count = len(list(processing_query.stream()))
+            
+            return {
+                "queued": queued_count,
+                "processing": processing_count,
+                "total": queued_count + processing_count
+            }
+        except Exception as e:
+            print(f"Error getting pipeline status: {e}")
+            return {"queued": 0, "processing": 0, "total": 0}
+
+    def cleanupProcessingSessionsOnStartup(self):
+        """Clean up any sessions that were processing when server restarted"""
+        try:
+            print("Starting cleanup of processing sessions...")
+            
+            # Find all sessions with "processing" status
+            pipelineRef = self.db.collection("sessionPipeline")
+            processing_query = pipelineRef.where("status", "==", "processing")
+            
+            cleanup_count = 0
+            for doc in processing_query.stream():
+                session_data = doc.to_dict()
+                sessionId = session_data.get("sessionId")
+                userId = session_data.get("userId")
+                
+                if sessionId and userId:
+                    # Mark session as failed
+                    self.updateSession(userId, sessionId, {
+                        "status": "failed",
+                        "error": "Session failed due to server restart",
+                        "errorType": "SERVER_RESTART",
+                        "failedAt": datetime.now().isoformat()
+                    })
+                    
+                    # Remove from pipeline
+                    self.removeFromPipeline(sessionId)
+                    cleanup_count += 1
+            
+            print(f"Cleanup completed. Marked {cleanup_count} sessions as failed.")
+            return cleanup_count
+        except Exception as e:
+            print(f"Error during startup cleanup: {e}")
+            return 0
+
+    def getActivePipelineSessions(self, userId: str = None):
+        """Get all active sessions in the pipeline"""
+        try:
+            pipelineRef = self.db.collection("sessionPipeline")
+            
+            if userId:
+                query = pipelineRef.where("userId", "==", userId)
+            else:
+                query = pipelineRef.where("status", "in", ["queued", "processing"])
+            
+            sessions = []
+            for doc in query.stream():
+                sessions.append(doc.to_dict())
+            
+            return sessions
+        except Exception as e:
+            print(f"Error getting active pipeline sessions: {e}")
+            return []
+
     # User Operations
     def createUser(self, userId, email, displayName=None):
         """Create new user document with default structure"""

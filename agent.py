@@ -29,6 +29,10 @@ GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 console = Console()
 
+# Log the current deciding score threshold
+DECIDING_SCORE = float(os.getenv("DECIDING_SCORE", "8.1"))
+console.print(f"[bold blue]🤖 Agent initialized with DECIDING_SCORE threshold: {DECIDING_SCORE}[/bold blue]")
+
 
 class AgentState(TypedDict):
     resume_data: Dict[str, Any]
@@ -580,10 +584,10 @@ def finalize_and_print_json(state):
 
 
 def decide_after_judging(state):
-    if state["score"] < 8.6 and state["iteration_count"] < 3:
+    if state["score"] < DECIDING_SCORE and state["iteration_count"] < 3:
         console.print(
             Panel(
-                f"Score {state['score']}/10 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}",
+                f"Score {state['score']}/10 is below threshold ({DECIDING_SCORE}). Re-editing technical skills. Iteration: {state['iteration_count']}",
                 title="Decision",
                 border_style="red",
             )
@@ -592,7 +596,7 @@ def decide_after_judging(state):
     else:
         console.print(
             Panel(
-                f"Score {state['score']}/10 is sufficient or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}",
+                f"Score {state['score']}/10 is sufficient (threshold: {DECIDING_SCORE}) or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}",
                 title="Decision",
                 border_style="green",
             )

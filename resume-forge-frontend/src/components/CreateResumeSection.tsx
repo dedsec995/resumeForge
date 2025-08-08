@@ -3,42 +3,27 @@ import {
   Container, 
   Typography,
   Paper,
-  TextField,
   Button,
   Grid,
-  Card,
-  CardContent,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   CircularProgress,
   Alert,
   Fade,
   Grow,
-  Slide,
-  IconButton,
-  Tabs,
-  Tab
+  Slide
 } from '@mui/material';
 import { 
   Add as AddIcon,
-  Delete as DeleteIcon,
-  AccessTime as TimeIcon,
-  Description as DescriptionIcon,
-  Code as CodeIcon,
-  DataObject as DataObjectIcon,
   WorkOutline as ResumeIcon,
-  ArrowForward as ArrowIcon,
-  Psychology as AIIcon,
-  Star as StarIcon,
-  Refresh as RefreshIcon,
-  ContentCopy as CopyIcon
+  Description as DescriptionIcon,
+  Star as StarIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
 import { toast } from 'react-hot-toast';
+
+// Import reusable components
+import { ResumeSessionCard, NewResumeForm, FirstTimeUserWelcome } from './ResumeComponents';
+import SessionDetailsDialog from './SessionDetailsDialog';
 
 interface ResumeSession {
   sessionId: string;
@@ -47,6 +32,7 @@ interface ResumeSession {
   preview: string;
   companyName?: string;
   position?: string;
+  tailoredResume?: Record<string, unknown>;
 }
 
 interface SessionData {
@@ -87,16 +73,17 @@ const CreateResumeSection = () => {
   const [selectedSession, setSelectedSession] = useState<SessionData | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
-  const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [downloadPDFLoading, setDownloadPDFLoading] = useState(false);
-  const [downloadLatexLoading, setDownloadLatexLoading] = useState(false);
-  const [regenerateLatexLoading, setRegenerateLatexLoading] = useState(false);
+  const [workflowLoading, setWorkflowLoading] = useState<string | null>(null);
+  const [downloadPDFLoading, setDownloadPDFLoading] = useState<string | null>(null);
+  const [downloadLatexLoading, setDownloadLatexLoading] = useState<string | null>(null);
+  const [regenerateLatexLoading, setRegenerateLatexLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
   const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
+
 
   // Load existing sessions on component mount
   useEffect(() => {
@@ -105,6 +92,40 @@ const CreateResumeSection = () => {
     loadIndividualCounter();
     loadUserApiConfig();
   }, []);
+
+  // Real-time status updates for active sessions
+  useEffect(() => {
+    const activeSessions = sessions.filter(session => 
+      session.status === 'processing' || session.status === 'queued'
+    );
+
+    if (activeSessions.length === 0) return;
+
+    const interval = setInterval(async () => {
+      try {
+        // Update each active session individually for better performance
+        for (const session of activeSessions) {
+          await updateSessionStatus(session.sessionId);
+        }
+        
+        // Only update selected session if dialog is open and session is active
+        if (dialogOpen && selectedSession && (selectedSession.status === 'processing' || selectedSession.status === 'queued')) {
+          try {
+            const response = await apiClient.get(`/getResumeSession/${selectedSession.sessionId}`);
+            if (response.data.success && response.data.sessionData) {
+              setSelectedSession(response.data.sessionData);
+            }
+          } catch (error) {
+            console.error('Error updating selected session:', error);
+          }
+        }
+      } catch (error) {
+        console.error('Error updating session status:', error);
+      }
+    }, 3000); // Poll every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [sessions, selectedSession, dialogOpen]);
 
   const loadGlobalCounter = async () => {
     try {
@@ -153,6 +174,39 @@ const CreateResumeSection = () => {
     }
   };
 
+  // Update individual session status in real-time
+  const updateSessionStatus = async (sessionId: string) => {
+    try {
+      const response = await apiClient.get(`/sessionStatus/${sessionId}`);
+      // The sessionStatus endpoint returns status directly, not wrapped in success field
+      const newStatus = response.data.status;
+      
+      console.log(`Updating session ${sessionId} status to: ${newStatus}`, response.data);
+      
+      // Only update if status actually changed
+      setSessions(prevSessions => {
+        const session = prevSessions.find(s => s.sessionId === sessionId);
+        if (session && session.status !== newStatus) {
+          console.log(`Session ${sessionId} status changed from ${session.status} to ${newStatus}`);
+          return prevSessions.map(s => 
+            s.sessionId === sessionId 
+              ? { ...s, status: newStatus }
+              : s
+          );
+        }
+        return prevSessions;
+      });
+      
+      // Also update selected session if it's the same session and status changed
+      if (selectedSession && selectedSession.sessionId === sessionId && selectedSession.status !== newStatus) {
+        console.log(`Selected session ${sessionId} status changed from ${selectedSession.status} to ${newStatus}`);
+        setSelectedSession(prev => prev ? { ...prev, status: newStatus } : null);
+      }
+    } catch (error) {
+      console.error('Error updating session status:', error);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!jobDescription.trim()) {
       toast.error('Please enter a job description');
@@ -172,7 +226,7 @@ const CreateResumeSection = () => {
         
         // Automatically start the workflow
         try {
-          setWorkflowLoading(true);
+          setWorkflowLoading(sessionId);
           
           // Start the workflow
           const workflowResponse = await apiClient.post('/fullWorkflow', {
@@ -186,40 +240,55 @@ const CreateResumeSection = () => {
             const pollInterval = setInterval(async () => {
               try {
                 const statusResponse = await apiClient.get(`/sessionStatus/${sessionId}`);
+                // The sessionStatus endpoint returns status directly, not wrapped in success field
                 const status = statusResponse.data.status;
                 
                 console.log('Workflow status:', status, statusResponse.data);
                 
+                // Update the sessions list immediately
+                setSessions(prevSessions => 
+                  prevSessions.map(session => 
+                    session.sessionId === sessionId 
+                      ? { ...session, status: status }
+                      : session
+                  )
+                );
+                
+                // Also update selected session if it's the same session
+                if (selectedSession && selectedSession.sessionId === sessionId) {
+                  setSelectedSession(prev => prev ? { ...prev, status: status } : null);
+                }
+                
                 if (status === 'completed') {
                   clearInterval(pollInterval);
-                  setWorkflowLoading(false);
+                  setWorkflowLoading(null);
                   toast.success(`Resume processing completed! Final score: ${statusResponse.data.currentScore}/100`);
                   
-                          // Refresh the sessions list to show updated status
-        loadSessions();
-        loadGlobalCounter(); // Refresh the global counter
-        loadIndividualCounter(); // Refresh the individual counter
-        
-        // Hide the form after successful submission for returning users
-        if (!isFirstTimeUser) {
-          setShowNewResumeForm(false);
-        }
-        
-        // If the modal is open for this session, refresh the session data
-        if (selectedSession && selectedSession.sessionId === sessionId) {
-          try {
-            const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
-            if (sessionResponse.data.success && sessionResponse.data.sessionData) {
-              setSelectedSession(sessionResponse.data.sessionData);
-            }
-          } catch (refreshError) {
-            console.error('Error refreshing session data:', refreshError);
-          }
-        }
+                  // Refresh the sessions list to show updated status
+                  loadSessions();
+                  loadGlobalCounter(); // Refresh the global counter
+                  loadIndividualCounter(); // Refresh the individual counter
+                  
+                  // Hide the form after successful submission for returning users
+                  if (!isFirstTimeUser) {
+                    setShowNewResumeForm(false);
+                  }
+                  
+                  // If the modal is open for this session, refresh the session data
+                  if (selectedSession && selectedSession.sessionId === sessionId) {
+                    try {
+                      const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+                      if (sessionResponse.data.success && sessionResponse.data.sessionData) {
+                        setSelectedSession(sessionResponse.data.sessionData);
+                      }
+                    } catch (refreshError) {
+                      console.error('Error refreshing session data:', refreshError);
+                    }
+                  }
                   
                 } else if (status === 'failed') {
                   clearInterval(pollInterval);
-                  setWorkflowLoading(false);
+                  setWorkflowLoading(null);
                   toast.error(`Processing failed: ${statusResponse.data.error || 'Unknown error'}`);
                   
                   // Refresh the sessions list
@@ -227,15 +296,15 @@ const CreateResumeSection = () => {
                   loadGlobalCounter(); // Refresh the global counter
                   loadIndividualCounter(); // Refresh the individual counter
                   
-                } else if (status === 'processing') {
-                  // Still processing, continue polling
-                  console.log('Still processing...');
+                } else if (status === 'processing' || status === 'queued') {
+                  // Still processing or queued, continue polling
+                  console.log('Still processing or queued...');
                 }
                 
               } catch (pollError) {
                 console.error('Error polling status:', pollError);
                 clearInterval(pollInterval);
-                setWorkflowLoading(false);
+                setWorkflowLoading(null);
                 toast.error('Error checking processing status');
               }
             }, 3000); // Poll every 3 seconds
@@ -243,7 +312,7 @@ const CreateResumeSection = () => {
             // Set a timeout to stop polling after 10 minutes
             setTimeout(() => {
               clearInterval(pollInterval);
-              setWorkflowLoading(false);
+              setWorkflowLoading(null);
               toast.error('Processing timeout. Please check the session manually.');
               loadSessions();
               loadGlobalCounter(); // Refresh the global counter
@@ -251,12 +320,12 @@ const CreateResumeSection = () => {
             }, 600000); // 10 minutes
             
           } else {
-            setWorkflowLoading(false);
+            setWorkflowLoading(null);
             toast.error('Failed to start processing');
           }
         } catch (workflowError) {
           console.error('Error starting workflow:', workflowError);
-          setWorkflowLoading(false);
+          setWorkflowLoading(null);
           toast.error('Failed to start automatic processing. You can start it manually.');
         }
         
@@ -276,49 +345,81 @@ const CreateResumeSection = () => {
 
   const handleViewSession = async (sessionId: string) => {
     try {
-      setDialogLoading(true);
+      // Open dialog immediately for better UX
       setDialogOpen(true);
-      const response = await apiClient.get(`/getResumeSession/${sessionId}`);
-      if (response.data.success && response.data.sessionData) {
-        setSelectedSession(response.data.sessionData);
-        
-        // If the session is still processing, start auto-refresh
-        if (response.data.sessionData.status === 'processing') {
-          const refreshInterval = setInterval(async () => {
-            try {
-              const refreshResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
-              if (refreshResponse.data.success && refreshResponse.data.sessionData) {
-                const newStatus = refreshResponse.data.sessionData.status;
-                setSelectedSession(refreshResponse.data.sessionData);
-                
-                // Stop refreshing if completed or failed
-                if (newStatus === 'completed' || newStatus === 'failed') {
-                  clearInterval(refreshInterval);
-                  loadSessions(); // Refresh the sessions list
+      setDialogLoading(true);
+      
+      // Load session data in the background
+      const loadSessionData = async () => {
+        try {
+          // First get the current session status
+          const statusResponse = await apiClient.get(`/sessionStatus/${sessionId}`);
+          // The sessionStatus endpoint returns status directly, not wrapped in success field
+          const currentStatus = statusResponse.data.status || 'unknown';
+          
+          console.log(`Loading session ${sessionId} with status: ${currentStatus}`, statusResponse.data);
+          
+          // Then get the full session data
+          const response = await apiClient.get(`/getResumeSession/${sessionId}`);
+          if (response.data.success && response.data.sessionData) {
+            // Ensure the session data has the current status
+            const sessionData = {
+              ...response.data.sessionData,
+              status: currentStatus
+            };
+            console.log(`Setting selected session with status: ${currentStatus}`, sessionData);
+            setSelectedSession(sessionData);
+            
+            // If the session is still processing or queued, start auto-refresh
+            if (currentStatus === 'processing' || currentStatus === 'queued') {
+              const refreshInterval = setInterval(async () => {
+                try {
+                  const refreshResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+                  if (refreshResponse.data.success && refreshResponse.data.sessionData) {
+                    const newStatus = refreshResponse.data.sessionData.status;
+                    console.log(`Auto-refresh: session ${sessionId} status is now: ${newStatus}`);
+                    setSelectedSession(refreshResponse.data.sessionData);
+                    
+                    // Stop refreshing if completed or failed
+                    if (newStatus === 'completed' || newStatus === 'failed') {
+                      clearInterval(refreshInterval);
+                      loadSessions(); // Refresh the sessions list
+                    }
+                  }
+                } catch (refreshError) {
+                  console.error('Error auto-refreshing session:', refreshError);
                 }
-              }
-            } catch (refreshError) {
-              console.error('Error auto-refreshing session:', refreshError);
+              }, 3000); // Refresh every 3 seconds
+              
+              // Clean up interval when modal closes
+              const cleanup = () => {
+                clearInterval(refreshInterval);
+              };
+              
+              // Store cleanup function to call when modal closes
+              (window as { sessionRefreshCleanup?: () => void }).sessionRefreshCleanup = cleanup;
             }
-          }, 3000); // Refresh every 3 seconds
-          
-          // Clean up interval when modal closes
-          const cleanup = () => {
-            clearInterval(refreshInterval);
-          };
-          
-          // Store cleanup function to call when modal closes
-          (window as { sessionRefreshCleanup?: () => void }).sessionRefreshCleanup = cleanup;
+          } else {
+            console.error('Failed to load session data:', response);
+            toast.error('Failed to load session details');
+            setDialogOpen(false);
+          }
+        } catch (error) {
+          console.error('Error fetching session:', error);
+          toast.error('Failed to load session details');
+          setDialogOpen(false);
+        } finally {
+          setDialogLoading(false);
         }
-      } else {
-        toast.error('Failed to load session details');
-        setDialogOpen(false);
-      }
+      };
+      
+      // Load data in background
+      loadSessionData();
+      
     } catch (error) {
-      console.error('Error fetching session:', error);
-      toast.error('Failed to load session details');
+      console.error('Error opening session dialog:', error);
+      toast.error('Failed to open session details');
       setDialogOpen(false);
-    } finally {
       setDialogLoading(false);
     }
   };
@@ -342,8 +443,8 @@ const CreateResumeSection = () => {
     }
   };
 
-  const handleStartWorkflow = async () => {
-    if (!selectedSession) {
+  const handleStartWorkflow = async (sessionId: string) => {
+    if (!sessionId) {
       toast.error('No session selected');
       return;
     }
@@ -354,35 +455,50 @@ const CreateResumeSection = () => {
     }
 
     try {
-      setWorkflowLoading(true);
+      setWorkflowLoading(sessionId); // Set loading for specific session
       
       // Start the workflow
       const response = await apiClient.post('/fullWorkflow', {
-        sessionId: selectedSession.sessionId
+        sessionId: sessionId
       });
 
       if (response.data.success) {
-        toast.success('Workflow started! Processing your resume...');
+        toast.success('Workflow queued! Your resume will be processed in order...');
         
         // Start polling for status updates
         const pollInterval = setInterval(async () => {
           try {
-            const statusResponse = await apiClient.get(`/sessionStatus/${selectedSession.sessionId}`);
+            const statusResponse = await apiClient.get(`/sessionStatus/${sessionId}`);
+            // The sessionStatus endpoint returns status directly, not wrapped in success field
             const status = statusResponse.data.status;
             
             console.log('Workflow status:', status, statusResponse.data);
             
+            // Update the sessions list immediately
+            setSessions(prevSessions => 
+              prevSessions.map(session => 
+                session.sessionId === sessionId 
+                  ? { ...session, status: status }
+                  : session
+              )
+            );
+            
+            // Also update selected session if it's the same session
+            if (selectedSession && selectedSession.sessionId === sessionId) {
+              setSelectedSession(prev => prev ? { ...prev, status: status } : null);
+            }
+            
             if (status === 'completed') {
               clearInterval(pollInterval);
-              setWorkflowLoading(false);
+              setWorkflowLoading(null); // Clear loading for this session
               toast.success(`Workflow completed! Final score: ${statusResponse.data.currentScore}/100`);
               
               // Refresh the session data to show updated results
-              await handleViewSession(selectedSession.sessionId);
+              await handleViewSession(sessionId);
               
             } else if (status === 'failed') {
               clearInterval(pollInterval);
-              setWorkflowLoading(false);
+              setWorkflowLoading(null); // Clear loading for this session
               
               // Handle different error types
               if (statusResponse.data.errorType === 'API_KEY_ERROR') {
@@ -406,11 +522,11 @@ const CreateResumeSection = () => {
               }
               
               // Refresh the session data to show error status
-              await handleViewSession(selectedSession.sessionId);
+              await handleViewSession(sessionId);
               
-            } else if (status === 'processing') {
-              // Still processing, keep polling
-              console.log('Workflow still processing...');
+            } else if (status === 'processing' || status === 'queued') {
+              // Still processing or queued, keep polling
+              console.log('Workflow still processing or queued...');
             }
             
           } catch (pollError) {
@@ -419,11 +535,10 @@ const CreateResumeSection = () => {
           }
         }, 3000); // Poll every 3 seconds
         
-        // Safety timeout to stop polling after 5 minutes
         setTimeout(() => {
           clearInterval(pollInterval);
-          if (workflowLoading) {
-            setWorkflowLoading(false);
+          if (workflowLoading === sessionId) {
+            setWorkflowLoading(null); // Clear loading for this session
             toast('Workflow is taking longer than expected. Please check the session later.', { 
               icon: '⚠️',
               duration: 5000 
@@ -432,12 +547,12 @@ const CreateResumeSection = () => {
         }, 300000); // 5 minutes
         
       } else {
-        setWorkflowLoading(false);
+        setWorkflowLoading(null); // Clear loading for this session
         toast.error('Failed to start workflow');
       }
     } catch (error) {
       console.error('Error starting workflow:', error);
-      setWorkflowLoading(false);
+      setWorkflowLoading(null); // Clear loading for this session
       
       // Check if it's an API key error from the response
       const errorResponse = error as { response?: { data?: { detail?: string } } };
@@ -463,22 +578,22 @@ const CreateResumeSection = () => {
     }
   };
 
-  const handleDownloadPDF = async () => {
-    if (!selectedSession) {
+  const handleDownloadPDF = async (sessionId: string) => {
+    if (!sessionId) {
       toast.error('No session selected');
       return;
     }
 
     try {
-      setDownloadPDFLoading(true);
+      setDownloadPDFLoading(sessionId);
       
       // First, ensure LaTeX file exists
       let latexResponse;
       try {
-        latexResponse = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
+        latexResponse = await apiClient.post(`/generateLatex/${sessionId}`);
         if (latexResponse.data.success) {
           toast.success('LaTeX file generated successfully!');
-          await handleViewSession(selectedSession.sessionId);
+          await handleViewSession(sessionId);
         } else {
           throw new Error('Failed to generate LaTeX file');
         }
@@ -490,15 +605,18 @@ const CreateResumeSection = () => {
 
       // Then try to download the PDF
       try {
-        const pdfResponse = await apiClient.get(`/downloadPDF/${selectedSession.sessionId}`, {
+        const pdfResponse = await apiClient.get(`/downloadPDF/${sessionId}`, {
           responseType: 'blob'
         });
 
+        // Get session data for filename generation
+        const sessionData = sessions.find(s => s.sessionId === sessionId);
+        
         // Generate filename based on person name, company and position
         const generateFilename = () => {
-          const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
-          const companyName = selectedSession.companyName || '';
-          const position = selectedSession.position || '';
+          const personName = (sessionData?.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+          const companyName = sessionData?.companyName || '';
+          const position = sessionData?.position || '';
           
           if (personName || companyName || position) {
             const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
@@ -507,7 +625,7 @@ const CreateResumeSection = () => {
             const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
             return `${parts.join('_')}.pdf`;
           }
-          return `resume_${selectedSession.sessionId}.pdf`;
+          return `resume_${sessionId}.pdf`;
         };
 
         const url = window.URL.createObjectURL(new Blob([pdfResponse.data]));
@@ -520,7 +638,7 @@ const CreateResumeSection = () => {
         window.URL.revokeObjectURL(url);
         
         toast.success('PDF downloaded successfully!');
-        await handleViewSession(selectedSession.sessionId);
+        await handleViewSession(sessionId);
       } catch (pdfError) {
         console.error('Error downloading PDF:', pdfError);
         toast.error('Failed to download PDF. Please try again.');
@@ -529,29 +647,32 @@ const CreateResumeSection = () => {
       console.error('Error in PDF download process:', error);
       toast.error('Failed to process PDF download');
     } finally {
-      setDownloadPDFLoading(false);
+      setDownloadPDFLoading(null);
     }
   };
 
 
 
-  const handleDownloadLatexFile = async () => {
-    if (!selectedSession?.latexFilePath) {
-      toast.error('No LaTeX file available for download');
+  const handleDownloadLatexFile = async (sessionId: string) => {
+    if (!sessionId) {
+      toast.error('No session selected');
       return;
     }
 
     try {
-      setDownloadLatexLoading(true);
-              const response = await apiClient.get(`/downloadLatex/${selectedSession.sessionId}`, {
+      setDownloadLatexLoading(sessionId);
+      const response = await apiClient.get(`/downloadLatex/${sessionId}`, {
         responseType: 'blob'
       });
 
+      // Get session data for filename generation
+      const sessionData = sessions.find(s => s.sessionId === sessionId);
+
       // Generate filename based on person name, company and position
       const generateFilename = () => {
-        const personName = (selectedSession.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
-        const companyName = selectedSession.companyName || '';
-        const position = selectedSession.position || '';
+        const personName = (sessionData?.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+        const companyName = sessionData?.companyName || '';
+        const position = sessionData?.position || '';
         
         if (personName || companyName || position) {
           const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
@@ -560,7 +681,7 @@ const CreateResumeSection = () => {
           const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
           return `${parts.join('_')}.tex`;
         }
-        return `resume_${selectedSession.sessionId}.tex`;
+        return `resume_${sessionId}.tex`;
       };
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -577,21 +698,21 @@ const CreateResumeSection = () => {
       console.error('Error downloading LaTeX:', error);
       toast.error('Failed to download LaTeX file');
     } finally {
-      setDownloadLatexLoading(false);
+      setDownloadLatexLoading(null);
     }
   };
 
-  const handleRegenerateLatex = async () => {
-    if (!selectedSession?.sessionId) return;
+  const handleRegenerateLatex = async (sessionId: string) => {
+    if (!sessionId) return;
     
-    setRegenerateLatexLoading(true);
+    setRegenerateLatexLoading(sessionId);
     try {
       // Call the generateLaTeX endpoint to regenerate LaTeX using latest data
-      const response = await apiClient.post(`/generateLatex/${selectedSession.sessionId}`);
+      const response = await apiClient.post(`/generateLatex/${sessionId}`);
       
       if (response.data.success) {
         // Refresh the session data to get the updated LaTeX content
-        const sessionResponse = await apiClient.get(`/getResumeSession/${selectedSession.sessionId}`);
+        const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
         if (sessionResponse.data.success && sessionResponse.data.sessionData) {
           setSelectedSession(sessionResponse.data.sessionData);
         }
@@ -604,7 +725,7 @@ const CreateResumeSection = () => {
       console.error('Error regenerating LaTeX:', error);
       toast.error('Failed to regenerate LaTeX');
     } finally {
-      setRegenerateLatexLoading(false);
+      setRegenerateLatexLoading(null);
     }
   };
 
@@ -641,6 +762,8 @@ const CreateResumeSection = () => {
     }
   };
 
+
+
   const checkApiKeyRequirement = () => {
     if (!userApiConfig?.hasApiKey) {
       toast.error(
@@ -653,6 +776,29 @@ const CreateResumeSection = () => {
       return false;
     }
     return true;
+  };
+
+  const handleCloseDialog = () => {
+    // Store the current session status before closing
+    const currentSessionStatus = selectedSession?.status;
+    
+    setDialogOpen(false);
+    setSelectedSession(null);
+    
+    // Clean up any refresh intervals
+    const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
+    if (windowWithCleanup.sessionRefreshCleanup) {
+      windowWithCleanup.sessionRefreshCleanup();
+      windowWithCleanup.sessionRefreshCleanup = undefined;
+    }
+    
+    // Only refresh sessions if the session was active (processing/queued) when dialog closed
+    // This prevents unnecessary refreshes for completed/failed sessions
+    if (currentSessionStatus === 'processing' || currentSessionStatus === 'queued') {
+      setTimeout(() => {
+        loadSessions();
+      }, 500);
+    }
   };
 
   return (
@@ -794,6 +940,8 @@ const CreateResumeSection = () => {
                             {individualCounter.toLocaleString()} Yours
                           </Typography>
                         </Box>
+
+
                       </Box>
                     </Box>
                   </Slide>
@@ -881,208 +1029,18 @@ const CreateResumeSection = () => {
         <Slide direction="up" in timeout={1400}>
           <Box sx={{ mb: 4 }}>
             {/* First Time User Welcome */}
-            {isFirstTimeUser && (
-              <Fade in timeout={800}>
-                <Paper 
-                  elevation={8}
-                  sx={{ 
-                    p: 4, 
-                    mb: 4,
-                    background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%)',
-                    border: '2px solid rgba(99, 102, 241, 0.3)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: 3,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '4px',
-                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899, #6366F1)'
-                    }
-                  }}
-                >
-                  <Box sx={{ textAlign: 'center' }}>
-                    <StarIcon sx={{ 
-                      fontSize: 60, 
-                      color: '#6366F1', 
-                      mb: 2,
-                      filter: 'drop-shadow(0 0 12px rgba(99, 102, 241, 0.5))',
-                      animation: 'pulse 2s infinite'
-                    }} />
-                    <Typography variant="h4" sx={{ 
-                      fontWeight: 700, 
-                      color: '#F8FAFC',
-                      mb: 2,
-                      background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                      backgroundClip: 'text',
-                      WebkitBackgroundClip: 'text',
-                      WebkitTextFillColor: 'transparent'
-                    }}>
-                      Welcome to Resume Forge! 🎉
-                    </Typography>
-                    <Typography variant="h6" sx={{ 
-                      color: '#E2E8F0',
-                      mb: 3,
-                      opacity: 0.9,
-                      lineHeight: 1.5
-                    }}>
-                      Ready to create your first AI-powered tailored resume? 
-                      <br />
-                      Just paste a job description below and watch the magic happen!
-                    </Typography>
-                  </Box>
-                </Paper>
-              </Fade>
-            )}
+            {isFirstTimeUser && <FirstTimeUserWelcome />}
 
             {/* New Resume Form - Hidden by default if user has sessions */}
             {showNewResumeForm && (
-              <Fade in timeout={600}>
-                <Paper 
-                  elevation={8}
-                  sx={{ 
-                    p: 4, 
-                    mb: 4,
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    backdropFilter: 'blur(20px)',
-                    borderRadius: 3,
-                    position: 'relative',
-                    overflow: 'hidden',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      height: '3px',
-                      background: 'linear-gradient(90deg, #6366F1, #8B5CF6, #EC4899)'
-                    }
-                  }}
-                >
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'space-between',
-                    mb: 3,
-                    pb: 2,
-                    borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
-                  }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                      <AIIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
-                      <Typography variant="h5" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
-                        New Resume (Auto-Process)
-                      </Typography>
-                    </Box>
-                    {!isFirstTimeUser && (
-                      <IconButton
-                        onClick={handleToggleNewResumeForm}
-                        sx={{ 
-                          color: '#94A3B8',
-                          '&:hover': {
-                            color: '#6366F1',
-                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                            transform: 'scale(1.1)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    )}
-                  </Box>
-
-                  <TextField
-                    fullWidth
-                    multiline
-                    rows={4}
-                    label="Job Description"
-                    value={jobDescription}
-                    onChange={(e) => setJobDescription(e.target.value)}
-                    placeholder="Paste the job description here..."
-                    sx={{ 
-                      mb: 3,
-                      '& .MuiOutlinedInput-root': {
-                        backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                        borderRadius: 2,
-                        '& fieldset': {
-                          borderColor: 'rgba(99, 102, 241, 0.3)',
-                        },
-                        '&:hover fieldset': {
-                          borderColor: '#6366F1',
-                        },
-                        '&.Mui-focused fieldset': {
-                          borderColor: '#6366F1',
-                        },
-                      },
-                      '& .MuiInputLabel-root': {
-                        color: '#94A3B8',
-                        '&.Mui-focused': {
-                          color: '#6366F1',
-                        },
-                      },
-                      '& .MuiInputBase-input': {
-                        color: '#F8FAFC',
-                      },
-                      '& .MuiFormHelperText-root': {
-                        color: '#64748B',
-                      },
-                    }}
-                    helperText={`${jobDescription.length} characters, ${jobDescription.split(' ').filter(word => word.length > 0).length} words`}
-                  />
-
-                  <Box sx={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <Button
-                      variant="contained"
-                      size="large"
-                      onClick={handleSubmit}
-                      disabled={submitting || !jobDescription.trim()}
-                      startIcon={submitting ? <CircularProgress size={20} /> : <AddIcon />}
-                      endIcon={!submitting ? <ArrowIcon /> : null}
-                      sx={{ 
-                        px: 4,
-                        py: 1.5,
-                        fontSize: '1.1rem',
-                        fontWeight: 600,
-                        background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                        boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
-                        borderRadius: 2,
-                        '&:hover': {
-                          background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
-                          boxShadow: '0 8px 25px rgba(99, 102, 241, 0.5)',
-                          transform: 'translateY(-2px)'
-                        },
-                        '&:disabled': {
-                          background: 'rgba(99, 102, 241, 0.3)',
-                          transform: 'none'
-                        },
-                        transition: 'all 0.3s ease-in-out',
-                        position: 'relative',
-                        overflow: 'hidden',
-                        '&::before': {
-                          content: '""',
-                          position: 'absolute',
-                          top: 0,
-                          left: '-100%',
-                          width: '100%',
-                          height: '100%',
-                          background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                          transition: 'left 0.5s',
-                        },
-                        '&:hover::before': {
-                          left: '100%',
-                        }
-                      }}
-                    >
-                      {submitting ? 'Creating Session...' : 'Create & Process Resume'}
-                    </Button>
-                  </Box>
-                </Paper>
-              </Fade>
+              <NewResumeForm
+                jobDescription={jobDescription}
+                onJobDescriptionChange={setJobDescription}
+                onSubmit={handleSubmit}
+                onClose={!isFirstTimeUser ? handleToggleNewResumeForm : undefined}
+                submitting={submitting}
+                isFirstTimeUser={isFirstTimeUser}
+              />
             )}
 
             
@@ -1138,141 +1096,13 @@ const CreateResumeSection = () => {
               <Grid container spacing={3}>
                 {sessions.map((session, index) => (
                   <Grid item xs={12} md={6} lg={4} key={session.sessionId}>
-                    <Fade in={true} timeout={300 + index * 100}>
-                      <Card 
-                        elevation={4}
-                        sx={{ 
-                          height: '100%', 
-                          display: 'flex', 
-                          flexDirection: 'column', 
-                          cursor: 'pointer',
-                          background: 'rgba(30, 41, 59, 0.8)',
-                          border: '1px solid rgba(99, 102, 241, 0.2)',
-                          backdropFilter: 'blur(20px)',
-                          borderRadius: 3,
-                          transition: 'all 0.3s ease-in-out',
-                          '&:hover': {
-                            borderColor: 'rgba(99, 102, 241, 0.4)',
-                            transform: 'translateY(-4px)',
-                            boxShadow: '0 8px 25px rgba(99, 102, 241, 0.3)'
-                          }
-                        }}
-                        onClick={() => handleViewSession(session.sessionId)}
-                      >
-                        <CardContent sx={{ flexGrow: 1, p: 3, pb: 2 }}>
-                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                            <Box sx={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                              <DescriptionIcon sx={{ mr: 1, color: '#6366F1', flexShrink: 0 }} />
-                              <Box sx={{ flex: 1, minWidth: 0 }}>
-                                <Typography 
-                                  variant="h6" 
-                                  component="div" 
-                                  sx={{ 
-                                    fontWeight: 600, 
-                                    mb: 0.5,
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                    color: '#F8FAFC'
-                                  }}
-                                >
-                                  {session.status === 'completed' && session.companyName ? session.companyName : 'Resume Session'}
-                                </Typography>
-                                {session.status === 'completed' && session.position ? (
-                                  <Typography 
-                                    variant="body2" 
-                                    sx={{ 
-                                      color: '#94A3B8', 
-                                      fontSize: '0.85rem',
-                                      overflow: 'hidden',
-                                      textOverflow: 'ellipsis',
-                                      whiteSpace: 'nowrap'
-                                    }}
-                                  >
-                                    {session.position}
-                                  </Typography>
-                                ) : (
-                                  <Typography variant="body2" sx={{ color: '#94A3B8', fontSize: '0.85rem' }}>
-                                    Click to edit
-                                  </Typography>
-                                )}
-                              </Box>
-                            </Box>
-                            <Box sx={{ flexShrink: 0 }}>
-                              <IconButton
-                                size="small"
-                                color="error"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteSession(session.sessionId);
-                                }}
-                                sx={{ 
-                                  p: 0.5,
-                                  color: '#EF4444',
-                                  '&:hover': {
-                                    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                                    transform: 'scale(1.1)'
-                                  },
-                                  transition: 'all 0.2s ease-in-out'
-                                }}
-                              >
-                                <DeleteIcon fontSize="small" />
-                              </IconButton>
-                            </Box>
-                          </Box>
-                          
-                          <Box sx={{ flexGrow: 1 }}>
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
-                                mb: 0, 
-                                lineHeight: 1.4,
-                                p: 1.5,
-                                borderRadius: 2,
-                                backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                                color: '#E2E8F0',
-                                fontSize: '0.85rem'
-                              }}
-                            >
-                              {session.preview}
-                            </Typography>
-                          </Box>
-                          
-                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2, mb: 0.5 }}>
-                            <Chip 
-                              label={session.status === 'processing' ? 'Processing...' : session.status} 
-                              size="small" 
-                              color={session.status === 'completed' ? 'success' : 
-                                     session.status === 'processing' ? 'primary' : 
-                                     session.status === 'failed' ? 'error' : 'default'}
-                              icon={session.status === 'processing' ? <CircularProgress size={16} /> : undefined}
-                              sx={{ 
-                                textTransform: 'capitalize',
-                                backgroundColor: session.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' :
-                                               session.status === 'processing' ? 'rgba(99, 102, 241, 0.1)' :
-                                               session.status === 'failed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(148, 163, 184, 0.1)',
-                                color: session.status === 'completed' ? '#22C55E' :
-                                       session.status === 'processing' ? '#6366F1' :
-                                       session.status === 'failed' ? '#EF4444' : '#94A3B8',
-                                border: '1px solid',
-                                borderColor: session.status === 'completed' ? 'rgba(34, 197, 94, 0.3)' :
-                                            session.status === 'processing' ? 'rgba(99, 102, 241, 0.3)' :
-                                            session.status === 'failed' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(148, 163, 184, 0.3)'
-                              }}
-                            />
-                            <Typography variant="caption" sx={{ 
-                              display: 'flex', 
-                              alignItems: 'center', 
-                              fontSize: '0.75rem',
-                              color: '#64748B'
-                            }}>
-                              <TimeIcon sx={{ mr: 0.5, fontSize: 12 }} />
-                              {formatDate(session.timestamp)}
-                            </Typography>
-                          </Box>
-                        </CardContent>
-                      </Card>
-                    </Fade>
+                    <ResumeSessionCard
+                      session={session}
+                      index={index}
+                      onViewSession={handleViewSession}
+                      onDeleteSession={handleDeleteSession}
+                      formatDate={formatDate}
+                    />
                   </Grid>
                 ))}
               </Grid>
@@ -1280,643 +1110,25 @@ const CreateResumeSection = () => {
           </Box>
         </Slide>
 
-        {/* Session Details Dialog */}
-        <Dialog 
-          open={dialogOpen} 
-          onClose={() => {
-            setDialogOpen(false);
-            setSelectedSession(null);
-            // Clean up any refresh intervals
-            const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
-            if (windowWithCleanup.sessionRefreshCleanup) {
-              windowWithCleanup.sessionRefreshCleanup();
-              windowWithCleanup.sessionRefreshCleanup = undefined;
-            }
-          }}
-          maxWidth="lg"
-          fullWidth
-          PaperProps={{
-            sx: {
-              maxHeight: '90vh',
-              minHeight: '600px',
-              background: 'rgba(30, 41, 59, 0.95)',
-              border: '1px solid rgba(99, 102, 241, 0.2)',
-              backdropFilter: 'blur(20px)',
-              borderRadius: 3
-            }
-          }}
-          TransitionProps={{
-            timeout: 300
-          }}
-        >
-          <DialogTitle sx={{ 
-            display: 'flex', 
-            justifyContent: 'space-between', 
-            alignItems: 'center',
-            color: '#F8FAFC',
-            borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
-            pb: 2
-          }}>
-            Resume Session Details
-            {selectedSession && (
-              <Chip 
-                label={selectedSession.status === 'completed' && selectedSession.workflowResult 
-                  ? `${selectedSession.workflowResult.score}/100` 
-                  : selectedSession.status} 
-                size="small" 
-                color={selectedSession.status === 'completed' ? 'success' : 
-                       selectedSession.status === 'processing' ? 'primary' : 
-                       selectedSession.status === 'failed' ? 'error' : 'default'}
-                sx={{ 
-                  textTransform: 'capitalize',
-                  backgroundColor: selectedSession.status === 'completed' ? 'rgba(34, 197, 94, 0.1)' :
-                                   selectedSession.status === 'processing' ? 'rgba(99, 102, 241, 0.1)' :
-                                   selectedSession.status === 'failed' ? 'rgba(239, 68, 68, 0.1)' : 'rgba(148, 163, 184, 0.1)',
-                  color: selectedSession.status === 'completed' ? '#22C55E' :
-                         selectedSession.status === 'processing' ? '#6366F1' :
-                         selectedSession.status === 'failed' ? '#EF4444' : '#94A3B8',
-                  border: '1px solid',
-                  borderColor: selectedSession.status === 'completed' ? 'rgba(34, 197, 94, 0.3)' :
-                              selectedSession.status === 'processing' ? 'rgba(99, 102, 241, 0.3)' :
-                              selectedSession.status === 'failed' ? 'rgba(239, 68, 68, 0.3)' : 'rgba(148, 163, 184, 0.3)'
-                }}
-              />
-            )}
-          </DialogTitle>
-          <DialogContent sx={{ height: 'calc(90vh - 200px)', p: 3, overflow: 'hidden' }}>
-            {dialogLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-                <CircularProgress 
-                  size={60} 
-                  sx={{ 
-                    color: '#6366F1',
-                    filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
-                  }} 
-                />
-              </Box>
-            ) : selectedSession ? (
-              <Box>
-                {/* Session Info */}
-                <Paper 
-                  elevation={4}
-                  sx={{ 
-                    p: 3, 
-                    mb: 3, 
-                    background: 'rgba(15, 23, 42, 0.4)',
-                    border: '1px solid rgba(99, 102, 241, 0.2)',
-                    borderRadius: 2,
-                    backdropFilter: 'blur(10px)'
-                  }}
-                >
-                  <Grid container spacing={3}>
-                    <Grid item xs={12} sm={6}>
-                      <Box>
-                        {selectedSession.status === 'completed' && selectedSession.workflowResult ? (
-                          <>
-                            <Typography variant="h5" sx={{ 
-                              fontWeight: 700, 
-                              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                              backgroundClip: 'text',
-                              WebkitBackgroundClip: 'text',
-                              WebkitTextFillColor: 'transparent',
-                              mb: 0.5
-                            }}>
-                              {selectedSession.workflowResult.company_name}
-                            </Typography>
-                            <Typography variant="h6" sx={{ 
-                              fontWeight: 500, 
-                              color: '#94A3B8',
-                              opacity: 0.9
-                            }}>
-                              {selectedSession.workflowResult.position}
-                            </Typography>
-                          </>
-                        ) : (
-                          <Typography variant="h6" sx={{ 
-                            fontWeight: 600, 
-                            color: '#6366F1',
-                            opacity: 0.8
-                          }}>
-                            Session Created
-                          </Typography>
-                        )}
-                      </Box>
-                    </Grid>
-                    <Grid item xs={12} sm={6}>
-                      <Box sx={{ textAlign: 'right' }}>
-                        <Typography variant="body2" sx={{ 
-                          fontFamily: 'monospace', 
-                          color: '#64748B',
-                          opacity: 0.7,
-                          fontSize: '0.75rem'
-                        }}>
-                          {selectedSession.sessionId}
-                        </Typography>
-                        <Typography variant="body2" sx={{ 
-                          color: '#94A3B8',
-                          opacity: 0.8,
-                          mt: 0.5
-                        }}>
-                          {formatDate(selectedSession.timestamp)}
-                        </Typography>
-                      </Box>
-                    </Grid>
-                  </Grid>
-                </Paper>
-
-                {/* Tabs */}
-                <Box sx={{ borderBottom: 1, borderColor: 'rgba(99, 102, 241, 0.2)', mb: 2 }}>
-                  <Tabs 
-                    value={activeTab} 
-                    onChange={handleTabChange}
-                    sx={{
-                      minHeight: '48px',
-                      '& .MuiTab-root': {
-                        color: '#94A3B8',
-                        minHeight: '48px',
-                        padding: '8px 16px',
-                        fontSize: '0.875rem',
-                        textTransform: 'none',
-                        fontWeight: 500,
-                        transition: 'all 0.3s ease-in-out',
-                        '&.Mui-selected': {
-                          color: '#6366F1',
-                          fontWeight: 600
-                        },
-                        '&:hover': {
-                          color: '#E2E8F0',
-                          backgroundColor: 'rgba(99, 102, 241, 0.1)'
-                        }
-                      },
-                      '& .MuiTabs-indicator': {
-                        backgroundColor: '#6366F1',
-                        height: '3px',
-                        borderRadius: '2px 2px 0 0'
-                      }
-                    }}
-                  >
-                    <Tab 
-                      icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                      label="Job Description" 
-                      iconPosition="start"
-                    />
-                    {selectedSession.tailoredResume && (
-                      <Tab 
-                        icon={<DataObjectIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                        label="JSON Output" 
-                        iconPosition="start"
-                      />
-                    )}
-                    {selectedSession.latexFilePath && (
-                      <Tab 
-                        icon={<CodeIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                        label="Generated LaTeX" 
-                        iconPosition="start"
-                      />
-                    )}
-                    {selectedSession.status === 'completed' && selectedSession.workflowResult && (
-                      <Tab 
-                        icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
-                        label="Feedback" 
-                        iconPosition="start"
-                      />
-                    )}
-                  </Tabs>
-                </Box>
-
-                {/* Tab Content */}
-                <Box sx={{ height: '400px', display: 'flex', flexDirection: 'column' }}>
-                  {/* Job Description Tab */}
-                  {activeTab === 0 && (
-                    <Paper 
-                      elevation={4}
-                      sx={{ 
-                        p: 2, 
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        height: '100%',
-                        overflow: 'auto',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(5px)',
-                        position: 'relative',
-                        '&::-webkit-scrollbar': {
-                          width: '8px'
-                        },
-                        '&::-webkit-scrollbar-track': {
-                          background: 'rgba(15, 23, 42, 0.3)',
-                          borderRadius: '4px'
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                          background: 'rgba(99, 102, 241, 0.3)',
-                          borderRadius: '4px',
-                          '&:hover': {
-                            background: 'rgba(99, 102, 241, 0.5)'
-                          }
-                        }
-                      }}
-                    >
-                      <IconButton
-                        onClick={() => handleCopyToClipboard(
-                          selectedSession.jobDescription || 'No job description available',
-                          'Job Description'
-                        )}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          color: '#6366F1',
-                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                          '&:hover': {
-                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                        size="small"
-                      >
-                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                      <Typography 
-                        variant="body2" 
-                        sx={{ 
-                          whiteSpace: 'pre-wrap', 
-                          lineHeight: 1.5,
-                          color: '#E2E8F0',
-                          fontSize: '0.9rem',
-                          fontWeight: 400,
-                          pr: 4
-                        }}
-                      >
-                        {selectedSession.jobDescription && selectedSession.jobDescription.trim() 
-                          ? selectedSession.jobDescription 
-                          : 'No job description available'}
-                      </Typography>
-                    </Paper>
-                  )}
-
-                  {/* JSON Output Tab */}
-                  {activeTab === 1 && selectedSession.tailoredResume && (
-                    <Paper 
-                      elevation={4}
-                      sx={{ 
-                        p: 2, 
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        height: '100%',
-                        overflow: 'auto',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(5px)',
-                        position: 'relative',
-                        '&::-webkit-scrollbar': {
-                          width: '8px'
-                        },
-                        '&::-webkit-scrollbar-track': {
-                          background: 'rgba(15, 23, 42, 0.3)',
-                          borderRadius: '4px'
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                          background: 'rgba(99, 102, 241, 0.3)',
-                          borderRadius: '4px',
-                          '&:hover': {
-                            background: 'rgba(99, 102, 241, 0.5)'
-                          }
-                        }
-                      }}
-                    >
-                      <IconButton
-                        onClick={() => handleCopyToClipboard(
-                          JSON.stringify(selectedSession.tailoredResume, null, 2),
-                          'JSON Output'
-                        )}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          color: '#6366F1',
-                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                          '&:hover': {
-                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                        size="small"
-                      >
-                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                      <pre 
-                        style={{ 
-                          margin: 0, 
-                          fontSize: '11px', 
-                          whiteSpace: 'pre-wrap',
-                          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                          lineHeight: 1.3,
-                          color: '#E2E8F0',
-                          fontWeight: 400,
-                          paddingRight: '32px'
-                        }}
-                      >
-                        {JSON.stringify(selectedSession.tailoredResume, null, 2)}
-                      </pre>
-                    </Paper>
-                  )}
-
-                  {/* Generated LaTeX Tab */}
-                  {activeTab === 2 && selectedSession.latexFilePath && (
-                    <Paper 
-                      elevation={4}
-                      sx={{ 
-                        p: 2, 
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        height: '100%',
-                        overflow: 'auto',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(5px)',
-                        position: 'relative',
-                        '&::-webkit-scrollbar': {
-                          width: '8px'
-                        },
-                        '&::-webkit-scrollbar-track': {
-                          background: 'rgba(15, 23, 42, 0.3)',
-                          borderRadius: '4px'
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                          background: 'rgba(99, 102, 241, 0.3)',
-                          borderRadius: '4px',
-                          '&:hover': {
-                            background: 'rgba(99, 102, 241, 0.5)'
-                          }
-                        }
-                      }}
-                    >
-                      <IconButton
-                        onClick={() => handleCopyToClipboard(
-                          selectedSession.latexContent || 'Loading LaTeX content...',
-                          'Generated LaTeX'
-                        )}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          color: '#6366F1',
-                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                          '&:hover': {
-                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                        size="small"
-                      >
-                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                      <pre 
-                        style={{ 
-                          margin: 0, 
-                          fontSize: '11px', 
-                          whiteSpace: 'pre-wrap',
-                          fontFamily: 'Monaco, Consolas, "Courier New", monospace',
-                          lineHeight: 1.3,
-                          color: '#E2E8F0',
-                          fontWeight: 400,
-                          paddingRight: '32px'
-                        }}
-                      >
-                        {selectedSession.latexContent || 'Loading LaTeX content...'}
-                      </pre>
-                    </Paper>
-                  )}
-
-                  {/* Feedback Tab */}
-                  {activeTab === 3 && selectedSession.status === 'completed' && selectedSession.workflowResult && (
-                    <Paper 
-                      elevation={4}
-                      sx={{ 
-                        p: 2, 
-                        background: 'rgba(15, 23, 42, 0.4)',
-                        height: '100%',
-                        overflow: 'auto',
-                        border: '1px solid rgba(99, 102, 241, 0.2)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(5px)',
-                        position: 'relative',
-                        '&::-webkit-scrollbar': {
-                          width: '8px'
-                        },
-                        '&::-webkit-scrollbar-track': {
-                          background: 'rgba(15, 23, 42, 0.3)',
-                          borderRadius: '4px'
-                        },
-                        '&::-webkit-scrollbar-thumb': {
-                          background: 'rgba(99, 102, 241, 0.3)',
-                          borderRadius: '4px',
-                          '&:hover': {
-                            background: 'rgba(99, 102, 241, 0.5)'
-                          }
-                        }
-                      }}
-                    >
-                      <IconButton
-                        onClick={() => {
-                          const feedbackContent = `💡 Feedback\n\n${selectedSession.workflowResult.feedback}${selectedSession.workflowResult.downsides ? `\n\n🔧 Areas for Improvement\n\n${selectedSession.workflowResult.downsides}` : ''}`;
-                          handleCopyToClipboard(feedbackContent, 'Feedback');
-                        }}
-                        sx={{
-                          position: 'absolute',
-                          top: 8,
-                          right: 8,
-                          color: '#6366F1',
-                          backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                          '&:hover': {
-                            backgroundColor: 'rgba(99, 102, 241, 0.2)',
-                            transform: 'scale(1.05)'
-                          },
-                          transition: 'all 0.2s ease-in-out'
-                        }}
-                        size="small"
-                      >
-                        <CopyIcon sx={{ fontSize: '1rem' }} />
-                      </IconButton>
-                      <Box sx={{ pr: 4 }}>
-                        <Typography variant="h6" sx={{ 
-                          fontWeight: 600,
-                          color: '#6366F1',
-                          mb: 1.5,
-                          fontSize: '1rem'
-                        }}>
-                          💡 Feedback
-                        </Typography>
-                        <Typography variant="body2" sx={{ 
-                          whiteSpace: 'pre-wrap', 
-                          lineHeight: 1.5,
-                          color: '#E2E8F0',
-                          fontSize: '0.9rem',
-                          mb: 2
-                        }}>
-                          {selectedSession.workflowResult.feedback}
-                        </Typography>
-                        
-                        {selectedSession.workflowResult.downsides && (
-                          <>
-                            <Typography variant="h6" sx={{ 
-                              fontWeight: 600,
-                              color: '#F59E0B',
-                              mb: 1.5,
-                              fontSize: '1rem'
-                            }}>
-                              🔧 Areas for Improvement
-                            </Typography>
-                            <Typography variant="body2" sx={{ 
-                              whiteSpace: 'pre-wrap', 
-                              lineHeight: 1.5,
-                              color: '#E2E8F0',
-                              fontSize: '0.9rem'
-                            }}>
-                              {selectedSession.workflowResult.downsides}
-                            </Typography>
-                          </>
-                        )}
-                      </Box>
-                    </Paper>
-                  )}
-                </Box>
-                
-              </Box>
-            ) : (
-              <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '300px' }}>
-                <Typography variant="body1" sx={{ color: '#94A3B8' }}>
-                  No session data available
-                </Typography>
-              </Box>
-            )}
-          </DialogContent>
-          <DialogActions sx={{ p: 3, pt: 2, borderTop: '1px solid rgba(99, 102, 241, 0.2)' }}>
-            {!selectedSession?.latexFilePath ? (
-              <Button 
-                variant="contained" 
-                onClick={selectedSession?.status === 'completed' ? handleDownloadPDF : handleStartWorkflow}
-                disabled={workflowLoading || downloadPDFLoading}
-                startIcon={(workflowLoading || downloadPDFLoading) ? <CircularProgress size={16} /> : null}
-                sx={{ 
-                  mr: 'auto',
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: 2,
-                  background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                  boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
-                    boxShadow: '0 6px 20px rgba(99, 102, 241, 0.6)',
-                    transform: 'translateY(-1px)'
-                  },
-                  '&:disabled': {
-                    background: 'rgba(99, 102, 241, 0.3)',
-                    transform: 'none'
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {workflowLoading ? 'Processing Resume (1-2 min)...' : 
-                 downloadPDFLoading ? 'Generating...' : 
-                 selectedSession?.status === 'completed' ? 'Generate LaTeX' : 'Start Resume Workflow'}
-              </Button>
-            ) : (
-              <Button 
-                variant="contained" 
-                onClick={handleDownloadPDF}
-                disabled={downloadPDFLoading || downloadLatexLoading}
-                startIcon={downloadPDFLoading ? <CircularProgress size={16} /> : null}
-                sx={{ 
-                  mr: 'auto',
-                  px: 4,
-                  py: 1.5,
-                  borderRadius: 2,
-                  background: 'linear-gradient(135deg, #22C55E 0%, #16A34A 100%)',
-                  boxShadow: '0 4px 15px rgba(34, 197, 94, 0.4)',
-                  '&:hover': {
-                    background: 'linear-gradient(135deg, #16A34A 0%, #15803D 100%)',
-                    boxShadow: '0 6px 20px rgba(34, 197, 94, 0.6)',
-                    transform: 'translateY(-1px)'
-                  },
-                  '&:disabled': {
-                    background: 'rgba(34, 197, 94, 0.3)',
-                    transform: 'none'
-                  },
-                  transition: 'all 0.3s ease'
-                }}
-              >
-                {downloadPDFLoading ? 'Generating & Downloading...' : 'Download PDF'}
-              </Button>
-            )}
-            
-            {selectedSession?.latexFilePath && (
-              <>
-                <Button 
-                  variant="outlined" 
-                  onClick={handleRegenerateLatex}
-                  disabled={downloadPDFLoading || downloadLatexLoading || regenerateLatexLoading}
-                  startIcon={regenerateLatexLoading ? <CircularProgress size={16} /> : <RefreshIcon />}
-                  sx={{ 
-                    px: 3,
-                    py: 1.5,
-                    borderRadius: 2,
-                    border: '1px solid rgba(99, 102, 241, 0.5)',
-                    color: '#6366F1',
-                    '&:hover': {
-                      backgroundColor: 'rgba(99, 102, 241, 0.1)',
-                      borderColor: '#6366F1',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {regenerateLatexLoading ? 'Regenerating...' : 'Regenerate LaTeX'}
-                </Button>
-                <Button 
-                  variant="outlined" 
-                  onClick={handleDownloadLatexFile}
-                  disabled={downloadPDFLoading || downloadLatexLoading || regenerateLatexLoading}
-                  startIcon={downloadLatexLoading ? <CircularProgress size={16} /> : null}
-                  sx={{ 
-                    px: 3,
-                    py: 1.5,
-                    borderRadius: 2,
-                    border: '1px solid rgba(245, 158, 11, 0.5)',
-                    color: '#F59E0B',
-                    '&:hover': {
-                      backgroundColor: 'rgba(245, 158, 11, 0.1)',
-                      borderColor: '#F59E0B',
-                      transform: 'translateY(-1px)'
-                    },
-                    transition: 'all 0.3s ease'
-                  }}
-                >
-                  {downloadLatexLoading ? 'Downloading...' : 'Download LaTeX'}
-                </Button>
-              </>
-            )}
-            
-            <Button 
-              onClick={() => setDialogOpen(false)}
-              sx={{ 
-                px: 3,
-                py: 1.5,
-                borderRadius: 2,
-                border: '1px solid rgba(148, 163, 184, 0.3)',
-                color: '#94A3B8',
-                '&:hover': {
-                  backgroundColor: 'rgba(148, 163, 184, 0.1)',
-                  borderColor: 'rgba(148, 163, 184, 0.5)',
-                  transform: 'translateY(-1px)'
-                },
-                transition: 'all 0.3s ease'
-              }}
-            >
-              Close
-            </Button>
-          </DialogActions>
-        </Dialog>
+                {/* Session Details Dialog */}
+        <SessionDetailsDialog
+          open={dialogOpen}
+          onClose={handleCloseDialog}
+          selectedSession={selectedSession}
+          dialogLoading={dialogLoading}
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          onStartWorkflow={handleStartWorkflow}
+          onDownloadPDF={handleDownloadPDF}
+          onRegenerateLatex={handleRegenerateLatex}
+          onDownloadLatexFile={handleDownloadLatexFile}
+          onCopyToClipboard={handleCopyToClipboard}
+          workflowLoading={workflowLoading}
+          downloadPDFLoading={downloadPDFLoading}
+          downloadLatexLoading={downloadLatexLoading}
+          regenerateLatexLoading={regenerateLatexLoading}
+          formatDate={formatDate}
+        />
       </Container>
 
       <style>{`
