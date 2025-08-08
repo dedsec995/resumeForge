@@ -114,8 +114,10 @@ def get_llm_for_task(
                 google_api_key=GOOGLE_API_KEY,
             )
         elif task_name == "edit_technical_skills":
-            return ChatOpenRouter(
-                temperature=temperature, model="qwen/qwen3-30b-a3b:free"
+            return ChatGoogleGenerativeAI(
+                temperature=temperature,
+                model="gemini-2.0-flash-exp",
+                google_api_key=GOOGLE_API_KEY,
             )
         elif task_name == "edit_experience":
             return ChatGroq(
@@ -580,7 +582,7 @@ def finalize_and_print_json(state):
 
 
 def decide_after_judging(state):
-    if state["score"] < 8.6 and state["iteration_count"] < 3:
+    if state["score"] < 9.3 and state["iteration_count"] < 3:
         console.print(
             Panel(
                 f"Score {state['score']}/10 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}",
