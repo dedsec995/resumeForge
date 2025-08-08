@@ -48,36 +48,24 @@ if [ ! -d "dist" ]; then
     exit 1
 fi
 
-# Stop existing PM2 process if running
-print_status "Stopping existing PM2 process..."
-pm2 delete resume-forge-frontend 2>/dev/null || true
+# Stop and delete existing PM2 process if it exists
+pm2 delete frontend 2>/dev/null || true
 
-# Start new PM2 process
-print_status "Starting PM2 process on port 3006..."
-pm2 serve dist/ 3006 --name resume-forge-frontend --spa
+# Start the application with PM2
+pm2 serve dist/ 3006 --name frontend --spa
 
-# Save PM2 configuration
-print_status "Saving PM2 configuration..."
-pm2 save
+# Wait a moment for PM2 to start the process
+sleep 2
 
-# Check if process is running
-if pm2 list | grep -q "resume-forge-frontend.*online"; then
-    print_status "✅ Frontend deployment successful!"
-    print_status "Frontend is running on http://localhost:3006"
-    print_status "Available at: https://resumeforge.thatinsaneguy.com/"
+# Check if the process started successfully
+if pm2 list | grep -q "frontend.*online"; then
+    print_status "✅ Frontend deployed successfully!"
     
-    # Show process status
-    print_status "PM2 Status:"
-    pm2 status
-    
-    # Show memory usage
-    MEMORY=$(pm2 list | grep resume-forge-frontend | awk '{print $10}')
+    # Get memory usage
+    MEMORY=$(pm2 list | grep frontend | awk '{print $10}')
     print_status "Memory usage: $MEMORY"
 else
     print_error "❌ Frontend deployment failed!"
-    print_error "Check PM2 logs with: pm2 logs resume-forge-frontend"
+    print_error "Check PM2 logs with: pm2 logs frontend"
     exit 1
-fi
-
-print_status "🎉 Frontend deployment complete!"
-print_status "Note: Make sure nginx is configured to proxy to port 3006" 
+fi 

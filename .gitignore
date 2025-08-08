@@ -10,7 +10,7 @@ pip-selfcheck.json
 
 # Environment
 .env
-resume-forge-frontend/.env
+frontend/.env
 
 # PDF
 *.aux

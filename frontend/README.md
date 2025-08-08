@@ -2,30 +2,62 @@
 
 A modern React frontend built with Vite, TypeScript, and Material UI with dark theme.
 
-## 🚀 Quick Start
+## Quick Start
 
-### Prerequisites
-- Node.js 18+ 
-- npm
-
-### Installation
-
-1. **Navigate to the frontend directory:**
+1. Navigate to the frontend directory:
 ```bash
-cd resume-forge-frontend
+cd frontend
 ```
 
-2. **Install dependencies:**
+2. Install dependencies:
 ```bash
 npm install
 ```
 
-3. **Start the development server:**
+3. Start the development server:
 ```bash
 npm run dev
 ```
 
-The app will be available at `http://localhost:5173`
+The application will be available at `http://localhost:5173`
+
+## Building for Production
+
+To build the application for production:
+
+```bash
+npm run build
+```
+
+The built files will be in the `dist/` directory.
+
+## Deployment
+
+The frontend can be deployed using the included deploy script:
+
+```bash
+./deploy.sh
+```
+
+This will:
+- Build the application
+- Start it with PM2 on port 3006
+- Make it available at `https://resumeforge.thatinsaneguy.com/`
+
+## Project Structure
+
+```
+frontend/
+├── src/
+│   ├── components/     # React components
+│   ├── contexts/       # React contexts
+│   ├── hooks/          # Custom hooks
+│   ├── utils/          # Utility functions
+│   └── main.tsx        # Application entry point
+├── public/             # Static assets
+├── dist/               # Built files (generated)
+└── package.json        # Dependencies and scripts
+```
 
 ## 🛠️ Built With
 
@@ -36,23 +68,6 @@ The app will be available at `http://localhost:5173`
 - **React Hot Toast** - Beautiful notifications
 - **Axios** - HTTP client for API calls
 - **React Router DOM** - Client-side routing
-
-## 📁 Project Structure
-
-```
-resume-forge-frontend/
-├── src/
-│   ├── components/
-│   │   └── HomePage.tsx          # Main landing page
-│   ├── theme/
-│   │   └── theme.ts             # Material UI dark theme
-│   ├── App.tsx                  # Main app component
-│   ├── main.tsx                # Entry point
-│   └── index.css               # Global styles
-├── public/                     # Static assets
-├── package.json               # Dependencies
-└── vite.config.ts            # Vite configuration
-```
 
 ## 🎨 Features
 

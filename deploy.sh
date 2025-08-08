@@ -108,31 +108,32 @@ echo ""
 if [[ $REPLY =~ ^[Yy]$ ]]; then
     print_step "Starting frontend deployment..."
     
-    if [ ! -d "resume-forge-frontend" ]; then
-        print_error "Frontend directory 'resume-forge-frontend' not found!"
-        print_error "Please ensure the frontend code is in the resume-forge-frontend directory."
+    # Check if frontend directory exists
+    if [ ! -d "frontend" ]; then
+        print_error "Frontend directory 'frontend' not found!"
+        print_error "Please ensure the frontend code is in the frontend directory."
         exit 1
     fi
-    
-    cd resume-forge-frontend
-    
-    if [ -f "deploy.sh" ]; then
-        print_status "Running frontend deploy script..."
-        if ./deploy.sh; then
-            print_status "✅ Frontend deployment completed successfully!"
-        else
-            print_error "❌ Frontend deployment failed!"
-            print_error "Please check the frontend deployment logs above."
-        fi
-    else
-        print_error "Frontend deploy.sh script not found!"
-        print_error "Please ensure the frontend deploy script exists in resume-forge-frontend/deploy.sh"
+
+    print_status "Deploying frontend..."
+    cd frontend
+
+    # Check if frontend deploy script exists
+    if [ ! -f "deploy.sh" ]; then
+        print_error "Frontend deploy script not found!"
+        print_error "Please ensure the frontend deploy script exists in frontend/deploy.sh"
+        exit 1
     fi
+
+    # Run frontend deployment
+    ./deploy.sh
+
+    print_status "cd frontend && ./deploy.sh"
     
     cd ..
     
     print_status "🎉 Full deployment (backend + frontend) complete!"
 else
     print_status "Frontend deployment skipped. You can deploy it manually by running:"
-    print_status "cd resume-forge-frontend && ./deploy.sh"
+    print_status "cd frontend && ./deploy.sh"
 fi

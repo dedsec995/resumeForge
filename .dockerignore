@@ -34,8 +34,8 @@ agent_log.txt
 README.md
 *.md
 
-# Frontend (if present)
-resume-forge-frontend/
+# Frontend
+frontend/
 
 # Development files
 rmv.sh
