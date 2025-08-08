@@ -141,7 +141,7 @@ def edit_technical_skills(state):
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
     llm = ChatGroq(
-        temperature=0.7, model_name="llama-3.3-70b-versatile", api_key=GROQ_API_KEY
+        temperature=0.3, model_name="llama-3.3-70b-versatile", api_key=GROQ_API_KEY
     )
     # llm = ChatOpenAI(temperature=0.7, model="gpt-4", api_key=OPENAI_API_KEY)
 
@@ -226,10 +226,10 @@ def judge_resume_quality(state):
     console.print(
         Panel("Judging Resume Quality...", title="Progress", border_style="blue")
     )
-    # llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
-    llm = ChatGoogleGenerativeAI(
-        temperature=0.1, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
-    )
+    llm = ChatOpenRouter(temperature=0.1, model_name="qwen/qwen3-235b-a22b:free")
+    # llm = ChatGoogleGenerativeAI(
+    #     temperature=0.1, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    # )
     # llm = ChatOpenAI(temperature=0.1, model="gpt-4", api_key=OPENAI_API_KEY)
     iteration_count = state.get("iteration_count", 0) + 1
 
@@ -253,7 +253,7 @@ def judge_resume_quality(state):
         feedback = "LLM feedback parsing failed. Please check the LLM response format."
         downsides = "Failed to parse LLM feedback."
 
-    console.print(f"[bold green]Resume Quality Score: {score}/100[/bold green]")
+    console.print(f"[bold green]Resume Quality Score: {score}/10[/bold green]")
     console.print(f"[bold yellow]Feedback: {feedback}[/bold yellow]")
     console.print(f"[bold red]Downsides: {downsides}[/bold red]")
 
@@ -319,10 +319,10 @@ def finalize_and_print_json(state):
 
 
 def decide_after_judging(state):
-    if state["score"] < 80 and state["iteration_count"] < 3:
+    if state["score"] < 8.6 and state["iteration_count"] < 3:
         console.print(
             Panel(
-                f"Score {state['score']}/100 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}",
+                f"Score {state['score']}/10 is below threshold. Re-editing technical skills. Iteration: {state['iteration_count']}",
                 title="Decision",
                 border_style="red",
             )
@@ -331,7 +331,7 @@ def decide_after_judging(state):
     else:
         console.print(
             Panel(
-                f"Score {state['score']}/100 is sufficient or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}",
+                f"Score {state['score']}/10 is sufficient or max iterations reached. Proceeding to finalize. Iteration: {state['iteration_count']}",
                 title="Decision",
                 border_style="green",
             )
