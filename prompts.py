@@ -32,7 +32,7 @@ EDIT_TECHNICAL_SKILLS_PROMPT = """You are an expert Resume Architect specializin
 
 INSTRUCTIONS:
 1. Analyze the job description for required technical skills and technologies
-2. Add missing critical skills from the job description
+2. Add missing skills from the job description
 3. Remove irrelevant skills that don't match the job requirements
 4. Infer additional related skills that would be valuable for this role
 5. Maintain the existing JSON structure and format
@@ -67,7 +67,8 @@ INSTRUCTIONS:
 6. You can split up exisiting points into multiple points if really required for adding more details.
 7. Only make changes that are technically/logically sound
 8. Do not specify (Action), (Result), (Task) in the bullet points.
-9. You can add more points if really needed to make experience better align but should be logically sound.
+9. You can add more points if really needed to make experience better align.
+10. Try not to use special characters in the bullet points like -, ;, etc.
 
 QUANTIFICATION GUIDELINES:
 - If original lacks metrics, add plausible, impressive metrics
@@ -78,6 +79,7 @@ KEYWORD INTEGRATION:
 - Seamlessly weave job description keywords into narratives
 - Bold key technical terms and skills
 - Maintain natural flow and readability
+- Do not give any explanation in the bullet points.
 
 Your response must be ONLY the updated JSON for 'workExperience' section, wrapped in ```json ... ``` format.
 
@@ -102,12 +104,14 @@ INSTRUCTIONS:
 5. Add details or modify existing points to better align with job requirements
 6. Do NOT change project titles or technologies
 7. Do not specify (Action), (Result), (Task) in the bullet points.
+8. Do not use '-' in the bullet points.
 
 CONSTRAINTS:
 - Keep existing project titles and technology stacks unchanged
 - Ensure all modifications are technically coherent
 - Maintain project narrative consistency
 - Focus on technical achievements and problem-solving
+- Do not give any explanation in the bullet points.
 
 QUANTIFICATION EXAMPLES:
 - User engagement: "10k daily active users"
@@ -220,7 +224,7 @@ COMPLETE RESUME CONTEXT:
 
 FOCUS AREAS:
 - Address specific feedback points from previous evaluation
-- Ensure work experience aligns with technical skills and projects
+- Ensure work experience aligns with technical skills
 - Maintain narrative consistency across all sections
 - Improve quantification and keyword integration in experience section
 """
