@@ -24,3 +24,8 @@ package-lock.json
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript build artifacts
+*.tsbuildinfo
+*.d.ts
+vite.config.js

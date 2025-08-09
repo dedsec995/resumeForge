@@ -82,6 +82,9 @@ const CreateResumeSection = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
+  const [editableJson, setEditableJson] = useState<string>('');
+  const [saveJsonLoading, setSaveJsonLoading] = useState(false);
+  const [structuredData, setStructuredData] = useState<any>(null);
   const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
 
 
@@ -369,6 +372,12 @@ const CreateResumeSection = () => {
             };
             console.log(`Setting selected session with status: ${currentStatus}`, sessionData);
             setSelectedSession(sessionData);
+            
+            // Initialize editable JSON with the session's tailored resume data
+            if (sessionData.tailoredResume) {
+              setEditableJson(JSON.stringify(sessionData.tailoredResume, null, 2));
+              setStructuredData(sessionData.tailoredResume);
+            }
             
             // If the session is still processing or queued, start auto-refresh
             if (currentStatus === 'processing' || currentStatus === 'queued') {
@@ -778,12 +787,47 @@ const CreateResumeSection = () => {
     return true;
   };
 
+  const handleSaveJson = async () => {
+    if (!selectedSession || !structuredData) {
+      toast.error('No data to save');
+      return;
+    }
+
+    try {
+      setSaveJsonLoading(true);
+
+      // Update the session with the new structured data
+      const response = await apiClient.post(`/updateSessionJson/${selectedSession.sessionId}`, {
+        tailoredResume: structuredData
+      });
+
+      if (response.data.success) {
+        toast.success('Resume data updated successfully!');
+        
+        // Refresh the session data to show updated content
+        await handleViewSession(selectedSession.sessionId);
+        
+        // Switch back to JSON Output tab to show updated data
+        setActiveTab(1);
+      } else {
+        toast.error('Failed to update resume data');
+      }
+    } catch (error) {
+      console.error('Error saving resume data:', error);
+      toast.error('Failed to save resume data');
+    } finally {
+      setSaveJsonLoading(false);
+    }
+  };
+
   const handleCloseDialog = () => {
     // Store the current session status before closing
     const currentSessionStatus = selectedSession?.status;
     
     setDialogOpen(false);
     setSelectedSession(null);
+    setEditableJson(''); // Clear editable JSON when closing
+    setStructuredData(null); // Clear structured data when closing
     
     // Clean up any refresh intervals
     const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
@@ -1128,6 +1172,12 @@ const CreateResumeSection = () => {
           downloadLatexLoading={downloadLatexLoading}
           regenerateLatexLoading={regenerateLatexLoading}
           formatDate={formatDate}
+          editableJson={editableJson}
+          onEditableJsonChange={setEditableJson}
+          onSaveJson={handleSaveJson}
+          saveJsonLoading={saveJsonLoading}
+          structuredData={structuredData}
+          onStructuredDataChange={setStructuredData}
         />
       </Container>
 
