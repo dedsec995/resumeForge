@@ -217,10 +217,10 @@ def extract_info(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(
@@ -287,10 +287,10 @@ def edit_technical_skills(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(
@@ -357,10 +357,10 @@ def edit_experience(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(
@@ -421,10 +421,10 @@ def edit_projects(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(
@@ -488,10 +488,10 @@ def judge_resume_quality(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(
@@ -546,10 +546,10 @@ def keywords_editor(state):
         if user_tier == "FREE":
             if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
                 console.print(
-                    "[bold red]Error: Invalid or missing API key. Please add your OpenAI API key in the API Config section.[/bold red]"
+                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
                 )
                 raise Exception(
-                    "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
                 )
             else:
                 console.print(

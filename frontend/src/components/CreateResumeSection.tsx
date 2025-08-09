@@ -9,13 +9,22 @@ import {
   Alert,
   Fade,
   Grow,
-  Slide
+  Slide,
+  TextField,
+  InputAdornment,
+  IconButton,
+  Collapse
 } from '@mui/material';
 import { 
   Add as AddIcon,
   WorkOutline as ResumeIcon,
   Description as DescriptionIcon,
-  Star as StarIcon
+  Star as StarIcon,
+  Visibility as VisibilityIcon,
+  VisibilityOff as VisibilityOffIcon,
+  Save as SaveIcon,
+  Delete as DeleteIcon,
+  Key as KeyIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
@@ -86,6 +95,10 @@ const CreateResumeSection = () => {
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<any>(null);
   const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
+  const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
+  const [apiKey, setApiKey] = useState('');
+  const [showApiKey, setShowApiKey] = useState(false);
+  const [savingApiConfig, setSavingApiConfig] = useState(false);
 
 
   // Load existing sessions on component mount
@@ -94,6 +107,7 @@ const CreateResumeSection = () => {
     loadGlobalCounter();
     loadIndividualCounter();
     loadUserApiConfig();
+    loadUserInfo();
   }, []);
 
   // Real-time status updates for active sessions
@@ -511,13 +525,24 @@ const CreateResumeSection = () => {
               
               // Handle different error types
               if (statusResponse.data.errorType === 'API_KEY_ERROR') {
-                toast.error(
-                  'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
-                  { 
-                    duration: 8000,
-                    icon: '🔑'
-                  }
-                );
+                // Check if user has API key configured to provide appropriate message
+                if (userApiConfig?.hasApiKey) {
+                  toast.error(
+                    'Invalid API Key: Your OpenAI API key appears to be incorrect or expired. Please update it below.',
+                    { 
+                      duration: 8000,
+                      icon: '❌'
+                    }
+                  );
+                } else {
+                  toast.error(
+                    'API Key Required: Please add your OpenAI API key below to continue.',
+                    { 
+                      duration: 8000,
+                      icon: '🔑'
+                    }
+                  );
+                }
               } else if (statusResponse.data.errorType === 'MODEL_ERROR') {
                 toast.error(
                   'Model Error: There was an issue with the AI model. Please try again later.',
@@ -566,13 +591,24 @@ const CreateResumeSection = () => {
       // Check if it's an API key error from the response
       const errorResponse = error as { response?: { data?: { detail?: string } } };
       if (errorResponse.response?.data?.detail?.includes('API_KEY_ERROR')) {
-        toast.error(
-          'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
-          { 
-            duration: 8000,
-            icon: '🔑'
-          }
-        );
+        // Check if user has API key configured to provide appropriate message
+        if (userApiConfig?.hasApiKey) {
+          toast.error(
+            'Invalid API Key: Your OpenAI API key appears to be incorrect or expired. Please update it below.',
+            { 
+              duration: 8000,
+              icon: '❌'
+            }
+          );
+        } else {
+          toast.error(
+            'API Key Required: Please add your OpenAI API key below to continue.',
+            { 
+              duration: 8000,
+              icon: '🔑'
+            }
+          );
+        }
       } else if (errorResponse.response?.data?.detail?.includes('MODEL_ERROR')) {
         toast.error(
           'Model Error: There was an issue with the AI model. Please try again later.',
@@ -771,19 +807,88 @@ const CreateResumeSection = () => {
     }
   };
 
+  const loadUserInfo = async () => {
+    try {
+      const response = await apiClient.get('/user/info');
+      if (response.data.success) {
+        setUserInfo({
+          accountTier: response.data.accountTier,
+          email: response.data.email,
+          displayName: response.data.displayName
+        });
+      }
+    } catch (error) {
+      console.error('Error loading user info:', error);
+    }
+  };
 
+  const handleSaveApiConfig = async () => {
+    if (!apiKey.trim()) {
+      toast.error('Please enter an API key');
+      return;
+    }
+
+    setSavingApiConfig(true);
+    try {
+      const response = await apiClient.post('/apiConfig', {
+        apiKey: apiKey.trim()
+      });
+      
+      if (response.data.success) {
+        setApiKey('');
+        setShowApiKey(false);
+        await loadUserApiConfig();
+        toast.success('API key saved securely!');
+      } else {
+        toast.error('Failed to save API key.');
+      }
+    } catch (error) {
+      console.error('Error saving API config:', error);
+      toast.error('Failed to save API key. Make sure the backend is running.');
+    } finally {
+      setSavingApiConfig(false);
+    }
+  };
+
+  const handleDeleteApiKey = async () => {
+    setSavingApiConfig(true);
+    try {
+      const response = await apiClient.post('/apiConfig', {
+        apiKey: '' // Empty key to delete
+      });
+      
+      if (response.data.success) {
+        setUserApiConfig(null);
+        toast.success('API key deleted successfully!');
+      } else {
+        toast.error('Failed to delete API key.');
+      }
+    } catch (error) {
+      console.error('Error deleting API config:', error);
+      toast.error('Failed to delete API key.');
+    } finally {
+      setSavingApiConfig(false);
+    }
+  };
 
   const checkApiKeyRequirement = () => {
-    if (!userApiConfig?.hasApiKey) {
-      toast.error(
-        'API Key Required: Please add your OpenAI API key in the API Config section to continue.',
-        { 
-          duration: 8000,
-          icon: '🔑'
-        }
-      );
-      return false;
+    // Debug: Log user tier information
+    console.log('Debug - User tier:', userInfo?.accountTier, 'Has API key:', userApiConfig?.hasApiKey);
+    
+    // Only check API key requirement for FREE tier users
+    if (userInfo?.accountTier === 'FREE') {
+      if (!userApiConfig?.hasApiKey) {
+        toast.error(
+          'API Key Required: Please add your OpenAI API key below to continue.',
+          { 
+            duration: 8000,
+            icon: '🔑'
+          }
+        );
+        return false;
+      }
     }
+    // Admin users (ADMI tier) don't need API key - they use environment variables
     return true;
   };
 
@@ -987,6 +1092,8 @@ const CreateResumeSection = () => {
 
 
                       </Box>
+
+
                     </Box>
                   </Slide>
                 </Box>
@@ -1042,6 +1149,201 @@ const CreateResumeSection = () => {
                 )}
               </Box>
             </Grow>
+
+            {/* API Key Configuration - Full width, outside the flex container */}
+            {userInfo?.accountTier === 'FREE' && (
+              <Slide direction="up" in timeout={1400}>
+                <Box sx={{ mt: 4 }}>
+                  <Collapse in={!userApiConfig?.hasApiKey} timeout={500}>
+                    <Paper
+                      elevation={2}
+                      sx={{
+                        p: 3,
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(10px)',
+                        width: '100%',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                          <KeyIcon sx={{ color: '#EF4444', fontSize: 20 }} />
+                          <Typography variant="h6" sx={{ color: '#F8FAFC', fontWeight: 600 }}>
+                            OpenAI API Key Required
+                          </Typography>
+                        </Box>
+                        
+                        {/* User Tier Badge */}
+                        <Box sx={{
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          background: userInfo?.accountTier === 'FREE' 
+                            ? 'rgba(239, 68, 68, 0.2)' 
+                            : 'rgba(34, 197, 94, 0.2)',
+                          border: userInfo?.accountTier === 'FREE' 
+                            ? '1px solid rgba(239, 68, 68, 0.4)' 
+                            : '1px solid rgba(34, 197, 94, 0.4)',
+                          backdropFilter: 'blur(10px)'
+                        }}>
+                          <Typography variant="caption" sx={{ 
+                            color: userInfo?.accountTier === 'FREE' ? '#EF4444' : '#22C55E',
+                            fontWeight: 600,
+                            fontSize: '0.75rem'
+                          }}>
+                            {userInfo?.accountTier || 'FREE'} USER
+                          </Typography>
+                        </Box>
+                      </Box>
+                      
+                      <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 3, opacity: 0.9 }}>
+                        Enter your OpenAI API key to enable AI-powered resume tailoring. Your key will be stored securely and encrypted.
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+                        <TextField
+                          fullWidth
+                          label="OpenAI API Key"
+                          type={showApiKey ? 'text' : 'password'}
+                          value={apiKey}
+                          onChange={(e) => setApiKey(e.target.value)}
+                          placeholder="sk-..."
+                          size="small"
+                          InputProps={{
+                            endAdornment: (
+                              <InputAdornment position="end">
+                                <IconButton
+                                  onClick={() => setShowApiKey(!showApiKey)}
+                                  edge="end"
+                                  size="small"
+                                  sx={{ color: '#94A3B8' }}
+                                >
+                                  {showApiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                                </IconButton>
+                              </InputAdornment>
+                            ),
+                          }}
+                          sx={{
+                            '& .MuiOutlinedInput-root': {
+                              backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                              borderRadius: 1,
+                              '& fieldset': {
+                                borderColor: 'rgba(239, 68, 68, 0.3)',
+                              },
+                              '&:hover fieldset': {
+                                borderColor: '#EF4444',
+                              },
+                              '&.Mui-focused fieldset': {
+                                borderColor: '#EF4444',
+                              },
+                            },
+                            '& .MuiInputLabel-root': {
+                              color: '#94A3B8',
+                              '&.Mui-focused': {
+                                color: '#EF4444',
+                              },
+                            },
+                            '& .MuiOutlinedInput-input': {
+                              color: '#F8FAFC',
+                            },
+                          }}
+                        />
+                        
+                        <Button
+                          variant="contained"
+                          onClick={handleSaveApiConfig}
+                          disabled={savingApiConfig || !apiKey.trim()}
+                          startIcon={<SaveIcon />}
+                          size="small"
+                          sx={{
+                            background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
+                            '&:hover': {
+                              background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'
+                            },
+                            '&:disabled': {
+                              background: 'rgba(239, 68, 68, 0.3)',
+                              color: 'rgba(248, 250, 252, 0.5)'
+                            },
+                            whiteSpace: 'nowrap'
+                          }}
+                        >
+                          {savingApiConfig ? 'Saving...' : 'Save Key'}
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Collapse>
+                  
+                  {/* API Key Configured Status */}
+                  <Collapse in={!!userApiConfig?.hasApiKey} timeout={500}>
+                    <Paper
+                      elevation={2}
+                      sx={{
+                        p: 2,
+                        background: 'rgba(34, 197, 94, 0.1)',
+                        border: '1px solid rgba(34, 197, 94, 0.3)',
+                        borderRadius: 2,
+                        backdropFilter: 'blur(10px)',
+                        width: '100%',
+                      }}
+                    >
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'space-between',
+                        width: '100%',
+                        gap: 2
+                      }}>
+                        <Box sx={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          gap: 2,
+                          flex: 1,
+                          minWidth: 0
+                        }}>
+                          <KeyIcon sx={{ color: '#22C55E', fontSize: 20, flexShrink: 0 }} />
+                          <Typography variant="body2" sx={{ 
+                            color: '#22C55E', 
+                            fontWeight: 600,
+                            flexShrink: 0
+                          }}>
+                            API Key Configured
+                          </Typography>
+                          <Typography variant="caption" sx={{ 
+                            color: '#94A3B8',
+                            ml: 1,
+                            opacity: 0.8
+                          }}>
+                            • Last updated: {userApiConfig?.timestamp ? new Date(userApiConfig.timestamp).toLocaleString() : 'Unknown'}
+                          </Typography>
+                        </Box>
+                        
+                        <Button
+                          variant="outlined"
+                          color="error"
+                          onClick={handleDeleteApiKey}
+                          disabled={savingApiConfig}
+                          startIcon={<DeleteIcon />}
+                          size="small"
+                          sx={{
+                            borderColor: '#EF4444',
+                            color: '#EF4444',
+                            flexShrink: 0,
+                            whiteSpace: 'nowrap',
+                            '&:hover': {
+                              borderColor: '#DC2626',
+                              backgroundColor: 'rgba(239, 68, 68, 0.1)'
+                            }
+                          }}
+                        >
+                          {savingApiConfig ? 'Deleting...' : 'Remove'}
+                        </Button>
+                      </Box>
+                    </Paper>
+                  </Collapse>
+                </Box>
+              </Slide>
+            )}
           </Box>
         </Fade>
 

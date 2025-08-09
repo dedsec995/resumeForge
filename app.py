@@ -410,11 +410,20 @@ async def updateResumeEndpoint(
 
 
 @app.post("/extractCompanyInfo", response_model=CompanyPositionResponse)
-async def extractCompanyInfoEndpoint(request: JobDescriptionRequest):
+async def extractCompanyInfoEndpoint(request: JobDescriptionRequest, userId: str = Depends(verifyFirebaseToken)):
     """Extract company name and position from job description"""
     try:
-        state = {"job_description": request.jobDescription, "resume": ""}
+        # Get user data to determine tier
+        user_data = dbOps.getUser(userId)
+        user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
         
+        state = {
+            "job_description": request.jobDescription, 
+            "resume": "",
+            "user_id": userId,
+            "user_tier": user_tier
+        }
+
         result = extract_info(state)
         
         return CompanyPositionResponse(
@@ -541,9 +550,9 @@ def run_workflow_sync(userId: str, sessionId: str):
 
             # Handle API key errors specifically
             if "API_KEY_ERROR" in error_msg:
-            errorUpdateData = {
-                "status": "failed",
-                    "error": "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue.",
+                errorUpdateData = {
+                    "status": "failed",
+                    "error": "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct.",
                     "errorType": "API_KEY_ERROR",
                     "failedAt": datetime.now().isoformat(),
                 }
@@ -1130,6 +1139,37 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
         print(f"Error getting API config: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to get API configuration: {str(e)}"
+        )
+
+
+class UserInfoResponse(BaseModel):
+    success: bool
+    accountTier: str
+    email: str
+    displayName: str
+    message: str
+
+
+@app.get("/user/info", response_model=UserInfoResponse)
+async def getUserInfoEndpoint(userId: str = Depends(verifyFirebaseToken)):
+    """Get current user information including account tier"""
+    try:
+        userData = dbOps.getUser(userId)
+        
+        if not userData:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return UserInfoResponse(
+            success=True,
+            accountTier=userData.get("accountTier", "FREE"),
+            email=userData.get("email", ""),
+            displayName=userData.get("displayName", ""),
+            message="User information retrieved successfully"
+        )
+    except Exception as e:
+        print(f"Error getting user info: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to get user information: {str(e)}"
         )
 
 

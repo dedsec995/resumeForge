@@ -35,9 +35,7 @@ import {
   Star as StarIcon,
   Psychology as SkillsIcon,
   CheckCircle as CheckIcon,
-  Api as ApiIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon
+
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
@@ -51,10 +49,7 @@ const ProfileSection = () => {
   const [currentSection, setCurrentSection] = useState(0);
   const [hasLoaded, setHasLoaded] = useState(false); // Track if we've already loaded
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false); // Track changes
-  const [apiConfig, setApiConfig] = useState<any>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [savingApiConfig, setSavingApiConfig] = useState(false);
+
 
   const sections = [
     'Personal Info',
@@ -62,8 +57,7 @@ const ProfileSection = () => {
     'Technical Skills',
     'Work Experience',
     'Projects',
-    'Education',
-    'API Config'
+    'Education'
   ];
 
   const getSectionIcon = (section: string, isSelected: boolean = false) => {
@@ -87,8 +81,6 @@ const ProfileSection = () => {
         return <CodeIcon sx={iconSx} />;
       case 'Education':
         return <SchoolIcon sx={iconSx} />;
-      case 'API Config':
-        return <ApiIcon sx={iconSx} />;
       default:
         return <StarIcon sx={iconSx} />;
     }
@@ -252,73 +244,7 @@ const ProfileSection = () => {
     });
   };
 
-  // API Config functions
-  const loadApiConfig = async () => {
-    try {
-      const response = await apiClient.get('/apiConfig');
-      if (response.data.success) {
-        setApiConfig(response.data.apiData);
-      }
-    } catch (error) {
-      console.error('Error loading API config:', error);
-    }
-  };
 
-  const handleSaveApiConfig = async () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter an API key');
-      return;
-    }
-
-    setSavingApiConfig(true);
-    try {
-      const response = await apiClient.post('/apiConfig', {
-        apiKey: apiKey.trim()
-      });
-      
-      if (response.data.success) {
-        setApiKey('');
-        setShowApiKey(false);
-        await loadApiConfig();
-        toast.success('API key saved securely!');
-      } else {
-        toast.error('Failed to save API key.');
-      }
-    } catch (error) {
-      console.error('Error saving API config:', error);
-      toast.error('Failed to save API key. Make sure the backend is running.');
-    } finally {
-      setSavingApiConfig(false);
-    }
-  };
-
-  const handleDeleteApiKey = async () => {
-    setSavingApiConfig(true);
-    try {
-      const response = await apiClient.post('/apiConfig', {
-        apiKey: '' // Empty key to delete
-      });
-      
-      if (response.data.success) {
-        setApiConfig(null);
-        toast.success('API key deleted successfully!');
-      } else {
-        toast.error('Failed to delete API key.');
-      }
-    } catch (error) {
-      console.error('Error deleting API config:', error);
-      toast.error('Failed to delete API key.');
-    } finally {
-      setSavingApiConfig(false);
-    }
-  };
-
-  // Load API config when API Config tab is selected
-  useEffect(() => {
-    if (currentSection === sections.length - 1 && !apiConfig) {
-      loadApiConfig();
-    }
-  }, [currentSection, apiConfig]);
 
   const renderCurrentSection = () => {
     if (!resumeData) return null;
@@ -1920,147 +1846,6 @@ const ProfileSection = () => {
                 </Button>
               </Stack>
             </Box>
-          </Grow>
-        );
-
-      case 6: // API Config
-        return (
-          <Grow in timeout={800}>
-            <Paper 
-              elevation={4}
-              sx={{ 
-                p: 3,
-                background: 'rgba(15, 23, 42, 0.4)',
-                border: '1px solid rgba(99, 102, 241, 0.2)',
-                borderRadius: 2,
-                transition: 'all 0.3s ease-in-out',
-                '&:hover': {
-                  borderColor: 'rgba(99, 102, 241, 0.4)',
-                  boxShadow: '0 8px 25px rgba(99, 102, 241, 0.15)'
-                }
-              }}
-            >
-                <Box sx={{ mb: 3 }}>
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                    <ApiIcon sx={{ color: '#6366F1', fontSize: 20 }} />
-                    <Typography variant="h6" fontWeight={600} sx={{ color: '#F8FAFC' }}>
-                      OpenAI API Key
-                    </Typography>
-                  </Box>
-                  
-                  {apiConfig?.hasApiKey ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Alert severity="success" sx={{ backgroundColor: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.3)', py: 0.5 }}>
-                          <Typography variant="body2" sx={{ color: '#22C55E' }}>
-                            API key is configured and saved securely
-                          </Typography>
-                        </Alert>
-                        
-                        <Typography variant="body2" sx={{ color: '#94A3B8' }}>
-                          Last Updated: {apiConfig.timestamp ? new Date(apiConfig.timestamp).toLocaleString() : 'Unknown'}
-                        </Typography>
-                      </Box>
-                      
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={handleDeleteApiKey}
-                        disabled={savingApiConfig}
-                        startIcon={<DeleteIcon />}
-                        size="small"
-                        sx={{
-                          borderColor: '#EF4444',
-                          color: '#EF4444',
-                          '&:hover': {
-                            borderColor: '#DC2626',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                          }
-                        }}
-                      >
-                        {savingApiConfig ? 'Deleting...' : 'Delete API Key'}
-                      </Button>
-                    </Box>
-                  ) : (
-                    <Box>
-                      <Typography variant="body2" sx={{ color: '#94A3B8', mb: 3 }}>
-                        Enter your OpenAI API key to enable AI-powered resume tailoring features. 
-                        Your key will be stored securely and encrypted.
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <Box sx={{ position: 'relative', flex: 1 }}>
-                          <TextField
-                            fullWidth
-                            label="OpenAI API Key"
-                            type={showApiKey ? 'text' : 'password'}
-                            value={apiKey}
-                            onChange={(e) => setApiKey(e.target.value)}
-                            placeholder="sk-..."
-                            sx={{
-                              '& .MuiOutlinedInput-root': {
-                                backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                                borderRadius: 2,
-                                '& fieldset': {
-                                  borderColor: 'rgba(99, 102, 241, 0.3)',
-                                },
-                                '&:hover fieldset': {
-                                  borderColor: '#6366F1',
-                                },
-                                '&.Mui-focused fieldset': {
-                                  borderColor: '#6366F1',
-                                },
-                              },
-                              '& .MuiInputLabel-root': {
-                                color: '#94A3B8',
-                                '&.Mui-focused': {
-                                  color: '#6366F1',
-                                },
-                              },
-                              '& .MuiInputBase-input': {
-                                color: '#F8FAFC',
-                              },
-                            }}
-                          />
-                          <IconButton
-                            onClick={() => setShowApiKey(!showApiKey)}
-                            sx={{
-                              position: 'absolute',
-                              right: 8,
-                              top: '50%',
-                              transform: 'translateY(-50%)',
-                              color: '#94A3B8',
-                              '&:hover': { color: '#6366F1' }
-                            }}
-                          >
-                            {showApiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                          </IconButton>
-                        </Box>
-                        
-                        <Button
-                          variant="contained"
-                          onClick={handleSaveApiConfig}
-                          disabled={savingApiConfig || !apiKey.trim()}
-                          startIcon={<SaveIcon />}
-                          size="small"
-                          sx={{
-                            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)'
-                            },
-                            '&:disabled': {
-                              background: 'rgba(99, 102, 241, 0.3)',
-                              color: 'rgba(248, 250, 252, 0.5)'
-                            }
-                          }}
-                        >
-                          {savingApiConfig ? 'Saving...' : 'Save Securely'}
-                        </Button>
-                      </Box>
-                    </Box>
-                  )}
-                </Box>
-              </Paper>
           </Grow>
         );
 
