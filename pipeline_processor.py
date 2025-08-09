@@ -179,7 +179,7 @@ class PipelineProcessor:
             if "API_KEY_ERROR" in error_msg:
                 error_update_data = {
                     "status": "failed",
-                    "error": "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue.",
+                    "error": "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct.",
                     "errorType": "API_KEY_ERROR",
                     "failedAt": datetime.now().isoformat(),
                 }
