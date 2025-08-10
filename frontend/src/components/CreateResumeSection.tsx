@@ -91,9 +91,9 @@ const CreateResumeSection = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
-  const [editableJson, setEditableJson] = useState<string>('');
+
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
-  const [structuredData, setStructuredData] = useState<any>(null);
+  const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
   const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
   const [apiKey, setApiKey] = useState('');
@@ -389,7 +389,8 @@ const CreateResumeSection = () => {
             
             // Initialize editable JSON with the session's tailored resume data
             if (sessionData.tailoredResume) {
-              setEditableJson(JSON.stringify(sessionData.tailoredResume, null, 2));
+              console.log('Setting structured data:', sessionData.tailoredResume);
+              console.log('Projects in tailoredResume:', sessionData.tailoredResume.projects);
               setStructuredData(sessionData.tailoredResume);
             }
             
@@ -909,11 +910,19 @@ const CreateResumeSection = () => {
       if (response.data.success) {
         toast.success('Resume data updated successfully!');
         
+        // Update the selectedSession with the new data to ensure hasChanges is immediately correct
+        if (selectedSession) {
+          setSelectedSession({
+            ...selectedSession,
+            tailoredResume: structuredData
+          });
+        }
+        
         // Refresh the session data to show updated content
         await handleViewSession(selectedSession.sessionId);
         
-        // Switch back to JSON Output tab to show updated data
-        setActiveTab(1);
+        // Stay on the current tab (Edit JSON tab) instead of switching
+        // setActiveTab(1); // Removed automatic tab switching
       } else {
         toast.error('Failed to update resume data');
       }
@@ -931,7 +940,7 @@ const CreateResumeSection = () => {
     
     setDialogOpen(false);
     setSelectedSession(null);
-    setEditableJson(''); // Clear editable JSON when closing
+    
     setStructuredData(null); // Clear structured data when closing
     
     // Clean up any refresh intervals
@@ -1474,8 +1483,7 @@ const CreateResumeSection = () => {
           downloadLatexLoading={downloadLatexLoading}
           regenerateLatexLoading={regenerateLatexLoading}
           formatDate={formatDate}
-          editableJson={editableJson}
-          onEditableJsonChange={setEditableJson}
+          
           onSaveJson={handleSaveJson}
           saveJsonLoading={saveJsonLoading}
           structuredData={structuredData}

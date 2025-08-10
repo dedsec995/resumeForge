@@ -576,13 +576,13 @@ def run_workflow_sync(userId: str, sessionId: str):
     except Exception as e:
         print(f"Critical error in run_workflow_sync for session {sessionId}: {str(e)}")
         try:
-        errorUpdateData = {
-            "status": "failed",
-                "error": f"Critical error: {str(e)}",
-                "errorType": "CRITICAL_ERROR",
-                "failedAt": datetime.now().isoformat(),
-        }
-        dbOps.updateSession(userId, sessionId, errorUpdateData)
+            errorUpdateData = {
+                "status": "failed",
+                    "error": f"Critical error: {str(e)}",
+                    "errorType": "CRITICAL_ERROR",
+                    "failedAt": datetime.now().isoformat(),
+            }
+            dbOps.updateSession(userId, sessionId, errorUpdateData)
         except Exception as update_error:
             print(f"Failed to update session with error: {str(update_error)}")
 

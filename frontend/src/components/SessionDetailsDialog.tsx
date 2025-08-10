@@ -15,7 +15,6 @@ import {
   CircularProgress,
   IconButton,
   TextField,
-  Divider,
   Stack
 } from '@mui/material';
 import {
@@ -23,9 +22,7 @@ import {
   DataObject as DataObjectIcon,
   Code as CodeIcon,
   Refresh as RefreshIcon,
-  ContentCopy as CopyIcon,
-  Add as AddIcon,
-  Delete as DeleteIcon
+  ContentCopy as CopyIcon
 } from '@mui/icons-material';
 
 interface WorkflowResult {
@@ -77,8 +74,6 @@ interface SessionDetailsDialogProps {
   downloadLatexLoading: string | null;
   regenerateLatexLoading: string | null;
   formatDate: (timestamp: string) => string;
-  editableJson: string;
-  onEditableJsonChange: (value: string) => void;
   onSaveJson: () => void;
   saveJsonLoading: boolean;
   structuredData: any;
@@ -102,13 +97,11 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   downloadLatexLoading,
   regenerateLatexLoading,
   formatDate,
-  editableJson,
-  onEditableJsonChange,
   onSaveJson,
   saveJsonLoading,
   structuredData,
-      onStructuredDataChange
-  }) => {
+  onStructuredDataChange
+}) => {
     // Function to detect if there are changes
     const hasChanges = React.useMemo(() => {
       if (!structuredData || !selectedSession?.tailoredResume) return false;
@@ -121,6 +114,21 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
         return false;
       }
     }, [structuredData, selectedSession?.tailoredResume]);
+
+    // Debug logging to help identify data structure issues
+    React.useEffect(() => {
+      if (structuredData && activeTab === 2) {
+        console.log('Structured Data Debug:', {
+          technicalSkills: structuredData.technicalSkillsCategories,
+          workExperience: structuredData.workExperience,
+          projects: structuredData.projects,
+          projectsType: typeof structuredData.projects,
+          projectsIsArray: Array.isArray(structuredData.projects),
+          projectsLength: Array.isArray(structuredData.projects) ? structuredData.projects.length : 'not array',
+          firstProject: Array.isArray(structuredData.projects) && structuredData.projects.length > 0 ? structuredData.projects[0] : 'no projects'
+        });
+      }
+    }, [structuredData, activeTab]);
 
     if (!selectedSession) return null;
 
@@ -480,35 +488,49 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                       }
                     }
                   }}>
-                    <Stack spacing={4}>
-
+                    <Stack spacing={2} mb={12}>
                       {/* Technical Skills Section */}
-                      {structuredData?.technicalSkillsCategories && (
+                      {structuredData?.technicalSkillsCategories && Array.isArray(structuredData.technicalSkillsCategories) && structuredData.technicalSkillsCategories.length > 0 && (
                         <Box>
-                          <Typography variant="h5" sx={{ 
-                            color: '#6366F1', 
-                            fontWeight: 700, 
-                            mb: 3,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1
-                          }}>
-                            🛠️ Technical Skills
-                          </Typography>
                           <Paper sx={{ 
-                            p: 3, 
+                            p: 2, 
                             background: 'rgba(15, 23, 42, 0.4)',
                             border: '1px solid rgba(99, 102, 241, 0.2)',
                             borderRadius: 2
                           }}>
+                            <Typography variant="h6" sx={{ 
+                              color: '#6366F1', 
+                              fontWeight: 700, 
+                              mb: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              🛠️ Technical Skills
+                            </Typography>
                             <Stack spacing={2}>
-                              {structuredData.technicalSkillsCategories.map((category: any, index: number) => (
+                              {(structuredData.technicalSkillsCategories || []).map((category: Record<string, unknown>, index: number) => (
                                 <Box key={index}>
                                   <TextField
-                                    fullWidth
                                     label="Category Name"
-                                    value={category.categoryName || ''}
+                                    size="small"
+                                    sx={{
+                                      width: '60%',
+                                      mb: 1,
+                                      '& .MuiInputLabel-root': { 
+                                        color: 'rgba(226, 232, 240, 0.7)',
+                                        fontSize: '0.875rem'
+                                      },
+                                      '& .MuiInputBase-root': { 
+                                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                                        color: '#E2E8F0',
+                                        fontSize: '0.875rem',
+                                        '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                                      }
+                                    }}
+                                    value={category?.categoryName || ''}
                                     onChange={(e) => {
+                                      if (!structuredData.technicalSkillsCategories) return;
                                       const newCategories = [...structuredData.technicalSkillsCategories];
                                       newCategories[index] = { ...newCategories[index], categoryName: e.target.value };
                                       onStructuredDataChange({
@@ -516,23 +538,14 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         technicalSkillsCategories: newCategories
                                       });
                                     }}
-                                    sx={{
-                                      mb: 1,
-                                      '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
-                                      '& .MuiInputBase-root': { 
-                                        backgroundColor: 'rgba(15, 23, 42, 0.6)',
-                                        color: '#E2E8F0',
-                                        '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
-                                      }
-                                    }}
                                   />
                                   <TextField
                                     fullWidth
                                     multiline
-                                    rows={2}
                                     label="Skills (comma separated)"
-                                    value={category.skills || ''}
+                                    value={category?.skills || ''}
                                     onChange={(e) => {
+                                      if (!structuredData.technicalSkillsCategories) return;
                                       const newCategories = [...structuredData.technicalSkillsCategories];
                                       newCategories[index] = { ...newCategories[index], skills: e.target.value };
                                       onStructuredDataChange({
@@ -540,11 +553,16 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         technicalSkillsCategories: newCategories
                                       });
                                     }}
+                                    size="small"
                                     sx={{
-                                      '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                      '& .MuiInputLabel-root': { 
+                                        color: 'rgba(226, 232, 240, 0.7)',
+                                        fontSize: '0.875rem'
+                                      },
                                       '& .MuiInputBase-root': { 
                                         backgroundColor: 'rgba(15, 23, 42, 0.6)',
                                         color: '#E2E8F0',
+                                        fontSize: '0.875rem',
                                         '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                       }
                                     }}
@@ -559,40 +577,40 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                       {/* Work Experience Section */}
                       {(structuredData?.workExperience && (
                         Array.isArray(structuredData.workExperience) ? structuredData.workExperience.length > 0 :
-                        (structuredData.workExperience.workExperience && Array.isArray(structuredData.workExperience.workExperience) && structuredData.workExperience.workExperience.length > 0)
+                        (structuredData.workExperience?.workExperience && Array.isArray(structuredData.workExperience.workExperience) && structuredData.workExperience.workExperience.length > 0)
                       )) && (
                         <Box>
-                          <Typography variant="h5" sx={{ 
-                            color: '#6366F1', 
-                            fontWeight: 700, 
-                            mb: 3,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1
-                          }}>
-                            💼 Work Experience
-                          </Typography>
                           <Paper sx={{ 
-                            p: 3, 
+                            p: 2, 
                             background: 'rgba(15, 23, 42, 0.4)',
                             border: '1px solid rgba(99, 102, 241, 0.2)',
                             borderRadius: 2
                           }}>
-                            <Stack spacing={3}>
-                              {(Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || []).map((exp: any, index: number) => (
+                            <Typography variant="h6" sx={{ 
+                              color: '#6366F1', 
+                              fontWeight: 700, 
+                              mb: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              💼 Work Experience
+                            </Typography>
+                            <Stack spacing={2}>
+                              {(Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience?.workExperience || []).map((exp: Record<string, unknown>, index: number) => (
                                 <Paper key={index} sx={{ 
                                   p: 2, 
                                   background: 'rgba(15, 23, 42, 0.6)',
                                   border: '1px solid rgba(99, 102, 241, 0.1)'
                                 }}>
-                                  <Grid container spacing={2}>
+                                  <Grid container spacing={1}>
                                     <Grid item xs={12} sm={6}>
                                       <TextField
                                         fullWidth
                                         label="Job Title"
-                                        value={exp.jobTitle || exp.position || ''}
+                                        value={(exp?.jobTitle || exp?.position || '') as string}
                                         onChange={(e) => {
-                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
+                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience?.workExperience || [];
                                           const newExp = [...workExpArray];
                                           newExp[index] = { ...newExp[index], jobTitle: e.target.value, position: e.target.value };
                                           onStructuredDataChange({
@@ -600,11 +618,16 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                             workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -614,9 +637,9 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         label="Company"
-                                        value={exp.company || exp.companyName || ''}
+                                        value={(exp?.company || exp?.companyName || '') as string}
                                         onChange={(e) => {
-                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
+                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience?.workExperience || [];
                                           const newExp = [...workExpArray];
                                           newExp[index] = { ...newExp[index], company: e.target.value, companyName: e.target.value };
                                           onStructuredDataChange({
@@ -624,11 +647,16 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                             workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -638,20 +666,26 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         label="Duration"
-                                        value={exp.duration || exp.dates || ''}
+                                        value={(exp?.duration || exp?.dates || '') as string}
                                         onChange={(e) => {
-                                          const newExp = [...structuredData.workExperience];
+                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
+                                          const newExp = [...workExpArray];
                                           newExp[index] = { ...newExp[index], duration: e.target.value, dates: e.target.value };
                                           onStructuredDataChange({
                                             ...structuredData,
-                                            workExperience: newExp
+                                            workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -661,20 +695,26 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         label="Location"
-                                        value={exp.location || ''}
+                                        value={(exp?.location || '') as string}
                                         onChange={(e) => {
-                                          const newExp = [...structuredData.workExperience];
+                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
+                                          const newExp = [...workExpArray];
                                           newExp[index] = { ...newExp[index], location: e.target.value };
                                           onStructuredDataChange({
                                             ...structuredData,
-                                            workExperience: newExp
+                                            workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -684,18 +724,18 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         multiline
-                                        minRows={3}
-                                        maxRows={20}
+                                        minRows={2}
+                                        maxRows={15}
                                         label="Bullet Points (one per line)"
                                         placeholder="Developed and maintained web applications&#10;Collaborated with cross-functional teams&#10;Implemented new features and bug fixes"
                                         value={
-                                          Array.isArray(exp.bulletPoints) ? exp.bulletPoints.join('\n') : 
-                                          Array.isArray(exp.bullets) ? exp.bullets.join('\n') : 
-                                          Array.isArray(exp.description) ? exp.description.join('\n') : 
-                                          typeof exp.bulletPoints === 'string' ? exp.bulletPoints :
-                                          typeof exp.bullets === 'string' ? exp.bullets :
-                                          typeof exp.description === 'string' ? exp.description :
-                                          exp.summary || ''
+                                          Array.isArray(exp?.bulletPoints) ? (exp.bulletPoints as string[]).join('\n') : 
+                                          Array.isArray(exp?.bullets) ? (exp.bullets as string[]).join('\n') : 
+                                          Array.isArray(exp?.description) ? (exp.description as string[]).join('\n') : 
+                                          typeof exp?.bulletPoints === 'string' ? exp.bulletPoints as string :
+                                          typeof exp?.bullets === 'string' ? exp.bullets as string :
+                                          typeof exp?.description === 'string' ? exp.description as string :
+                                          (exp?.summary as string) || ''
                                         }
                                         onChange={(e) => {
                                           const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
@@ -712,11 +752,16 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                             workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -733,40 +778,41 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                       {/* Projects Section */}
                       {(structuredData?.projects && (
                         Array.isArray(structuredData.projects) ? structuredData.projects.length > 0 :
-                        (structuredData.projects.projects && Array.isArray(structuredData.projects.projects) && structuredData.projects.projects.length > 0)
+                        (structuredData.projects?.projects && Array.isArray(structuredData.projects.projects) && structuredData.projects.projects.length > 0)
                       )) && (
                         <Box>
-                          <Typography variant="h5" sx={{ 
-                            color: '#6366F1', 
-                            fontWeight: 700, 
-                            mb: 3,
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1
-                          }}>
-                            🚀 Projects
-                          </Typography>
                           <Paper sx={{ 
-                            p: 3, 
+                            p: 2, 
                             background: 'rgba(15, 23, 42, 0.4)',
                             border: '1px solid rgba(99, 102, 241, 0.2)',
                             borderRadius: 2
                           }}>
-                            <Stack spacing={3}>
-                              {(Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || []).map((project: any, index: number) => (
+                            <Typography variant="h6" sx={{ 
+                              color: '#6366F1', 
+                              fontWeight: 700, 
+                              mb: 2,
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: 1
+                            }}>
+                              🚀 Projects
+                            </Typography>
+                            <Stack spacing={2}>
+                              {(Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects?.projects || []).map((project: Record<string, unknown>, index: number) => (
                                 <Paper key={index} sx={{ 
                                   p: 2, 
                                   background: 'rgba(15, 23, 42, 0.6)',
                                   border: '1px solid rgba(99, 102, 241, 0.1)'
                                 }}>
-                                  <Grid container spacing={2}>
+                                  <Grid container spacing={1}>
                                     <Grid item xs={12} sm={6}>
                                       <TextField
                                         fullWidth
                                         label="Project Name"
-                                        value={project.projectName || project.name || project.title || ''}
+                                        value={(project?.projectName || project?.name || project?.title || '') as string}
                                         onChange={(e) => {
-                                          const newProjects = [...structuredData.projects];
+                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
+                                          const newProjects = [...projectsArray];
                                           newProjects[index] = { 
                                             ...newProjects[index], 
                                             name: e.target.value,
@@ -775,14 +821,19 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                           };
                                           onStructuredDataChange({
                                             ...structuredData,
-                                            projects: newProjects
+                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -792,9 +843,10 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         label="Link/URL"
-                                        value={project.projectLink || project.link || project.url || ''}
+                                        value={(project?.projectLink || project?.link || project?.url || '') as string}
                                         onChange={(e) => {
-                                          const newProjects = [...structuredData.projects];
+                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
+                                          const newProjects = [...projectsArray];
                                           newProjects[index] = { 
                                             ...newProjects[index], 
                                             link: e.target.value,
@@ -803,14 +855,19 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                           };
                                           onStructuredDataChange({
                                             ...structuredData,
-                                            projects: newProjects
+                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -820,12 +877,13 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       <TextField
                                         fullWidth
                                         label="Technologies (comma separated)"
-                                        value={Array.isArray(project.techStack) ? project.techStack.join(', ') : 
-                                               Array.isArray(project.technologies) ? project.technologies.join(', ') :
-                                               project.techStack || project.technologies || ''}
+                                        value={Array.isArray(project?.techStack) ? (project.techStack as string[]).join(', ') : 
+                                               Array.isArray(project?.technologies) ? (project.technologies as string[]).join(', ') :
+                                               (project?.techStack || project?.technologies || '') as string}
                                         onChange={(e) => {
                                           const techArray = e.target.value.split(',').map(t => t.trim()).filter(t => t);
-                                          const newProjects = [...structuredData.projects];
+                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
+                                          const newProjects = [...projectsArray];
                                           newProjects[index] = { 
                                             ...newProjects[index], 
                                             techStack: e.target.value,
@@ -833,14 +891,19 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                           };
                                           onStructuredDataChange({
                                             ...structuredData,
-                                            projects: newProjects
+                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -850,18 +913,18 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                                                               <TextField
                                         fullWidth
                                         multiline
-                                        minRows={3}
-                                        maxRows={20}
+                                        minRows={2}
+                                        maxRows={15}
                                         label="Bullet Points (one per line)"
                                         placeholder="Built a full-stack application&#10;Implemented responsive design&#10;Integrated third-party APIs"
                                         value={
-                                          typeof project.bulletPoints === 'string' ? project.bulletPoints :
-                                          Array.isArray(project.bulletPoints) ? project.bulletPoints.join('\n') : 
-                                          typeof project.bullets === 'string' ? project.bullets :
-                                          Array.isArray(project.bullets) ? project.bullets.join('\n') : 
-                                          typeof project.description === 'string' ? project.description :
-                                          Array.isArray(project.description) ? project.description.join('\n') :
-                                          project.summary || ''
+                                          typeof project?.bulletPoints === 'string' ? project.bulletPoints as string :
+                                          Array.isArray(project?.bulletPoints) ? (project.bulletPoints as string[]).join('\n') : 
+                                          typeof project?.bullets === 'string' ? project.bullets as string :
+                                          Array.isArray(project?.bullets) ? (project.bullets as string[]).join('\n') : 
+                                          typeof project?.description === 'string' ? project.description as string :
+                                          Array.isArray(project?.description) ? (project.description as string[]).join('\n') :
+                                          (project?.summary as string) || ''
                                         }
                                         onChange={(e) => {
                                           const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
@@ -878,11 +941,16 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                             projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
                                           });
                                         }}
+                                        size="small"
                                         sx={{
-                                          '& .MuiInputLabel-root': { color: 'rgba(226, 232, 240, 0.7)' },
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.875rem'
+                                          },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
+                                            fontSize: '0.875rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -896,6 +964,26 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                         </Box>
                       )}
                     </Stack>
+                    
+                    {/* Fallback message when no data is available */}
+                    {(!structuredData?.technicalSkillsCategories || !Array.isArray(structuredData.technicalSkillsCategories) || structuredData.technicalSkillsCategories.length === 0) &&
+                     (!structuredData?.workExperience || (
+                       !Array.isArray(structuredData.workExperience) && 
+                       (!structuredData.workExperience?.workExperience || !Array.isArray(structuredData.workExperience.workExperience) || structuredData.workExperience.workExperience.length === 0)
+                     )) &&
+                     (!structuredData?.projects || (
+                       !Array.isArray(structuredData.projects) && 
+                       (!structuredData.projects?.projects || !Array.isArray(structuredData.projects.projects) || structuredData.projects.projects.length === 0)
+                     )) && (
+                       <Box sx={{ textAlign: 'center', py: 4 }}>
+                         <Typography variant="body1" sx={{ color: '#94A3B8', mb: 2 }}>
+                           No structured data available to edit.
+                         </Typography>
+                         <Typography variant="body2" sx={{ color: '#64748B' }}>
+                           Please ensure the resume has been processed and contains technical skills, work experience, or projects.
+                         </Typography>
+                       </Box>
+                     )}
                   </Box>
                   
                 </Box>
