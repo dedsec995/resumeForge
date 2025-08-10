@@ -171,12 +171,12 @@ const QuestionsTab: React.FC<QuestionsTabProps> = ({ sessionId, onCopyToClipboar
                             sx={{
                               '& .MuiInputLabel-root': {
                                 color: 'rgba(226, 232, 240, 0.7)',
-                                fontSize: '0.875rem'
+                                fontSize: '0.775rem'
                               },
                               '& .MuiInputBase-root': {
                                 backgroundColor: 'rgba(15, 23, 42, 0.6)',
                                 color: '#E2E8F0',
-                                fontSize: '0.875rem',
+                                fontSize: '0.775rem',
                                 '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' },
                                 '& .MuiInputBase-input': {
                                   overflow: 'hidden',
@@ -265,22 +265,24 @@ const QuestionsTab: React.FC<QuestionsTabProps> = ({ sessionId, onCopyToClipboar
                             border: '1px solid rgba(99, 102, 241, 0.1)',
                             borderRadius: 2
                           }}>
-                            <Box sx={{ mb: 2 }}>
-                              <Typography variant="subtitle2" sx={{
+                            <Box sx={{ mb: 1 }}>
+                              <Typography variant="body2" sx={{
                                 color: '#E2E8F0',
                                 fontWeight: 600,
-                                mb: 0.5
+                                mb: 0,
+                                fontSize: '0.775rem'
                               }}>
                                 Q: {question.question}
                               </Typography>
                             </Box>
 
                             <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
-                              <Typography variant="subtitle2" sx={{
+                              <Typography variant="body2" sx={{
                                 color: '#10B981',
                                 fontWeight: 600,
-                                mb: 0.5,
-                                flex: 1
+                                mb: 0,
+                                flex: 1,
+                                fontSize: '0.775rem'
                               }}>
                                 A: {question.answer}
                               </Typography>
@@ -495,7 +497,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                     color: '#94A3B8',
                     minHeight: '48px',
                     padding: '8px 16px',
-                    fontSize: '0.875rem',
+                    fontSize: '0.775rem',
                     textTransform: 'none',
                     fontWeight: 500,
                     transition: 'all 0.3s ease-in-out',
@@ -752,12 +754,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                       mb: 1,
                                       '& .MuiInputLabel-root': { 
                                         color: 'rgba(226, 232, 240, 0.7)',
-                                        fontSize: '0.875rem'
+                                        fontSize: '0.775rem'
                                       },
                                       '& .MuiInputBase-root': { 
                                         backgroundColor: 'rgba(15, 23, 42, 0.6)',
                                         color: '#E2E8F0',
-                                        fontSize: '0.875rem',
+                                        fontSize: '0.775rem',
                                         '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                       }
                                     }}
@@ -790,12 +792,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                     sx={{
                                       '& .MuiInputLabel-root': { 
                                         color: 'rgba(226, 232, 240, 0.7)',
-                                        fontSize: '0.875rem'
+                                        fontSize: '0.775rem'
                                       },
                                       '& .MuiInputBase-root': { 
                                         backgroundColor: 'rgba(15, 23, 42, 0.6)',
                                         color: '#E2E8F0',
-                                        fontSize: '0.875rem',
+                                        fontSize: '0.775rem',
                                         '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                       }
                                     }}
@@ -855,12 +857,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -884,12 +886,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -913,12 +915,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -942,12 +944,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -989,12 +991,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -1061,12 +1063,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -1095,12 +1097,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -1131,12 +1133,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
@@ -1178,12 +1180,12 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.875rem'
+                                            fontSize: '0.775rem'
                                           },
                                           '& .MuiInputBase-root': { 
                                             backgroundColor: 'rgba(15, 23, 42, 0.8)',
                                             color: '#E2E8F0',
-                                            fontSize: '0.875rem',
+                                            fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
                                           }
                                         }}
