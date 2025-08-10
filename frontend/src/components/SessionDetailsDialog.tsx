@@ -22,8 +22,10 @@ import {
   DataObject as DataObjectIcon,
   Code as CodeIcon,
   Refresh as RefreshIcon,
-  ContentCopy as CopyIcon
+  ContentCopy as CopyIcon,
+  QuestionAnswer as QuestionAnswerIcon
 } from '@mui/icons-material';
+import { questionsAPI } from '../utils/apiClient';
 
 interface WorkflowResult {
   score: number;
@@ -57,6 +59,19 @@ interface SessionData {
   latexContent?: string;
 }
 
+interface QuestionsTabProps {
+  sessionId: string;
+  onCopyToClipboard: (content: string, type: string) => void;
+}
+
+interface Question {
+  questionId: string;
+  question: string;
+  answer: string;
+  timestamp: string;
+  answered: boolean;
+}
+
 interface SessionDetailsDialogProps {
   open: boolean;
   onClose: () => void;
@@ -79,6 +94,219 @@ interface SessionDetailsDialogProps {
   structuredData: any;
   onStructuredDataChange: (data: any) => void;
 }
+
+const QuestionsTab: React.FC<QuestionsTabProps> = ({ sessionId, onCopyToClipboard }) => {
+  const [questions, setQuestions] = React.useState<Question[]>([]);
+  const [newQuestion, setNewQuestion] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+  const [submitting, setSubmitting] = React.useState(false);
+
+  React.useEffect(() => {
+    loadQuestions();
+  }, [sessionId]);
+
+  const loadQuestions = async () => {
+    try {
+      setLoading(true);
+      const response = await questionsAPI.getQuestions(sessionId);
+      if (response.success) {
+        setQuestions(response.questions || []);
+      }
+    } catch (error) {
+      console.error('Error loading questions:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmitQuestion = async () => {
+    if (!newQuestion.trim()) return;
+    
+    try {
+      setSubmitting(true);
+      const response = await questionsAPI.addQuestion(sessionId, newQuestion.trim());
+      if (response.success) {
+        setNewQuestion('');
+        await loadQuestions(); // Reload questions to show the new one
+      }
+    } catch (error) {
+      console.error('Error submitting question:', error);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+
+
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 2 }}>
+      {/* Question Input Section */}
+      <Paper sx={{ 
+        p: 2, 
+        background: 'rgba(15, 23, 42, 0.4)',
+        border: '1px solid rgba(99, 102, 241, 0.2)',
+        borderRadius: 2
+      }}>
+        <Typography variant="h6" sx={{ 
+          color: '#6366F1', 
+          fontWeight: 700, 
+          mb: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          <QuestionAnswerIcon sx={{ fontSize: '1.2rem' }} />
+          Ask a Question : Qestions thats gonna make you question your life choices!
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <TextField
+                            fullWidth
+                            multiline
+                            minRows={1}
+                            maxRows={10}
+                            placeholder="e.g., Why should we hier you bitch!?"
+                            value={newQuestion}
+                            onChange={(e) => setNewQuestion(e.target.value)}
+                            disabled={submitting}
+                            sx={{
+                              '& .MuiInputLabel-root': {
+                                color: 'rgba(226, 232, 240, 0.7)',
+                                fontSize: '0.875rem'
+                              },
+                              '& .MuiInputBase-root': {
+                                backgroundColor: 'rgba(15, 23, 42, 0.6)',
+                                color: '#E2E8F0',
+                                fontSize: '0.875rem',
+                                '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' },
+                                '& .MuiInputBase-input': {
+                                  overflow: 'hidden',
+                                  resize: 'none'
+                                }
+                              }
+                            }}
+                          />
+          <Button
+            variant="contained"
+            onClick={handleSubmitQuestion}
+            disabled={!newQuestion.trim() || submitting}
+            sx={{
+              px: 3,
+              py: 1.5,
+              borderRadius: 2,
+              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
+                transform: 'translateY(-1px)'
+              },
+              '&:disabled': {
+                background: 'rgba(99, 102, 241, 0.3)',
+              },
+              transition: 'all 0.3s ease'
+            }}
+          >
+            {submitting ? 'Submitting...' : 'Ask'}
+          </Button>
+        </Box>
+      </Paper>
+
+                            {/* Questions List Section */}
+                      <Paper sx={{
+                        p: 2,
+                        background: 'rgba(15, 23, 42, 0.4)',
+                        border: '1px solid rgba(99, 102, 241, 0.2)',
+                        borderRadius: 2,
+                        flex: 1,
+                        overflow: 'auto',
+                        '&::-webkit-scrollbar': {
+                          width: '8px'
+                        },
+                        '&::-webkit-scrollbar-track': {
+                          background: 'rgba(15, 23, 42, 0.3)',
+                          borderRadius: '4px'
+                        },
+                        '&::-webkit-scrollbar-thumb': {
+                          background: 'rgba(99, 102, 241, 0.5)',
+                          borderRadius: '4px',
+                          '&:hover': {
+                            background: 'rgba(99, 102, 241, 0.7)'
+                          }
+                        }
+                      }}>
+        <Typography variant="h6" sx={{ 
+          color: '#6366F1', 
+          fontWeight: 700, 
+          mb: 2,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 1
+        }}>
+          💬 Questions & Answers
+        </Typography>
+        
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+            <CircularProgress sx={{ color: '#6366F1' }} />
+          </Box>
+        ) : questions.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="body1" sx={{ color: '#94A3B8', mb: 1 }}>
+              No questions yet
+            </Typography>
+            <Typography variant="body2" sx={{ color: '#64748B' }}>
+              Ask your first question above to get started!
+            </Typography>
+          </Box>
+        ) : (
+          <Stack spacing={2}>
+                                    {questions.slice().reverse().map((question) => (
+                          <Paper key={question.questionId} sx={{
+                            p: 2,
+                            background: 'rgba(15, 23, 42, 0.6)',
+                            border: '1px solid rgba(99, 102, 241, 0.1)',
+                            borderRadius: 2
+                          }}>
+                            <Box sx={{ mb: 2 }}>
+                              <Typography variant="subtitle2" sx={{
+                                color: '#E2E8F0',
+                                fontWeight: 600,
+                                mb: 0.5
+                              }}>
+                                Q: {question.question}
+                              </Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 1 }}>
+                              <Typography variant="subtitle2" sx={{
+                                color: '#10B981',
+                                fontWeight: 600,
+                                mb: 0.5,
+                                flex: 1
+                              }}>
+                                A: {question.answer}
+                              </Typography>
+                              <IconButton
+                                size="small"
+                                onClick={() => onCopyToClipboard(question.answer, 'Answer')}
+                                sx={{
+                                  color: '#94A3B8',
+                                  '&:hover': {
+                                    color: '#6366F1',
+                                    backgroundColor: 'rgba(99, 102, 241, 0.1)'
+                                  },
+                                  transition: 'all 0.2s ease'
+                                }}
+                              >
+                                <CopyIcon sx={{ fontSize: '1rem' }} />
+                              </IconButton>
+                            </Box>
+                          </Paper>
+                        ))}
+          </Stack>
+        )}
+      </Paper>
+    </Box>
+  );
+};
 
 const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   open,
@@ -320,6 +548,11 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                     iconPosition="start"
                   />
                 )}
+                <Tab 
+                  icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                  label="Questions" 
+                  iconPosition="start"
+                />
               </Tabs>
             </Box>
 
@@ -1147,6 +1380,14 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                     )}
                   </Box>
                 </Paper>
+              )}
+
+              {/* Questions Tab */}
+              {activeTab === 5 && (
+                <QuestionsTab 
+                  sessionId={selectedSession.sessionId}
+                  onCopyToClipboard={onCopyToClipboard}
+                />
               )}
             </Box>
           </Box>

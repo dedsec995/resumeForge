@@ -558,17 +558,96 @@ class DatabaseOperations:
             return []
 
     def updateUserIndividualCounter(self, userId, counterValue=0):
-        """Update user's individual counter to a specific value"""
+        """Update individual counter for a user"""
         try:
             userRef = self.db.collection("users").document(userId)
             userRef.update({
-                "individualJobDescriptionCounter": counterValue,
-                "metadata.lastUpdated": firestore.SERVER_TIMESTAMP
+                "individualCounter": counterValue,
+                "lastUpdated": firestore.SERVER_TIMESTAMP
             })
-            print(f"User {userId} individual counter updated to: {counterValue}")
+            print(f"Individual counter updated for user {userId}: {counterValue}")
             return True
         except Exception as e:
-            print(f"Error updating user individual counter: {e}")
+            print(f"Error updating individual counter: {e}")
+            return False
+
+    # Questions Operations
+    def addQuestion(self, userId: str, sessionId: str, question: str, answer: str = None):
+        """Add a question to a session's questions subcollection"""
+        try:
+            questionId = str(uuid.uuid4())
+            questionRef = (
+                self.db.collection("users")
+                .document(userId)
+                .collection("sessions")
+                .document(sessionId)
+                .collection("questions")
+                .document(questionId)
+            )
+
+            questionData = {
+                "questionId": questionId,
+                "question": question,
+                "answer": answer,
+                "timestamp": firestore.SERVER_TIMESTAMP,
+                "answered": answer is not None
+            }
+
+            questionRef.set(questionData)
+            print(f"Question added to session {sessionId}: {questionId}")
+            return questionId
+        except Exception as e:
+            print(f"Error adding question: {e}")
+            return None
+
+    def getQuestions(self, userId: str, sessionId: str):
+        """Get all questions for a session"""
+        try:
+            questionsRef = (
+                self.db.collection("users")
+                .document(userId)
+                .collection("sessions")
+                .document(sessionId)
+                .collection("questions")
+            )
+            
+            query = questionsRef.order_by("timestamp", direction=firestore.Query.ASCENDING)
+            questions = []
+            
+            for doc in query.stream():
+                questionData = doc.to_dict()
+                # Convert timestamp to string for JSON serialization
+                if questionData.get("timestamp"):
+                    questionData["timestamp"] = questionData["timestamp"].isoformat()
+                questions.append(questionData)
+            
+            return questions
+        except Exception as e:
+            print(f"Error getting questions: {e}")
+            return []
+
+    def updateQuestionAnswer(self, userId: str, sessionId: str, questionId: str, answer: str):
+        """Update the answer for a specific question"""
+        try:
+            questionRef = (
+                self.db.collection("users")
+                .document(userId)
+                .collection("sessions")
+                .document(sessionId)
+                .collection("questions")
+                .document(questionId)
+            )
+
+            questionRef.update({
+                "answer": answer,
+                "answered": True,
+                "answeredAt": firestore.SERVER_TIMESTAMP
+            })
+            
+            print(f"Question {questionId} answered in session {sessionId}")
+            return True
+        except Exception as e:
+            print(f"Error updating question answer: {e}")
             return False
 
 

@@ -1251,6 +1251,102 @@ async def updateSessionJsonEndpoint(session_id: str, request: dict, userId: str 
         raise HTTPException(status_code=500, detail=f"Failed to update session JSON: {str(e)}")
 
 
+# Questions Endpoints
+@app.post("/sessions/{session_id}/questions")
+async def addQuestionEndpoint(
+    session_id: str, 
+    request: dict, 
+    userId: str = Depends(verifyFirebaseToken)
+):
+    """Add a new question to a session"""
+    try:
+        session_data = dbOps.getSession(userId, session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        question = request.get("question")
+        if not question:
+            raise HTTPException(status_code=400, detail="Question text is required")
+        
+        # For now, provide a dummy answer
+        dummy_answer = "This is a placeholder answer. The LLM integration will be implemented lateraceholder answer. The LLM integration will be implemented later to provide detailed, contextual responses based on the job description and resume content."
+        
+        question_id = dbOps.addQuestion(userId, session_id, question, dummy_answer)
+        if not question_id:
+            raise HTTPException(status_code=500, detail="Failed to add question")
+        
+        return {
+            "success": True,
+            "questionId": question_id,
+            "message": "Question added successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error adding question: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to add question: {str(e)}")
+
+
+@app.get("/sessions/{session_id}/questions")
+async def getQuestionsEndpoint(
+    session_id: str, 
+    userId: str = Depends(verifyFirebaseToken)
+):
+    """Get all questions for a session"""
+    try:
+        session_data = dbOps.getSession(userId, session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        questions = dbOps.getQuestions(userId, session_id)
+        
+        return {
+            "success": True,
+            "questions": questions,
+            "message": "Questions retrieved successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error getting questions: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to get questions: {str(e)}")
+
+
+@app.post("/sessions/{session_id}/questions/{question_id}/answer")
+async def answerQuestionEndpoint(
+    session_id: str,
+    question_id: str,
+    request: dict,
+    userId: str = Depends(verifyFirebaseToken)
+):
+    """Answer a specific question"""
+    try:
+        session_data = dbOps.getSession(userId, session_id)
+        if not session_data:
+            raise HTTPException(status_code=404, detail="Resume session not found")
+        
+        answer = request.get("answer")
+        if not answer:
+            raise HTTPException(status_code=400, detail="Answer text is required")
+        
+        success = dbOps.updateQuestionAnswer(userId, session_id, question_id, answer)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update question answer")
+        
+        return {
+            "success": True,
+            "message": "Question answered successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error answering question: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(e)}")
+
+
 if __name__ == "__main__":
     import uvicorn
 

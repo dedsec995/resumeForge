@@ -43,4 +43,29 @@ apiClient.interceptors.response.use(
   }
 );
 
+// Questions API methods
+export const questionsAPI = {
+  // Add a new question to a session
+  addQuestion: async (sessionId: string, question: string) => {
+    const response = await apiClient.post(`/sessions/${sessionId}/questions`, {
+      question
+    });
+    return response.data;
+  },
+
+  // Get all questions for a session
+  getQuestions: async (sessionId: string) => {
+    const response = await apiClient.get(`/sessions/${sessionId}/questions`);
+    return response.data;
+  },
+
+  // Answer a specific question
+  answerQuestion: async (sessionId: string, questionId: string, answer: string) => {
+    const response = await apiClient.post(`/sessions/${sessionId}/questions/${questionId}/answer`, {
+      answer
+    });
+    return response.data;
+  }
+};
+
 export default apiClient;
