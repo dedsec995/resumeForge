@@ -26,6 +26,7 @@ import {
   QuestionAnswer as QuestionAnswerIcon
 } from '@mui/icons-material';
 import { questionsAPI } from '../utils/apiClient';
+import AddressTab from './AddressTab';
 
 interface WorkflowResult {
   score: number;
@@ -553,6 +554,11 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                 <Tab 
                   icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
                   label="Questions" 
+                  iconPosition="start"
+                />
+                <Tab 
+                  icon={<DescriptionIcon sx={{ fontSize: '1.1rem', mr: 0.5 }} />} 
+                  label="Address" 
                   iconPosition="start"
                 />
               </Tabs>
@@ -1388,6 +1394,14 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
               {activeTab === 5 && (
                 <QuestionsTab 
                   sessionId={selectedSession.sessionId}
+                  onCopyToClipboard={onCopyToClipboard}
+                />
+              )}
+
+              {/* Address Tab */}
+              {activeTab === 6 && (
+                <AddressTab 
+                  location={selectedSession.workflowResult?.location}
                   onCopyToClipboard={onCopyToClipboard}
                 />
               )}

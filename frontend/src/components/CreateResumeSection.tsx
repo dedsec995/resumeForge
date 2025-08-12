@@ -24,7 +24,8 @@ import {
   VisibilityOff as VisibilityOffIcon,
   Save as SaveIcon,
   Delete as DeleteIcon,
-  Key as KeyIcon
+  Key as KeyIcon,
+  Search as SearchIcon
 } from '@mui/icons-material';
 import { useState, useEffect } from 'react';
 import apiClient from '../utils/apiClient';
@@ -91,6 +92,19 @@ const CreateResumeSection = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
+  
+  // Pagination state
+  const [displayedSessions, setDisplayedSessions] = useState<ResumeSession[]>([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMoreSessions, setHasMoreSessions] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [totalSessionsCount, setTotalSessionsCount] = useState(0);
+  
+  // Search state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<ResumeSession[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const sessionsPerPage = 10;
 
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
@@ -169,10 +183,23 @@ const CreateResumeSection = () => {
   const loadSessions = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get('/getResumeSessions');
+      // Use the new paginated endpoint to get all sessions
+      const response = await apiClient.get('/getPaginatedResumeSessions?page=1&pageSize=1000');
       if (response.data.success) {
         const sessionsData = response.data.sessions;
         setSessions(sessionsData);
+        
+        setDisplayedSessions(sessionsData.slice(0, sessionsPerPage));
+        setCurrentPage(1);
+        setHasMoreSessions((response.data.totalSessions || sessionsData.length) > sessionsPerPage);
+        setTotalSessionsCount(response.data.totalSessions);
+        
+        console.log('Pagination Debug:', {
+          totalSessions: response.data.totalSessions,
+          sessionsPerPage,
+          hasMoreSessions: sessionsData.length > sessionsPerPage,
+          displayedSessions: sessionsData.slice(0, sessionsPerPage).length
+        });
         
         // Check if this is a first-time user
         if (sessionsData.length === 0) {
@@ -189,6 +216,21 @@ const CreateResumeSection = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMoreSessions = () => {
+    if (loadingMore || !hasMoreSessions) return;
+    
+    setLoadingMore(true);
+    const nextPage = currentPage + 1;
+    const startIndex = (nextPage - 1) * sessionsPerPage;
+    const endIndex = startIndex + sessionsPerPage;
+    
+    const newSessions = sessions.slice(startIndex, endIndex);
+    setDisplayedSessions(prev => [...prev, ...newSessions]);
+    setCurrentPage(nextPage);
+    setHasMoreSessions(endIndex < (totalSessionsCount || sessions.length));
+    setLoadingMore(false);
   };
 
   // Update individual session status in real-time
@@ -374,8 +416,6 @@ const CreateResumeSection = () => {
           // The sessionStatus endpoint returns status directly, not wrapped in success field
           const currentStatus = statusResponse.data.status || 'unknown';
           
-          console.log(`Loading session ${sessionId} with status: ${currentStatus}`, statusResponse.data);
-          
           // Then get the full session data
           const response = await apiClient.get(`/getResumeSession/${sessionId}`);
           if (response.data.success && response.data.sessionData) {
@@ -384,7 +424,6 @@ const CreateResumeSection = () => {
               ...response.data.sessionData,
               status: currentStatus
             };
-            console.log(`Setting selected session with status: ${currentStatus}`, sessionData);
             setSelectedSession(sessionData);
             
             // Initialize editable JSON with the session's tailored resume data
@@ -959,6 +998,47 @@ const CreateResumeSection = () => {
     }
   };
 
+  // Search functions
+  const handleSearch = async () => {
+    if (!searchQuery.trim()) return;
+    
+    console.log('🔍 Starting search with query:', searchQuery);
+    setIsSearching(true);
+    
+    try {
+      const searchUrl = `/searchResumeSessions?query=${encodeURIComponent(searchQuery.trim())}`;
+      console.log('🔍 Making API call to:', searchUrl);
+      
+      const response = await apiClient.get(searchUrl);
+      console.log('🔍 Search response received:', response.data);
+      
+      if (response.data.success) {
+        console.log('🔍 Search successful, found sessions:', response.data.sessions);
+        setSearchResults(response.data.sessions);
+        setDisplayedSessions(response.data.sessions);
+        setTotalSessionsCount(response.data.totalSessions);
+        toast.success(response.data.message);
+      } else {
+        console.log('🔍 Search failed with response:', response.data);
+        toast.error('Search failed');
+      }
+    } catch (error) {
+      console.error('🔍 Search error:', error);
+      toast.error('Search failed');
+    } finally {
+      setIsSearching(false);
+      console.log('🔍 Search completed');
+    }
+  };
+
+  const handleClearSearch = () => {
+    console.log('🔍 Clearing search, resetting to all sessions');
+    setSearchQuery('');
+    setSearchResults([]);
+    setDisplayedSessions(sessions);
+    setTotalSessionsCount(sessions.length);
+  };
+
   return (
     <Box sx={{ 
       minHeight: '100vh',
@@ -1408,60 +1488,196 @@ const CreateResumeSection = () => {
             <Box sx={{ 
               display: 'flex', 
               alignItems: 'center', 
+              justifyContent: 'space-between',
               mb: 4,
               pb: 2,
               borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
             }}>
-              <DescriptionIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
-              <Typography variant="h4" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
-                Resume Sessions ({sessions.length})
-              </Typography>
+              <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                <DescriptionIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
+                <Typography variant="h4" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                  Resume Sessions ({totalSessionsCount || sessions.length})
+                  {displayedSessions.length < (totalSessionsCount || sessions.length) && (
+                    <Typography 
+                      component="span" 
+                      variant="h6" 
+                      sx={{ 
+                        color: '#94A3B8', 
+                        fontWeight: 400, 
+                        ml: 1,
+                        opacity: 0.8
+                      }}
+                    >
+                      (Showing {displayedSessions.length} of {totalSessionsCount || sessions.length})
+                    </Typography>
+                  )}
+                </Typography>
+              </Box>
+              
+              {/* Search Bar */}
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                <TextField
+                  size="small"
+                  placeholder={searchResults.length > 0 ? "Search active - type to refine..." : "Search company or position..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
+                  sx={{
+                    minWidth: 250,
+                    '& .MuiOutlinedInput-root': {
+                      backgroundColor: searchResults.length > 0 ? 'rgba(99, 102, 241, 0.1)' : 'rgba(15, 23, 42, 0.3)',
+                      borderRadius: 2,
+                      '& fieldset': {
+                        borderColor: searchResults.length > 0 ? 'rgba(99, 102, 241, 0.6)' : 'rgba(99, 102, 241, 0.2)',
+                      },
+                      '&:hover fieldset': {
+                        borderColor: searchResults.length > 0 ? 'rgba(99, 102, 241, 0.8)' : 'rgba(99, 102, 241, 0.4)',
+                      },
+                      '&.Mui-focused fieldset': {
+                        borderColor: '#6366F1',
+                      },
+                    },
+                    '& .MuiInputLabel-root': {
+                      color: '#94A3B8',
+                    },
+                    '& .MuiOutlinedInput-input': {
+                      color: '#F8FAFC',
+                      '&::placeholder': {
+                        color: searchResults.length > 0 ? '#6366F1' : '#64748B',
+                        opacity: 1,
+                      },
+                    },
+                  }}
+                />
+                <Button
+                  variant="contained"
+                  onClick={handleSearch}
+                  disabled={!searchQuery.trim() || isSearching}
+                  startIcon={isSearching ? <CircularProgress size={16} /> : <SearchIcon />}
+                  sx={{
+                    px: 3,
+                    py: 1,
+                    backgroundColor: '#6366F1',
+                    borderRadius: 2,
+                    '&:hover': {
+                      backgroundColor: '#4F46E5',
+                      transform: 'translateY(-1px)',
+                    },
+                    '&:disabled': {
+                      backgroundColor: 'rgba(99, 102, 241, 0.3)',
+                    },
+                    transition: 'all 0.2s ease-in-out',
+                  }}
+                >
+                  {isSearching ? 'Searching...' : 'Search'}
+                </Button>
+                {(searchQuery || searchResults.length > 0) && (
+                  <Button
+                    variant="outlined"
+                    onClick={handleClearSearch}
+                    size="small"
+                    sx={{
+                      px: 2,
+                      py: 1,
+                      borderColor: 'rgba(148, 163, 184, 0.3)',
+                      color: '#94A3B8',
+                      borderRadius: 2,
+                      '&:hover': {
+                        borderColor: '#94A3B8',
+                        backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                      },
+                    }}
+                  >
+                    Clear
+                  </Button>
+                )}
+              </Box>
             </Box>
 
-            {loading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
-                <CircularProgress 
-                  size={60} 
-                  sx={{ 
-                    color: '#6366F1',
-                    filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
-                  }} 
-                />
-              </Box>
-            ) : sessions.length === 0 ? (
-              <Paper 
-                elevation={4}
-                sx={{ 
-                  p: 4,
-                  textAlign: 'center',
-                  background: 'rgba(30, 41, 59, 0.6)',
-                  border: '1px solid rgba(99, 102, 241, 0.2)',
-                  borderRadius: 3
-                }}
-              >
-                <StarIcon sx={{ fontSize: 60, color: '#6366F1', mb: 2, opacity: 0.7 }} />
-                <Typography variant="h6" sx={{ color: '#F8FAFC', mb: 1 }}>
-                  {isFirstTimeUser ? 'No resume sessions yet' : 'All sessions cleared'}
-                </Typography>
-                <Typography variant="body1" sx={{ color: '#94A3B8' }}>
-                  {isFirstTimeUser ? 'Create your first session above to get started!' : 'Click the button above to create a new resume!'}
-                </Typography>
-              </Paper>
-            ) : (
-              <Grid container spacing={3}>
-                {sessions.map((session, index) => (
-                  <Grid item xs={12} md={6} lg={4} key={session.sessionId}>
-                    <ResumeSessionCard
-                      session={session}
-                      index={index}
-                      onViewSession={handleViewSession}
-                      onDeleteSession={handleDeleteSession}
-                      formatDate={formatDate}
-                    />
-                  </Grid>
-                ))}
-              </Grid>
-            )}
+                         {loading ? (
+               <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+                 <CircularProgress 
+                   size={60} 
+                   sx={{ 
+                     color: '#6366F1',
+                     filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
+                   }} 
+                 />
+               </Box>
+             ) : displayedSessions.length === 0 ? (
+               <Paper 
+                 elevation={4}
+                 sx={{ 
+                   p: 4,
+                   textAlign: 'center',
+                   background: 'rgba(30, 41, 59, 0.6)',
+                   border: '1px solid rgba(99, 102, 241, 0.2)',
+                   borderRadius: 3
+                 }}
+               >
+                 <StarIcon sx={{ fontSize: 60, color: '#6366F1', mb: 2, opacity: 0.7 }} />
+                 <Typography variant="h6" sx={{ color: '#F8FAFC', mb: 1 }}>
+                   {isFirstTimeUser ? 'No resume sessions yet' : 'All sessions cleared'}
+                 </Typography>
+                 <Typography variant="body1" sx={{ color: '#94A3B8' }}>
+                   {isFirstTimeUser ? 'Create your first session above to get started!' : 'Click the button above to create a new resume!'}
+                 </Typography>
+               </Paper>
+             ) : (
+               <>
+                 <Grid container spacing={3}>
+                   {displayedSessions.map((session, index) => (
+                     <Grid item xs={12} md={6} lg={4} key={session.sessionId}>
+                       <ResumeSessionCard
+                         session={session}
+                         index={index}
+                         onViewSession={handleViewSession}
+                         onDeleteSession={handleDeleteSession}
+                         formatDate={formatDate}
+                       />
+                     </Grid>
+                   ))}
+                 </Grid>
+                 
+                 {/* Load More Button */}
+                 {hasMoreSessions && displayedSessions.length < (totalSessionsCount || sessions.length) && (
+                   <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
+                     <Button
+                       variant="outlined"
+                       onClick={loadMoreSessions}
+                       disabled={loadingMore}
+                       startIcon={loadingMore ? <CircularProgress size={16} /> : null}
+                       sx={{
+                         px: 4,
+                         py: 1.5,
+                         fontSize: '1rem',
+                         fontWeight: 600,
+                         border: '2px solid rgba(99, 102, 241, 0.4)',
+                         color: '#6366F1',
+                         borderRadius: 3,
+                         background: 'rgba(99, 102, 241, 0.05)',
+                         backdropFilter: 'blur(10px)',
+                         '&:hover': {
+                           borderColor: '#6366F1',
+                           backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                           transform: 'translateY(-2px)',
+                           boxShadow: '0 8px 25px rgba(99, 102, 241, 0.3)'
+                         },
+                         transition: 'all 0.3s ease-in-out',
+                         '&:disabled': {
+                           borderColor: 'rgba(99, 102, 241, 0.2)',
+                           color: 'rgba(99, 102, 241, 0.5)',
+                           transform: 'none',
+                           boxShadow: 'none'
+                         }
+                       }}
+                     >
+                                               {loadingMore ? 'Loading...' : `Load More (${(totalSessionsCount || sessions.length) - displayedSessions.length} remaining)`}
+                     </Button>
+                   </Box>
+                 )}
+               </>
+             )}
           </Box>
         </Slide>
 

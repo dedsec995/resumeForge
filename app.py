@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Query
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -15,6 +15,7 @@ from auth_routes import authRouter
 from auth_middleware import verifyFirebaseToken, optionalAuth
 from database_operations import dbOps
 from pipeline_processor import start_pipeline_processor, stop_pipeline_processor, get_pipeline_status, cleanup_on_startup
+from addressFinder import findAddressesForLocation
 
 app = FastAPI(
     title="Resume Forge API",
@@ -22,24 +23,19 @@ app = FastAPI(
     version="1.0.0",
 )
 
-# Thread pool for CPU-intensive background tasks
 thread_pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix="workflow_")
 
-# Startup event handler
 @app.on_event("startup")
 async def startup_event():
     """Initialize pipeline processor and cleanup on startup"""
     print("Starting Resume Forge API...")
     
-    # Clean up any processing sessions from previous server runs
     cleanup_count = cleanup_on_startup()
     print(f"Cleaned up {cleanup_count} processing sessions from previous runs")
     
-    # Start the pipeline processor
     start_pipeline_processor()
     print("Pipeline processor started")
 
-# Shutdown event handler
 @app.on_event("shutdown")
 async def shutdown_event():
     """Cleanup on shutdown"""
@@ -51,7 +47,6 @@ async def shutdown_event():
 def generate_resume_filename(
     person_name: str, company_name: str, position: str, session_id: str, extension: str
 ) -> str:
-    """Generate resume filename using person name, company name and position, with spaces replaced by underscores"""
     try:
         clean_person = (
             re.sub(r"[^\w\s-]", "", person_name.strip()) if person_name else ""
@@ -185,6 +180,17 @@ class GetSessionsResponse(BaseModel):
     success: bool
     sessions: list
     totalSessions: int
+
+
+class GetPaginatedSessionsResponse(BaseModel):
+    success: bool
+    sessions: list
+    totalSessions: int
+    currentPage: int
+    pageSize: int
+    totalPages: int
+    hasNextPage: bool
+    hasPreviousPage: bool
 
 
 class GenerateLatexResponse(BaseModel):
@@ -748,6 +754,94 @@ async def getResumeSessionsEndpoint(userId: str = Depends(verifyFirebaseToken)):
         print(f"Error fetching resume sessions: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Failed to fetch resume sessions: {str(e)}"
+        )
+
+
+@app.get("/getPaginatedResumeSessions", response_model=GetPaginatedSessionsResponse)
+async def getPaginatedResumeSessionsEndpoint(
+    page: int = Query(1, ge=1, description="Page number (starts from 1)"),
+    pageSize: int = Query(10, ge=1, le=10000, description="Number of sessions per page (max 10000)"),
+    userId: str = Depends(verifyFirebaseToken)
+):
+    """Get paginated resume sessions for user"""
+    try:
+        paginatedData = dbOps.getPaginatedSessions(userId, page, pageSize)
+        
+        sessionList = []
+        for session in paginatedData["sessions"]:
+            sessionSummary = {
+                "sessionId": session.get("sessionId", ""),
+                "timestamp": session.get("timestamp", ""),
+                "filePath": f"/sessions/{session.get('sessionId', '')}",
+                "status": session.get("status", ""),
+                "preview": (
+                    session.get("jobDescription", "")[:200] + "..."
+                    if len(session.get("jobDescription", "")) > 200
+                    else session.get("jobDescription", "")
+                ),
+                "score": session.get("score", 0),
+                "companyName": session.get("companyName", ""),
+                "position": session.get("position", ""),
+            }
+            sessionList.append(sessionSummary)
+        
+        return GetPaginatedSessionsResponse(
+            success=True,
+            sessions=sessionList,
+            totalSessions=paginatedData["totalSessions"],
+            currentPage=paginatedData["currentPage"],
+            pageSize=paginatedData["pageSize"],
+            totalPages=paginatedData["totalPages"],
+            hasNextPage=paginatedData["hasNextPage"],
+            hasPreviousPage=paginatedData["hasPreviousPage"]
+        )
+        
+    except Exception as e:
+        print(f"Error fetching paginated resume sessions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to fetch paginated resume sessions: {str(e)}"
+        )
+
+
+@app.get("/searchResumeSessions")
+async def searchResumeSessionsEndpoint(
+    query: str = Query(..., description="Search query for company name or position"),
+    userId: str = Depends(verifyFirebaseToken)
+):
+    """Search resume sessions by company name or position"""
+    try:
+        searchResults = dbOps.searchSessions(userId, query)
+        
+        sessionList = []
+        for session in searchResults:
+            sessionSummary = {
+                "sessionId": session.get("sessionId", ""),
+                "timestamp": session.get("timestamp", ""),
+                "filePath": f"/sessions/{session.get('sessionId', '')}",
+                "status": session.get("status", ""),
+                "preview": (
+                    session.get("jobDescription", "")[:200] + "..."
+                    if len(session.get("jobDescription", "")) > 200
+                    else session.get("jobDescription", "")
+                ),
+                "score": session.get("score", 0),
+                "companyName": session.get("companyName", ""),
+                "position": session.get("position", ""),
+            }
+            sessionList.append(sessionSummary)
+        
+        return {
+            "success": True,
+            "sessions": sessionList,
+            "totalSessions": len(sessionList),
+            "searchQuery": query,
+            "message": f"Found {len(sessionList)} sessions matching '{query}'"
+        }
+        
+    except Exception as e:
+        print(f"Error searching resume sessions: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to search resume sessions: {str(e)}"
         )
 
 
@@ -1345,6 +1439,26 @@ async def answerQuestionEndpoint(
     except Exception as e:
         print(f"Error answering question: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to answer question: {str(e)}")
+
+
+@app.post("/api/find-addresses")
+async def findAddressesEndpoint(request: dict):
+    """Find addresses for a given location"""
+    try:
+        location = request.get("location")
+        if not location:
+            raise HTTPException(status_code=400, detail="Location is required")
+        
+        # Call the address finder function
+        result = findAddressesForLocation(location)
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error finding addresses: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to find addresses: {str(e)}")
 
 
 if __name__ == "__main__":

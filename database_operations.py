@@ -372,7 +372,7 @@ class DatabaseOperations:
             print(f"Error getting session: {e}")
             return None
 
-    def getAllSessions(self, userId, limit=10):
+    def getAllSessions(self, userId, limit=None):
         """Get all sessions for user"""
         try:
             sessionsRef = (
@@ -380,7 +380,10 @@ class DatabaseOperations:
             )
             query = sessionsRef.order_by(
                 "timestamp", direction=firestore.Query.DESCENDING
-            ).limit(limit)
+            )
+            
+            if limit:
+                query = query.limit(limit)
 
             sessions = []
             for doc in query.stream():
@@ -649,6 +652,77 @@ class DatabaseOperations:
         except Exception as e:
             print(f"Error updating question answer: {e}")
             return False
+
+    def getPaginatedSessions(self, userId, page=1, pageSize=10):
+        """Get paginated sessions for user"""
+        try:
+            sessionsRef = (
+                self.db.collection("users").document(userId).collection("sessions")
+            )
+            
+            # Calculate offset
+            offset = (page - 1) * pageSize
+            
+            # Get total count first
+            totalSessions = len(list(sessionsRef.stream()))
+            
+            # Get paginated results
+            query = sessionsRef.order_by(
+                "timestamp", direction=firestore.Query.DESCENDING
+            ).offset(offset).limit(pageSize)
+
+            sessions = []
+            for doc in query.stream():
+                sessionData = doc.to_dict()
+                sessions.append(sessionData)
+
+            return {
+                "sessions": sessions,
+                "totalSessions": totalSessions,
+                "currentPage": page,
+                "pageSize": pageSize,
+                "totalPages": (totalSessions + pageSize - 1) // pageSize,
+                "hasNextPage": (page * pageSize) < totalSessions,
+                "hasPreviousPage": page > 1
+            }
+        except Exception as e:
+            print(f"Error getting paginated sessions: {e}")
+            return {
+                "sessions": [],
+                "totalSessions": 0,
+                "currentPage": page,
+                "pageSize": pageSize,
+                "totalPages": 0,
+                "hasNextPage": False,
+                "hasPreviousPage": False
+            }
+
+    def searchSessions(self, userId: str, query: str):
+        """Search sessions by company name or position"""
+        try:
+            sessionsRef = (
+                self.db.collection("users").document(userId).collection("sessions")
+            )
+            
+            # Get all sessions and filter by company name or position
+            all_sessions = list(sessionsRef.stream())
+            search_results = []
+            
+            query_lower = query.lower()
+            
+            for doc in all_sessions:
+                session_data = doc.to_dict()
+                company_name = session_data.get("companyName", "").lower()
+                position = session_data.get("position", "").lower()
+                
+                # Check if query matches company name or position
+                if query_lower in company_name or query_lower in position:
+                    search_results.append(session_data)
+            
+            return search_results
+        except Exception as e:
+            print(f"Error searching sessions: {e}")
+            return []
 
 
 # Initialize database operations instance

@@ -19,3 +19,7 @@ firebase-admin
 latexcodec
 unidecode
 regex
+
+beautifulsoup4
+requests
+lxml

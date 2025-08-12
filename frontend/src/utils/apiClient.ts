@@ -1,15 +1,13 @@
 import axios from 'axios';
 import { auth } from '../firebase-config';
 
-// Create axios instance
 const apiClient = axios.create({
   baseURL: process.env.NODE_ENV === 'production' 
-    ? 'https://resumeforge.thatinsaneguy.com/api'  // Production - use nginx proxy
-    : 'http://localhost:8002', // Development
+    ? 'https://resumeforge.thatinsaneguy.com/api'  
+    : 'http://localhost:8002', 
   timeout: 10000,
 });
 
-// Request interceptor to add auth token
 apiClient.interceptors.request.use(
   async (config) => {
     try {
@@ -28,24 +26,19 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle auth errors
 apiClient.interceptors.response.use(
   (response) => {
     return response;
   },
   (error) => {
     if (error.response?.status === 401) {
-      // Token expired or invalid - redirect to login
       console.error('Authorization error - token may be expired');
-      // You could dispatch a logout action here if needed
     }
     return Promise.reject(error);
   }
 );
 
-// Questions API methods
 export const questionsAPI = {
-  // Add a new question to a session
   addQuestion: async (sessionId: string, question: string) => {
     const response = await apiClient.post(`/sessions/${sessionId}/questions`, {
       question
@@ -53,16 +46,23 @@ export const questionsAPI = {
     return response.data;
   },
 
-  // Get all questions for a session
   getQuestions: async (sessionId: string) => {
     const response = await apiClient.get(`/sessions/${sessionId}/questions`);
     return response.data;
   },
 
-  // Answer a specific question
   answerQuestion: async (sessionId: string, questionId: string, answer: string) => {
     const response = await apiClient.post(`/sessions/${sessionId}/questions/${questionId}/answer`, {
       answer
+    });
+    return response.data;
+  }
+};
+
+export const addressAPI = {
+  findAddresses: async (location: string) => {
+    const response = await apiClient.post('/api/find-addresses', {
+      location
     });
     return response.data;
   }
