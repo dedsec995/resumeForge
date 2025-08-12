@@ -35,7 +35,7 @@ const AddressTab: React.FC<AddressTabProps> = ({ location, onCopyToClipboard }) 
   const [manualStateError, setManualStateError] = useState<string | null>(null);
 
   // US states mapping
-  const states = {
+  const states: Record<string, string> = {
     "AL": "Alabama", "AK": "Alaska", "AZ": "Arizona", "AR": "Arkansas",
     "CA": "California", "CO": "Colorado", "CT": "Connecticut", "DE": "Delaware",
     "FL": "Florida", "GA": "Georgia", "HI": "Hawaii", "ID": "Idaho",
