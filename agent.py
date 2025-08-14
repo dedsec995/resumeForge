@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from utils import clean_the_text, extract_and_parse_json, parse_keywords_from_json
 from prompts import (
     EXTRACT_INFO_PROMPT,
+    EDIT_SUMMARY_PROMPT,
     EDIT_TECHNICAL_SKILLS_PROMPT,
     EDIT_EXPERIENCE_PROMPT,
     EDIT_PROJECTS_PROMPT,
@@ -32,7 +33,9 @@ console = Console()
 
 # Log the current deciding score threshold
 DECIDING_SCORE = float(os.getenv("DECIDING_SCORE", "8.1"))
-console.print(f"[bold blue]🤖 Agent initialized with DECIDING_SCORE threshold: {DECIDING_SCORE}[/bold blue]")
+console.print(
+    f"[bold blue]🤖 Agent initialized with DECIDING_SCORE threshold: {DECIDING_SCORE}[/bold blue]"
+)
 
 
 class AgentState(TypedDict):
@@ -64,12 +67,13 @@ def get_user_api_keys(user_id: str, user_tier: str) -> Dict[str, Optional[str]]:
     if user_tier == "FREE":
         try:
             from database_operations import dbOps
+
             api_data = dbOps.getUserApiConfig(user_id)
             if api_data:
                 return {
                     "openai": api_data.get("openAiKey"),
                     "groq": api_data.get("groqKey"),
-                    "google": api_data.get("googleGenAiKey")
+                    "google": api_data.get("googleGenAiKey"),
                 }
             return {"openai": None, "groq": None, "google": None}
         except Exception as e:
@@ -79,7 +83,7 @@ def get_user_api_keys(user_id: str, user_tier: str) -> Dict[str, Optional[str]]:
         return {
             "openai": OPENAI_API_KEY,
             "groq": GROQ_API_KEY,
-            "google": GOOGLE_API_KEY
+            "google": GOOGLE_API_KEY,
         }
     return {"openai": None, "groq": None, "google": None}
 
@@ -91,11 +95,15 @@ def get_llm_for_task(
     user_tier: str,
     selected_provider: str = "openai",
 ):
-    console.print(f"[bold blue]🔧 Getting LLM for task: {task_name}, provider: {selected_provider}, tier: {user_tier}[/bold blue]")
+    console.print(
+        f"[bold blue]🔧 Getting LLM for task: {task_name}, provider: {selected_provider}, tier: {user_tier}[/bold blue]"
+    )
     # Get API keys based on user tier
     api_keys = get_user_api_keys(user_id, user_tier)
-    console.print(f"[bold cyan]🔑 API Keys available: {list(k for k, v in api_keys.items() if v)}[/bold cyan]")
-    
+    console.print(
+        f"[bold cyan]🔑 API Keys available: {list(k for k, v in api_keys.items() if v)}[/bold cyan]"
+    )
+
     # Validate API keys based on selected provider
     if selected_provider == "openai":
         if not api_keys["openai"]:
@@ -105,30 +113,33 @@ def get_llm_for_task(
         # Use OpenAI for all tasks
         if task_name == "extract_info":
             return ChatOpenAI(
-                temperature=temperature, 
-                model="gpt-3.5-turbo", 
-                api_key=api_keys["openai"]
+                temperature=temperature,
+                model="gpt-3.5-turbo",
+                api_key=api_keys["openai"],
             )
-        elif task_name in ["edit_technical_skills", "edit_experience", "edit_projects"]:
+        elif task_name in [
+            "edit_summary",
+            "edit_technical_skills",
+            "edit_experience",
+            "edit_projects",
+        ]:
             return ChatOpenAI(
-                temperature=temperature, 
-                model="gpt-4", 
-                api_key=api_keys["openai"]
+                temperature=temperature, model="gpt-4", api_key=api_keys["openai"]
             )
         elif task_name == "judge_quality":
             # Always use OpenRouter for judging, regardless of selected provider
             return ChatOpenRouter(
-                temperature=temperature, 
+                temperature=temperature,
                 model="moonshotai/kimi-k2:free",
-                api_key=OPENROUTER_API_KEY
+                api_key=OPENROUTER_API_KEY,
             )
         elif task_name == "keywords_editor":
             return ChatOpenAI(
-                temperature=temperature, 
-                model="gpt-3.5-turbo", 
-                api_key=api_keys["openai"]
+                temperature=temperature,
+                model="gpt-3.5-turbo",
+                api_key=api_keys["openai"],
             )
-    
+
     elif selected_provider == "groq-google":
         if not api_keys["groq"] or not api_keys["google"]:
             raise Exception(
@@ -139,33 +150,33 @@ def get_llm_for_task(
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemma-3-27b-it",
-                api_key=api_keys["google"]
+                api_key=api_keys["google"],
             )
-        elif task_name == "edit_technical_skills":
+        elif task_name in ["edit_summary", "edit_technical_skills"]:
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemini-2.0-flash-exp",
-                api_key=api_keys["google"]
+                api_key=api_keys["google"],
             )
         elif task_name in ["edit_experience", "edit_projects"]:
             return ChatGroq(
                 temperature=temperature,
                 model="openai/gpt-oss-120b",
-                api_key=api_keys["groq"]
+                api_key=api_keys["groq"],
             )
         elif task_name == "judge_quality":
             return ChatOpenRouter(
-                temperature=temperature, 
+                temperature=temperature,
                 model="moonshotai/kimi-k2:free",
-                api_key=OPENROUTER_API_KEY
+                api_key=OPENROUTER_API_KEY,
             )
         elif task_name == "keywords_editor":
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemma-3-27b-it",
-                api_key=api_keys["google"]
+                api_key=api_keys["google"],
             )
-    
+
     # Default fallback
     raise Exception(
         f"API_KEY_ERROR: Invalid provider '{selected_provider}' or missing required API keys."
@@ -246,10 +257,68 @@ def extract_info(state):
                 "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
             )
         else:
-            console.print(
-                f"[bold red]Error in extract_info: {error_msg}[/bold red]"
-            )
+            console.print(f"[bold red]Error in extract_info: {error_msg}[/bold red]")
             raise Exception(f"EXTRACT_INFO_ERROR: {error_msg}")
+
+
+def edit_summary(state):
+    console.print(Panel("Editing Summary...", title="Progress", border_style="blue"))
+
+    user_id, user_tier, selected_provider = get_user_context(state)
+
+    try:
+        llm = get_llm_for_task(
+            "edit_summary", 0.6, user_id, user_tier, selected_provider
+        )
+
+        original_summary = state["tailored_resume_data"].get("summary", "")
+
+        feedback_context = ""
+        if (
+            state.get("feedback")
+            and state.get("downsides")
+            and state.get("iteration_count", 0) > 0
+        ):
+            feedback_context = FEEDBACK_CONTEXT_TEMPLATE.format(
+                feedback=state.get("feedback", ""),
+                downsides=state.get("downsides", ""),
+                iteration_count=state.get("iteration_count", 0),
+                section_name="Summary",
+            )
+
+        prompt = EDIT_SUMMARY_PROMPT.format(
+            feedback_context=feedback_context,
+            job_description=state["job_description"],
+            original_summary=original_summary,
+        )
+
+        response = llm.invoke(prompt)
+        try:
+            new_summary = extract_and_parse_json(response.content)
+            updated_resume_data = state["tailored_resume_data"].copy()
+            updated_resume_data["summary"] = new_summary
+            return {"tailored_resume_data": updated_resume_data}
+        except json.JSONDecodeError:
+            console.print(
+                "[bold yellow]Warning: Failed to extract JSON from LLM response for Summary. Skipping update.[/bold yellow]"
+            )
+            return {"tailored_resume_data": state["tailored_resume_data"]}
+
+    except Exception as e:
+        error_msg = str(e)
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
+            console.print(
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
+            )
+            raise Exception(
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
+            )
+        else:
+            console.print(f"[bold red]Error in edit_summary: {error_msg}[/bold red]")
+            raise Exception(f"EDIT_SUMMARY_ERROR: {error_msg}")
 
 
 def edit_technical_skills(state):
@@ -324,7 +393,9 @@ def edit_experience(state):
     user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("edit_experience", 0.3, user_id, user_tier, selected_provider)
+        llm = get_llm_for_task(
+            "edit_experience", 0.3, user_id, user_tier, selected_provider
+        )
 
         original_experience_section = state["tailored_resume_data"].get(
             "workExperience", []
@@ -392,7 +463,9 @@ def edit_projects(state):
     user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("edit_projects", 0.3, user_id, user_tier, selected_provider)
+        llm = get_llm_for_task(
+            "edit_projects", 0.3, user_id, user_tier, selected_provider
+        )
 
         original_projects_section = state["tailored_resume_data"].get("projects", [])
 
@@ -440,9 +513,7 @@ def edit_projects(state):
                 "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
             )
         else:
-            console.print(
-                f"[bold red]Error in edit_projects: {error_msg}[/bold red]"
-            )
+            console.print(f"[bold red]Error in edit_projects: {error_msg}[/bold red]")
             raise Exception(f"EDIT_PROJECTS_ERROR: {error_msg}")
 
 
@@ -454,7 +525,9 @@ def judge_resume_quality(state):
     user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("judge_quality", 0.1, user_id, user_tier, selected_provider)
+        llm = get_llm_for_task(
+            "judge_quality", 0.1, user_id, user_tier, selected_provider
+        )
         iteration_count = state.get("iteration_count", 0) + 1
 
         prompt = JUDGE_QUALITY_PROMPT.format(
@@ -519,7 +592,9 @@ def keywords_editor(state):
     user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("keywords_editor", 0, user_id, user_tier, selected_provider)
+        llm = get_llm_for_task(
+            "keywords_editor", 0, user_id, user_tier, selected_provider
+        )
 
         job_description = state["job_description"]
         resume_data = state["tailored_resume_data"]
@@ -555,9 +630,7 @@ def keywords_editor(state):
                 "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
             )
         else:
-            console.print(
-                f"[bold red]Error in keywords_editor: {error_msg}[/bold red]"
-            )
+            console.print(f"[bold red]Error in keywords_editor: {error_msg}[/bold red]")
             raise Exception(f"KEYWORDS_EDITOR_ERROR: {error_msg}")
 
 
@@ -608,6 +681,7 @@ def workflow(inputs):
 
     workflow.add_node("get_initial_data", get_initial_data)
     workflow.add_node("extract_info", extract_info)
+    workflow.add_node("edit_summary", edit_summary)
     workflow.add_node("edit_technical_skills", edit_technical_skills)
     workflow.add_node("edit_experience", edit_experience)
     workflow.add_node("edit_projects", edit_projects)
@@ -617,7 +691,8 @@ def workflow(inputs):
 
     workflow.set_entry_point("get_initial_data")
     workflow.add_edge("get_initial_data", "extract_info")
-    workflow.add_edge("extract_info", "edit_technical_skills")
+    workflow.add_edge("extract_info", "edit_summary")
+    workflow.add_edge("edit_summary", "edit_technical_skills")
     workflow.add_edge("edit_technical_skills", "edit_experience")
     workflow.add_edge("edit_experience", "edit_projects")
     workflow.add_edge("edit_projects", "judge_resume_quality")

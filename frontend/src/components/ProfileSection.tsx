@@ -1,6 +1,6 @@
-import { 
-  Box, 
-  Container, 
+import {
+  Box,
+  Container,
   Typography,
   Button,
   Grid,
@@ -20,7 +20,7 @@ import {
   Divider,
   Alert
 } from '@mui/material';
-import { 
+import {
   Save as SaveIcon,
   Add as AddIcon,
   Delete as DeleteIcon,
@@ -53,7 +53,8 @@ const ProfileSection = () => {
 
   const sections = [
     'Personal Info',
-    'Certifications', 
+    'Summary',
+    'Certifications',
     'Technical Skills',
     'Work Experience',
     'Projects',
@@ -71,6 +72,8 @@ const ProfileSection = () => {
     switch (section) {
       case 'Personal Info':
         return <PersonIcon sx={iconSx} />;
+      case 'Summary':
+        return <StarIcon sx={iconSx} />;
       case 'Certifications':
         return <CheckIcon sx={iconSx} />;
       case 'Technical Skills':
@@ -90,40 +93,40 @@ const ProfileSection = () => {
   useEffect(() => {
     // Prevent duplicate requests in StrictMode
     if (hasLoaded) return;
-    
+
     let isMounted = true; // Flag to prevent state updates if component unmounts
-    
-          const loadResumeData = async () => {
-        try {
-          const response = await apiClient.get('/parseResume');
-          if (isMounted && response.data.success) {
-            setResumeData(response.data.resumeData);
-            setOriginalResumeData(JSON.parse(JSON.stringify(response.data.resumeData))); // Deep copy
-            setHasLoaded(true);
-            setHasUnsavedChanges(false); // Reset changes flag
-            
-            // Check if this is a new profile (all fields empty)
-            const isNewProfile = !response.data.resumeData.personalInfo?.name && 
-                                 response.data.resumeData.workExperience?.length === 0 &&
-                                 response.data.resumeData.projects?.length === 0;
-            
-            if (isNewProfile) {
-              toast.success('Welcome! Please fill in your profile information.', { icon: <CheckIcon /> });
-            }
-          } else if (isMounted) {
-            toast.error('Failed to load resume', { icon: <ErrorIcon /> });
+
+    const loadResumeData = async () => {
+      try {
+        const response = await apiClient.get('/parseResume');
+        if (isMounted && response.data.success) {
+          setResumeData(response.data.resumeData);
+          setOriginalResumeData(JSON.parse(JSON.stringify(response.data.resumeData))); // Deep copy
+          setHasLoaded(true);
+          setHasUnsavedChanges(false); // Reset changes flag
+
+          // Check if this is a new profile (all fields empty)
+          const isNewProfile = !response.data.resumeData.personalInfo?.name &&
+            response.data.resumeData.workExperience?.length === 0 &&
+            response.data.resumeData.projects?.length === 0;
+
+          if (isNewProfile) {
+            toast.success('Welcome! Please fill in your profile information.', { icon: <CheckIcon /> });
           }
-        } catch (error) {
-          console.error('Error loading resume:', error);
-          if (isMounted) {
-            toast.error('Failed to connect to API. Make sure the backend is running.', { icon: <ErrorIcon /> });
-          }
-        } finally {
-          if (isMounted) {
-            setLoading(false);
-          }
+        } else if (isMounted) {
+          toast.error('Failed to load resume', { icon: <ErrorIcon /> });
         }
-      };
+      } catch (error) {
+        console.error('Error loading resume:', error);
+        if (isMounted) {
+          toast.error('Failed to connect to API. Make sure the backend is running.', { icon: <ErrorIcon /> });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
     loadResumeData();
 
@@ -136,7 +139,7 @@ const ProfileSection = () => {
   // Effect to track changes by comparing current data with original
   useEffect(() => {
     if (!originalResumeData || !resumeData) return;
-    
+
     const hasChanges = JSON.stringify(resumeData) !== JSON.stringify(originalResumeData);
     setHasUnsavedChanges(hasChanges);
   }, [resumeData, originalResumeData]);
@@ -161,13 +164,13 @@ const ProfileSection = () => {
 
   const handleSaveResume = async () => {
     if (!resumeData) return;
-    
+
     setSaving(true);
     try {
       const response = await apiClient.post('/updateResume', {
         resumeData: resumeData
       });
-      
+
       if (response.data.success) {
         // Update original data after successful save
         setOriginalResumeData(JSON.parse(JSON.stringify(resumeData)));
@@ -178,7 +181,7 @@ const ProfileSection = () => {
       }
     } catch (error) {
       console.error('Error saving resume:', error);
-              toast.error('Failed to save resume changes. Make sure the backend is running.', { icon: <ErrorIcon /> });
+      toast.error('Failed to save resume changes. Make sure the backend is running.', { icon: <ErrorIcon /> });
     } finally {
       setSaving(false);
     }
@@ -189,12 +192,12 @@ const ProfileSection = () => {
       const newData = { ...prev };
       const keys = path.split('.');
       let current = newData;
-      
+
       for (let i = 0; i < keys.length - 1; i++) {
         if (!current[keys[i]]) current[keys[i]] = {};
         current = current[keys[i]];
       }
-      
+
       current[keys[keys.length - 1]] = value;
       return newData;
     });
@@ -202,12 +205,12 @@ const ProfileSection = () => {
 
   const moveItemUp = (arrayPath: string, index: number) => {
     if (index === 0) return; // Can't move first item up
-    
+
     setResumeData((prev: any) => {
       const newData = { ...prev };
       const keys = arrayPath.split('.');
       let current = newData;
-      
+
       for (let i = 0; i < keys.length; i++) {
         if (i === keys.length - 1) {
           const array = [...current[keys[i]]];
@@ -217,19 +220,19 @@ const ProfileSection = () => {
           current = current[keys[i]];
         }
       }
-      
+
       return newData;
     });
   };
 
   const moveItemDown = (arrayPath: string, index: number, arrayLength: number) => {
     if (index === arrayLength - 1) return; // Can't move last item down
-    
+
     setResumeData((prev: any) => {
       const newData = { ...prev };
       const keys = arrayPath.split('.');
       let current = newData;
-      
+
       for (let i = 0; i < keys.length; i++) {
         if (i === keys.length - 1) {
           const array = [...current[keys[i]]];
@@ -239,7 +242,7 @@ const ProfileSection = () => {
           current = current[keys[i]];
         }
       }
-      
+
       return newData;
     });
   };
@@ -467,7 +470,58 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 1: // Certifications
+      case 1: // Summary
+        return (
+          <Grow in timeout={800}>
+            <Box>
+              <Typography variant="h6" sx={{ color: '#F8FAFC', mb: 3, fontWeight: 600 }}>
+                Professional Summary
+              </Typography>
+              <TextField
+                fullWidth
+                multiline
+                minRows={6}
+                maxRows={12}
+                label="Professional Summary"
+                value={resumeData.summary || ''}
+                onChange={(e) => updateResumeData('summary', e.target.value)}
+                placeholder="Write a compelling professional summary that highlights your key strengths, experience, and career objectives. This should be 3-5 sentences that give employers a quick overview of who you are professionally."
+                helperText="This summary will appear at the top of your resume, right after your contact information."
+                sx={{
+                  '& .MuiOutlinedInput-root': {
+                    backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                    borderRadius: 2,
+                    '& fieldset': {
+                      borderColor: 'rgba(99, 102, 241, 0.3)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: '#6366F1',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: '#6366F1',
+                    },
+                  },
+                  '& .MuiInputLabel-root': {
+                    color: '#94A3B8',
+                    '&.Mui-focused': {
+                      color: '#6366F1',
+                    },
+                  },
+                  '& .MuiInputBase-input': {
+                    color: '#F8FAFC',
+                    fontSize: '16px',
+                    lineHeight: 1.6
+                  },
+                  '& .MuiFormHelperText-root': {
+                    color: '#64748B',
+                  },
+                }}
+              />
+            </Box>
+          </Grow>
+        );
+
+      case 2: // Certifications
         return (
           <Grow in timeout={800}>
             <Box>
@@ -476,10 +530,10 @@ const ProfileSection = () => {
               </Typography>
               <Stack spacing={3}>
                 {(resumeData.certifications || []).map((cert: any, certIndex: number) => (
-                  <Paper 
-                    key={certIndex} 
+                  <Paper
+                    key={certIndex}
                     elevation={4}
-                    sx={{ 
+                    sx={{
                       p: 3,
                       background: 'rgba(15, 23, 42, 0.4)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -492,10 +546,10 @@ const ProfileSection = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 2,
                       pb: 2,
                       borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
@@ -659,7 +713,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 2: // Technical Skills
+      case 3: // Technical Skills
         return (
           <Grow in timeout={800}>
             <Box>
@@ -668,10 +722,10 @@ const ProfileSection = () => {
               </Typography>
               <Stack spacing={3}>
                 {(resumeData.technicalSkillsCategories || []).map((skillCategory: any, categoryIndex: number) => (
-                  <Paper 
-                    key={categoryIndex} 
+                  <Paper
+                    key={categoryIndex}
                     elevation={4}
-                    sx={{ 
+                    sx={{
                       p: 3,
                       background: 'rgba(15, 23, 42, 0.4)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -684,10 +738,10 @@ const ProfileSection = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 2,
                       pb: 2,
                       borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
@@ -847,7 +901,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 3: // Work Experience
+      case 4: // Work Experience
         return (
           <Grow in timeout={800}>
             <Box>
@@ -856,10 +910,10 @@ const ProfileSection = () => {
               </Typography>
               <Stack spacing={2}>
                 {(resumeData.workExperience || []).map((job: any, jobIndex: number) => (
-                  <Paper 
-                    key={jobIndex} 
+                  <Paper
+                    key={jobIndex}
                     elevation={4}
-                    sx={{ 
+                    sx={{
                       p: 2,
                       background: 'rgba(15, 23, 42, 0.4)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -872,10 +926,10 @@ const ProfileSection = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 1.5,
                       pb: 1.5,
                       borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
@@ -1068,7 +1122,7 @@ const ProfileSection = () => {
                         />
                       </Grid>
                     </Grid>
-                    
+
                     <Box sx={{ mt: 2, mb: 1.5 }}>
                       <Typography variant="h6" fontWeight={600} sx={{ color: '#F8FAFC', mb: 1.5 }}>
                         Achievements & Responsibilities:
@@ -1101,23 +1155,23 @@ const ProfileSection = () => {
                             const textarea = e.target as HTMLTextAreaElement;
                             const cursorPos = textarea.selectionStart;
                             const value = textarea.value;
-                            
+
                             // Split text at cursor position
                             const beforeCursor = value.substring(0, cursorPos);
                             const afterCursor = value.substring(cursorPos);
-                            
+
                             // Add bullet point at cursor position
                             const newText = beforeCursor + '\n• ' + afterCursor;
-                            
+
                             // Update textarea value directly
                             textarea.value = newText;
-                            
+
                             // Set cursor position after the bullet
                             const newCursorPos = cursorPos + 3;
                             setTimeout(() => {
                               textarea.setSelectionRange(newCursorPos, newCursorPos);
                             }, 0);
-                            
+
                             // Prevent default behavior
                             e.preventDefault();
                           }
@@ -1151,9 +1205,9 @@ const ProfileSection = () => {
                           },
                         }}
                       />
-                      <Typography variant="caption" sx={{ 
-                        display: 'block', 
-                        mt: 0.5, 
+                      <Typography variant="caption" sx={{
+                        display: 'block',
+                        mt: 0.5,
                         color: '#64748B',
                         fontStyle: 'italic'
                       }}>
@@ -1196,7 +1250,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 4: // Projects
+      case 5: // Projects
         return (
           <Grow in timeout={800}>
             <Box>
@@ -1205,10 +1259,10 @@ const ProfileSection = () => {
               </Typography>
               <Stack spacing={2}>
                 {(resumeData.projects || []).map((project: any, projectIndex: number) => (
-                  <Paper 
-                    key={projectIndex} 
+                  <Paper
+                    key={projectIndex}
                     elevation={4}
-                    sx={{ 
+                    sx={{
                       p: 2,
                       background: 'rgba(15, 23, 42, 0.4)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -1221,10 +1275,10 @@ const ProfileSection = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 1.5,
                       pb: 1.5,
                       borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
@@ -1429,7 +1483,7 @@ const ProfileSection = () => {
                         />
                       </Grid>
                     </Grid>
-                    
+
                     <Box sx={{ mt: 2, mb: 1.5 }}>
                       <Typography variant="h6" fontWeight={600} sx={{ color: '#F8FAFC', mb: 1.5 }}>
                         Project Details:
@@ -1462,23 +1516,23 @@ const ProfileSection = () => {
                             const textarea = e.target as HTMLTextAreaElement;
                             const cursorPos = textarea.selectionStart;
                             const value = textarea.value;
-                            
+
                             // Split text at cursor position
                             const beforeCursor = value.substring(0, cursorPos);
                             const afterCursor = value.substring(cursorPos);
-                            
+
                             // Add bullet point at cursor position
                             const newText = beforeCursor + '\n• ' + afterCursor;
-                            
+
                             // Update textarea value directly
                             textarea.value = newText;
-                            
+
                             // Set cursor position after the bullet
                             const newCursorPos = cursorPos + 3;
                             setTimeout(() => {
                               textarea.setSelectionRange(newCursorPos, newCursorPos);
                             }, 0);
-                            
+
                             // Prevent default behavior
                             e.preventDefault();
                           }
@@ -1512,9 +1566,9 @@ const ProfileSection = () => {
                           },
                         }}
                       />
-                      <Typography variant="caption" sx={{ 
-                        display: 'block', 
-                        mt: 0.5, 
+                      <Typography variant="caption" sx={{
+                        display: 'block',
+                        mt: 0.5,
                         color: '#64748B',
                         fontStyle: 'italic'
                       }}>
@@ -1557,7 +1611,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 5: // Education
+      case 6: // Education
         return (
           <Grow in timeout={800}>
             <Box>
@@ -1566,10 +1620,10 @@ const ProfileSection = () => {
               </Typography>
               <Stack spacing={2}>
                 {(resumeData.education || []).map((edu: any, eduIndex: number) => (
-                  <Paper 
-                    key={eduIndex} 
+                  <Paper
+                    key={eduIndex}
                     elevation={4}
-                    sx={{ 
+                    sx={{
                       p: 2,
                       background: 'rgba(15, 23, 42, 0.4)',
                       border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -1582,10 +1636,10 @@ const ProfileSection = () => {
                       }
                     }}
                   >
-                    <Box sx={{ 
-                      display: 'flex', 
-                      justifyContent: 'space-between', 
-                      alignItems: 'center', 
+                    <Box sx={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
                       mb: 1.5,
                       pb: 1.5,
                       borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
@@ -1861,7 +1915,7 @@ const ProfileSection = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
       minHeight: '100vh',
       background: 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #334155 100%)',
       py: 4
@@ -1871,13 +1925,13 @@ const ProfileSection = () => {
           // Loading Screen
           <Fade in timeout={800}>
             <Box textAlign="center" sx={{ py: 12 }}>
-              <CircularProgress 
-                size={80} 
-                sx={{ 
+              <CircularProgress
+                size={80}
+                sx={{
                   mb: 4,
                   color: '#6366F1',
                   filter: 'drop-shadow(0 0 8px rgba(99, 102, 241, 0.4))'
-                }} 
+                }}
               />
               <Typography variant="h4" gutterBottom sx={{ color: '#F8FAFC', fontWeight: 600 }}>
                 Loading Resume Data...
@@ -1900,8 +1954,8 @@ const ProfileSection = () => {
               <Button
                 variant="contained"
                 onClick={() => window.location.reload()}
-                sx={{ 
-                  px: 4, 
+                sx={{
+                  px: 4,
                   py: 1.5,
                   background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
                   '&:hover': {
@@ -1920,9 +1974,9 @@ const ProfileSection = () => {
               {/* Header */}
               <Grow in timeout={1000}>
                 <Box sx={{ mb: 6 }}>
-                  <Box sx={{ 
-                    display: 'flex', 
-                    alignItems: 'flex-start', 
+                  <Box sx={{
+                    display: 'flex',
+                    alignItems: 'flex-start',
                     justifyContent: 'space-between',
                     mb: 4,
                     flexWrap: { xs: 'wrap', md: 'nowrap' },
@@ -1930,8 +1984,8 @@ const ProfileSection = () => {
                   }}>
                     {/* Left side - Title and subtitle */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                      <Box sx={{ 
-                        display: 'flex', 
+                      <Box sx={{
+                        display: 'flex',
                         alignItems: 'center',
                         mb: 2,
                         cursor: 'pointer',
@@ -1940,19 +1994,19 @@ const ProfileSection = () => {
                           transform: 'scale(1.02)'
                         }
                       }}>
-                        <PersonIcon sx={{ 
-                          fontSize: { xs: 48, md: 56 }, 
+                        <PersonIcon sx={{
+                          fontSize: { xs: 48, md: 56 },
                           color: '#6366F1',
                           filter: 'drop-shadow(0 0 12px rgba(99, 102, 241, 0.5))',
                           mr: 2,
                           animation: 'pulse 2s infinite',
                           flexShrink: 0
                         }} />
-                        <Typography 
-                          variant="h2" 
-                          component="h1" 
-                          sx={{ 
-                            fontWeight: 700, 
+                        <Typography
+                          variant="h2"
+                          component="h1"
+                          sx={{
+                            fontWeight: 700,
                             color: '#F8FAFC',
                             fontSize: { xs: '2.5rem', md: '3rem', lg: '3.5rem' },
                             letterSpacing: '-0.02em',
@@ -1969,10 +2023,10 @@ const ProfileSection = () => {
                       </Box>
 
                       <Slide direction="up" in timeout={1200}>
-                        <Typography 
-                          variant="h5" 
-                          component="h2" 
-                          sx={{ 
+                        <Typography
+                          variant="h5"
+                          component="h2"
+                          sx={{
                             color: '#E2E8F0',
                             lineHeight: 1.4,
                             fontSize: { xs: '1.1rem', md: '1.3rem' },
@@ -1988,54 +2042,54 @@ const ProfileSection = () => {
 
                     {/* Right side - Save button */}
                     {currentSection !== sections.length - 1 && (
-                    <Fade in timeout={600}>
-                      <Box sx={{ flexShrink: 0 }}>
-                        <Button
-                          variant="contained"
-                          size="large"
-                          onClick={handleSaveResume}
-                          disabled={saving || !hasUnsavedChanges}
-                          startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
-                          sx={{ 
-                            px: 4,
-                            py: 2,
-                            fontSize: '1rem',
-                            fontWeight: 600,
-                            background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
-                            boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
-                            borderRadius: 3,
-                            whiteSpace: 'nowrap',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
-                              boxShadow: '0 8px 25px rgba(99, 102, 241, 0.5)',
-                              transform: 'translateY(-2px)'
-                            },
-                            '&:disabled': {
-                              background: 'rgba(99, 102, 241, 0.3)',
-                              transform: 'none'
-                            },
-                            transition: 'all 0.3s ease-in-out',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            '&::before': {
-                              content: '""',
-                              position: 'absolute',
-                              top: 0,
-                              left: '-100%',
-                              width: '100%',
-                              height: '100%',
-                              background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
-                              transition: 'left 0.5s',
-                            },
-                            '&:hover::before': {
-                              left: '100%',
-                            }
-                          }}
-                        >
-                          {saving ? 'Saving...' : 'Save Changes'}
-                        </Button>
-                      </Box>
-                    </Fade>
+                      <Fade in timeout={600}>
+                        <Box sx={{ flexShrink: 0 }}>
+                          <Button
+                            variant="contained"
+                            size="large"
+                            onClick={handleSaveResume}
+                            disabled={saving || !hasUnsavedChanges}
+                            startIcon={saving ? <CircularProgress size={20} /> : <SaveIcon />}
+                            sx={{
+                              px: 4,
+                              py: 2,
+                              fontSize: '1rem',
+                              fontWeight: 600,
+                              background: 'linear-gradient(135deg, #6366F1 0%, #8B5CF6 100%)',
+                              boxShadow: '0 6px 20px rgba(99, 102, 241, 0.4)',
+                              borderRadius: 3,
+                              whiteSpace: 'nowrap',
+                              '&:hover': {
+                                background: 'linear-gradient(135deg, #5B5BD6 0%, #7C3AED 100%)',
+                                boxShadow: '0 8px 25px rgba(99, 102, 241, 0.5)',
+                                transform: 'translateY(-2px)'
+                              },
+                              '&:disabled': {
+                                background: 'rgba(99, 102, 241, 0.3)',
+                                transform: 'none'
+                              },
+                              transition: 'all 0.3s ease-in-out',
+                              position: 'relative',
+                              overflow: 'hidden',
+                              '&::before': {
+                                content: '""',
+                                position: 'absolute',
+                                top: 0,
+                                left: '-100%',
+                                width: '100%',
+                                height: '100%',
+                                background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent)',
+                                transition: 'left 0.5s',
+                              },
+                              '&:hover::before': {
+                                left: '100%',
+                              }
+                            }}
+                          >
+                            {saving ? 'Saving...' : 'Save Changes'}
+                          </Button>
+                        </Box>
+                      </Fade>
                     )}
                   </Box>
                 </Box>
@@ -2043,9 +2097,9 @@ const ProfileSection = () => {
 
               {/* Section Tabs */}
               <Slide direction="up" in timeout={1200}>
-                <Paper 
+                <Paper
                   elevation={8}
-                  sx={{ 
+                  sx={{
                     mb: 4,
                     background: 'rgba(30, 41, 59, 0.8)',
                     border: '1px solid rgba(99, 102, 241, 0.2)',
@@ -2058,8 +2112,8 @@ const ProfileSection = () => {
                     value={currentSection}
                     onChange={handleTabChange}
                     variant="fullWidth"
-                    sx={{ 
-                      '& .MuiTab-root': { 
+                    sx={{
+                      '& .MuiTab-root': {
                         minHeight: 72,
                         fontSize: '0.95rem',
                         fontWeight: 500,
@@ -2097,8 +2151,8 @@ const ProfileSection = () => {
                     }}
                   >
                     {sections.map((section, index) => (
-                      <Tab 
-                        key={index} 
+                      <Tab
+                        key={index}
                         label={section}
                         icon={getSectionIcon(section, currentSection === index)}
                         iconPosition="start"
@@ -2110,9 +2164,9 @@ const ProfileSection = () => {
 
               {/* Current Section Content */}
               <Slide direction="up" in timeout={1400}>
-                <Paper 
+                <Paper
                   elevation={8}
-                  sx={{ 
+                  sx={{
                     mb: 4,
                     minHeight: 500,
                     background: 'rgba(30, 41, 59, 0.8)',
@@ -2122,9 +2176,9 @@ const ProfileSection = () => {
                     overflow: 'hidden'
                   }}
                 >
-                  <Box sx={{ 
-                    px: 4, 
-                    py: 3, 
+                  <Box sx={{
+                    px: 4,
+                    py: 3,
                     borderBottom: '1px solid rgba(99, 102, 241, 0.2)',
                     background: 'rgba(99, 102, 241, 0.05)'
                   }}>
@@ -2140,10 +2194,10 @@ const ProfileSection = () => {
 
               {/* Navigation */}
               <Slide direction="up" in timeout={1600}>
-                <Box sx={{ 
-                  display: 'flex', 
-                  justifyContent: 'space-between', 
-                  alignItems: 'center', 
+                <Box sx={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                   mb: 4,
                   p: 3,
                   background: 'rgba(30, 41, 59, 0.6)',
@@ -2170,7 +2224,7 @@ const ProfileSection = () => {
                   >
                     Previous
                   </Button>
-                  
+
                   <Chip
                     label={`${currentSection + 1} of ${sections.length}`}
                     sx={{
@@ -2180,7 +2234,7 @@ const ProfileSection = () => {
                       border: '1px solid rgba(99, 102, 241, 0.3)'
                     }}
                   />
-                  
+
                   <Button
                     variant="outlined"
                     endIcon={<NextIcon />}
@@ -2236,9 +2290,9 @@ const ProfileSection = () => {
 
               {/* Unsaved Changes Alert */}
               {hasUnsavedChanges && (
-                <Alert 
-                  severity="info" 
-                  sx={{ 
+                <Alert
+                  severity="info"
+                  sx={{
                     position: 'fixed',
                     top: 32,
                     right: 32,

@@ -24,6 +24,37 @@ Expected JSON format:```json
 {{"company": "Company Name", "position": "Job Title", "location": "City, ST"}}```
 """
 
+# Edit summary section
+# Used with: OpenRouter (qwen/qwen3-30b-a3b:free) - temperature=0.6
+EDIT_SUMMARY_PROMPT = """You are an expert Resume Architect specializing in professional summary optimization. Your task is to transform the summary section to perfectly align with the target job description.
+
+{feedback_context}
+
+INSTRUCTIONS:
+1. Analyze the job description for key requirements, responsibilities, and company culture
+2. Rewrite the summary to highlight relevant experience and skills for this specific role
+3. Integrate key keywords from the job description naturally
+4. Emphasize achievements and experience that match the job requirements
+5. Keep the summary concise (3-5 sentences) and impactful
+6. Use strong action verbs and professional language
+7. Bold important keywords using **keyword** markdown format
+
+CONSTRAINTS:
+- Only modify the 'summary' field
+- Maintain professional tone and readability
+- Ensure the summary flows naturally
+- Do not exceed 5 sentences
+- Focus on relevant experience and skills
+
+Your response must be ONLY the updated summary text, wrapped in ```json ... ``` format.
+
+Job Description:
+{job_description}
+
+Original Summary:
+{original_summary}
+"""
+
 # Edit technical skills section
 # Used with: OpenRouter (qwen/qwen3-30b-a3b:free) - temperature=0.6
 EDIT_TECHNICAL_SKILLS_PROMPT = """You are an expert Resume Architect specializing in technical skills optimization. Your task is to transform the technical skills section to perfectly align with the target job description.

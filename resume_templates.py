@@ -493,6 +493,35 @@ def generate_technical_skills_template(
     return skills_content
 
 
+def generate_summary_template(summary_data):
+    """Generate the summary section"""
+    # Handle different summary data types
+    if isinstance(summary_data, dict):
+        # Extract summary from nested structure (e.g., {"summary": "text"})
+        summary_text = summary_data.get("summary", "") or summary_data.get("text", "")
+    elif isinstance(summary_data, str):
+        summary_text = summary_data
+    else:
+        summary_text = str(summary_data) if summary_data else ""
+
+    # Check if we have actual content
+    if not summary_text or not summary_text.strip():
+        return ""
+
+    # Convert markdown bold to LaTeX properly
+    summary_latex = re.sub(r"\*\*(.*?)\*\*", r"\\textbf{\1}", summary_text)
+    # Escape special characters using intelligent escaping
+    summary_latex = escape_latex_for_content(summary_latex)
+
+    summary_content = f"""%-----------SUMMARY-----------
+\\section{{Summary}}
+  {summary_latex}
+\\vspace{{-10pt}}
+%-----------SUMMARY END-----------"""
+
+    return summary_content
+
+
 def generate_education_template(education_data):
     """Generate the education section"""
     if not education_data:
@@ -849,7 +878,11 @@ def generate_complete_resume_template(resume_data, location="Open to Relocation"
     complete_resume = document_header
     complete_resume += generate_header_template(personal_info, location)
     complete_resume += "\n\n"
-    # Education comes first (after header)
+    # Summary comes first (after header)
+    summary = resume_data.get("summary", "")
+    complete_resume += generate_summary_template(summary)
+    complete_resume += "\n\n"
+    # Education comes after summary
     complete_resume += generate_education_template(education)
     complete_resume += "\n\n"
     complete_resume += generate_technical_skills_template(
