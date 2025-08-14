@@ -11,6 +11,13 @@ import {
   Grow,
   Slide,
   TextField,
+  Fab,
+  Zoom,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  IconButton,
 } from '@mui/material';
 import { 
   Add as AddIcon,
@@ -26,6 +33,8 @@ import {
   ContentCopy as CopyIcon,
   Save as SaveIcon,
   Refresh as RefreshIcon,
+  Close as CloseIcon,
+  Psychology as AIIcon,
 } from '@mui/icons-material';
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../utils/apiClient';
@@ -90,6 +99,7 @@ const CreateResumeSection = () => {
   const [regenerateLatexLoading, setRegenerateLatexLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
+  const [showNewResumeDialog, setShowNewResumeDialog] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [globalCounter, setGlobalCounter] = useState(0);
   const [individualCounter, setIndividualCounter] = useState(0);
@@ -873,6 +883,14 @@ const CreateResumeSection = () => {
     setShowNewResumeForm(!showNewResumeForm);
   };
 
+  const handleOpenNewResumeDialog = () => {
+    setShowNewResumeDialog(true);
+  };
+
+  const handleCloseNewResumeDialog = () => {
+    setShowNewResumeDialog(false);
+  };
+
   const handleCopyToClipboard = async (content: string, type: string) => {
     try {
       await navigator.clipboard.writeText(content);
@@ -1269,41 +1287,23 @@ const CreateResumeSection = () => {
                       <Button
                         variant="outlined"
                         size="large"
-                        onClick={handleToggleNewResumeForm}
+                        onClick={handleOpenNewResumeDialog}
                         startIcon={<AddIcon />}
                         sx={{ 
                           px: 4,
                           py: 2,
                           fontSize: '1rem',
                           fontWeight: 600,
-                          border: '2px solid rgba(34, 197, 94, 0.6)',
-                          color: '#FFFFFF',
                           borderRadius: 3,
-                          background: 'linear-gradient(135deg, #22C55E, #16A34A)',
-                          backdropFilter: 'blur(10px)',
                           whiteSpace: 'nowrap',
+                          backgroundColor: 'primary.main',
+                          color: 'primary.contrastText',
                           '&:hover': {
-                            borderColor: '#16A34A',
-                            backgroundColor: 'linear-gradient(135deg, #16A34A, #15803D)',
+                            backgroundColor: 'primary.dark',
                             transform: 'translateY(-2px)',
-                            boxShadow: '0 8px 25px rgba(34, 197, 94, 0.4)'
+                            boxShadow: '0 8px 25px rgba(0, 0, 0, 0.2)'
                           },
                           transition: 'all 0.3s ease-in-out',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          '&::before': {
-                            content: '""',
-                            position: 'absolute',
-                            top: 0,
-                            left: '-100%',
-                            width: '100%',
-                            height: '100%',
-                            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
-                            transition: 'left 0.5s',
-                          },
-                          '&:hover::before': {
-                            left: '100%',
-                          }
                         }}
                       >
                         Create New Resume
@@ -1593,8 +1593,201 @@ const CreateResumeSection = () => {
           saveJsonLoading={saveJsonLoading}
           structuredData={structuredData}
           onStructuredDataChange={setStructuredData}
+          selectedProvider={selectedProvider}
         />
+
+        {/* New Resume Dialog */}
+        <Dialog
+          open={showNewResumeDialog}
+          onClose={handleCloseNewResumeDialog}
+          maxWidth="lg"
+          fullWidth
+          PaperProps={{
+            sx: {
+              background: 'rgba(30, 41, 59, 0.95)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              backdropFilter: 'blur(20px)',
+              borderRadius: 3,
+              boxShadow: '0 25px 50px rgba(0, 0, 0, 0.5)',
+            }
+          }}
+        >
+          <DialogTitle sx={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'space-between',
+            pb: 2,
+            borderBottom: '1px solid rgba(99, 102, 241, 0.1)'
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <AIIcon sx={{ color: '#6366F1', fontSize: 24, mr: 1 }} />
+              <Typography variant="h5" sx={{ fontWeight: 600, color: '#F8FAFC' }}>
+                New Resume (Auto-Process)
+              </Typography>
+            </Box>
+            
+            {/* Current Provider Bubble */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Box sx={{
+                px: 2,
+                py: 1,
+                borderRadius: 2.5,
+                border: '2px solid',
+                borderColor: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+                background: selectedProvider === 'openai' 
+                  ? 'rgba(99, 102, 241, 0.15)' 
+                  : 'rgba(16, 185, 129, 0.15)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1
+              }}>
+                <Typography sx={{
+                  color: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+                  fontWeight: 600,
+                  fontSize: '0.8rem'
+                }}>
+                  {selectedProvider === 'openai' ? 'Chat-GPT' : 'Groq & Google'}
+                </Typography>
+              </Box>
+              
+              <IconButton
+                onClick={handleCloseNewResumeDialog}
+                sx={{ 
+                  color: '#94A3B8',
+                  '&:hover': {
+                    color: '#6366F1',
+                    backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                    transform: 'scale(1.1)'
+                  },
+                  transition: 'all 0.2s ease-in-out'
+                }}
+              >
+                <CloseIcon />
+              </IconButton>
+            </Box>
+          </DialogTitle>
+          
+          <DialogContent sx={{ pt: 3, pb: 2 }}>
+            <TextField
+              fullWidth
+              multiline
+              rows={8}
+              label="Job Description"
+              value={jobDescription}
+              onChange={(e) => setJobDescription(e.target.value)}
+              placeholder="Paste the job description here..."
+              sx={{ 
+                my: 2,
+                '& .MuiOutlinedInput-root': {
+                  backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                  borderRadius: 2,
+                  minHeight: '200px',
+                  '& fieldset': {
+                    borderColor: 'rgba(99, 102, 241, 0.3)',
+                  },
+                  '&:hover fieldset': {
+                    borderColor: '#6366F1',
+                  },
+                  '&.Mui-focused fieldset': {
+                    borderColor: '#6366F1',
+                  },
+                },
+                '& .MuiInputLabel-root': {
+                  color: '#94A3B8',
+                  '&.Mui-focused': {
+                    color: '#6366F1',
+                  },
+                },
+                '& .MuiOutlinedInput-input': {
+                  color: '#F8FAFC',
+                  padding: '16px',
+                  '&::placeholder': {
+                    color: '#64748B',
+                    opacity: 1,
+                  },
+                },
+              }}
+            />
+            
+            <Box sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'space-between',
+              mb: 2
+            }}>
+              <Typography variant="body2" sx={{ color: '#94A3B8' }}>
+                {jobDescription.length} characters, {jobDescription.split(/\s+/).filter(word => word.length > 0).length} words
+              </Typography>
+            </Box>
+          </DialogContent>
+          
+          <DialogActions sx={{ px: 3, pb: 3, pt: 1 }}>
+            <Button
+              onClick={handleCloseNewResumeDialog}
+              sx={{
+                px: 3,
+                py: 1.5,
+                color: '#94A3B8',
+                borderColor: 'rgba(148, 163, 184, 0.3)',
+                '&:hover': {
+                  borderColor: '#94A3B8',
+                  backgroundColor: 'rgba(148, 163, 184, 0.1)',
+                }
+              }}
+              variant="outlined"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => {
+                handleSubmit();
+                handleCloseNewResumeDialog();
+              }}
+              disabled={!jobDescription.trim() || submitting}
+              variant="contained"
+              startIcon={submitting ? <CircularProgress size={16} /> : <AddIcon />}
+              sx={{
+                px: 4,
+                py: 1.5,
+                background: 'linear-gradient(135deg, #6366F1, #8B5CF6)',
+                '&:hover': {
+                  background: 'linear-gradient(135deg, #5B21B6, #7C3AED)',
+                  transform: 'translateY(-1px)',
+                  boxShadow: '0 8px 25px rgba(99, 102, 241, 0.4)'
+                },
+                transition: 'all 0.3s ease-in-out',
+              }}
+            >
+              {submitting ? 'Creating...' : 'Create & Process Resume'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Container>
+
+      {/* Floating Action Button for Create New Resume */}
+      <Zoom in={true} style={{ transitionDelay: '200ms' }}>
+        <Fab
+          color="primary"
+          aria-label="Create New Resume"
+          onClick={handleOpenNewResumeDialog}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            width: 56,
+            height: 56,
+            boxShadow: '0 8px 32px rgba(0, 0, 0, 0.2)',
+            '&:hover': {
+              transform: 'scale(1.1)',
+              boxShadow: '0 12px 40px rgba(0, 0, 0, 0.3)',
+            },
+            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+            zIndex: 1000,
+          }}
+        >
+          <AddIcon sx={{ fontSize: 28, color: '#FFFFFF' }} />
+        </Fab>
+      </Zoom>
 
       <style>{`
         @keyframes pulse {

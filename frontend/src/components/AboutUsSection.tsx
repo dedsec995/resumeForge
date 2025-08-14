@@ -31,7 +31,7 @@ const AboutUsSection = () => {
     {
       name: "Amit Luhar",
       role: "Full Stack Developer & AI Specialist",
-      avatar: "https://media.licdn.com/dms/image/v2/D4E35AQHUQlcovNcQtg/profile-framedphoto-shrink_200_200/B4EZf.zeX1HgAY-/0/1752326596399?e=1755187200&v=beta&t=t6NL4ake-UH--OtAJb-oMOq7rHjlbeQlg4mbLrT-oGU",
+      avatar: "https://media.licdn.com/dms/image/v2/D4E35AQH-leCLVJxFPw/profile-framedphoto-shrink_200_200/B4EZiaRuRJHgAg-/0/1754934994274?e=1755792000&v=beta&t=JR5Yz4pMAPawMGKQy3MPeP243gG0cVCumpP-2b9kEzM",
       bio: "Computer Science graduate with a passion for Machine Learning, AI, and Automation. Fascinated by micro-controllers and transformer's ability to map language in latent space. Firm believer in the rise of Skynet.",
       skills: ["Python", "React", "Node.js", "TensorFlow", "AWS", "Machine Learning", "AI"],
       github: "https://github.com/dedsec995",

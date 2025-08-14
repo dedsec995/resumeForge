@@ -94,6 +94,7 @@ interface SessionDetailsDialogProps {
   saveJsonLoading: boolean;
   structuredData: any;
   onStructuredDataChange: (data: any) => void;
+  selectedProvider: string;
 }
 
 const QuestionsTab: React.FC<QuestionsTabProps> = ({ sessionId, onCopyToClipboard }) => {
@@ -331,7 +332,8 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   onSaveJson,
   saveJsonLoading,
   structuredData,
-  onStructuredDataChange
+  onStructuredDataChange,
+  selectedProvider
 }) => {
     // Function to detect if there are changes
     const hasChanges = React.useMemo(() => {
@@ -418,13 +420,6 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                       </Typography>
          </Box>
            <Typography variant="body2" sx={{ 
-            color: '#94A3B8',
-            opacity: 0.8,
-             fontSize: '0.75rem'
-           }}>
-             {formatDate(selectedSession.timestamp)}
-           </Typography>
-           <Typography variant="body2" sx={{ 
     fontFamily: 'monospace', 
     color: '#64748B',
     opacity: 0.7,
@@ -432,6 +427,30 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   }}>
     {selectedSession.sessionId}
   </Typography>
+          
+          {/* Provider Bubble */}
+          <Box sx={{
+            px: 2,
+            py: 1,
+            borderRadius: 2.5,
+            border: '2px solid',
+            borderColor: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+            background: selectedProvider === 'openai' 
+              ? 'rgba(99, 102, 241, 0.15)' 
+              : 'rgba(16, 185, 129, 0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 1
+          }}>
+            <Typography sx={{
+              color: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+              fontWeight: 600,
+              fontSize: '0.8rem'
+            }}>
+              {selectedProvider === 'openai' ? 'Chat-GPT' : 'Groq & Google'}
+            </Typography>
+          </Box>
+          
           <Chip 
           label={
             selectedSession.status === 'completed' && selectedSession.workflowResult?.score 

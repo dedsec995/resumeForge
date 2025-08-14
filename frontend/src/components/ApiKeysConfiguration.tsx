@@ -1,13 +1,15 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Box,
-  Paper,
-  Typography,
-  TextField,
-  Button,
+import React, { useState, useCallback, useEffect } from 'react';
+import { 
+  Box, 
+  Paper, 
+  Typography, 
+  TextField, 
+  Button, 
+  IconButton, 
   InputAdornment,
-  IconButton,
   Collapse,
+  CircularProgress,
+  Zoom,
 } from '@mui/material';
 import {
   Key as KeyIcon,
@@ -18,8 +20,6 @@ import {
   KeyboardArrowDown as KeyboardArrowDownIcon,
   Error as ErrorIcon,
   CheckCircle as SuccessIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
 } from '@mui/icons-material';
 import apiClient from '../utils/apiClient';
 import { toast } from 'react-hot-toast';
@@ -46,12 +46,18 @@ interface UserApiConfig {
   lastUpdated?: string;
 }
 
+interface LoadingStates {
+  openAiKey: boolean;
+  groqKey: boolean;
+  googleGenAiKey: boolean;
+}
+
 const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({ 
   userInfo, 
   selectedProvider, 
   onProviderChange, 
   onApiConfigChange 
-}) => {
+}: ApiKeysConfigurationProps) => {
   const [userApiConfig, setUserApiConfig] = useState<UserApiConfig | null>(null);
   const [openAiKey, setOpenAiKey] = useState('');
   const [groqKey, setGroqKey] = useState('');
@@ -59,7 +65,11 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
   const [showGroqKey, setShowGroqKey] = useState(false);
   const [showGoogleGenAiKey, setShowGoogleGenAiKey] = useState(false);
-  const [savingApiConfig, setSavingApiConfig] = useState(false);
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    openAiKey: false,
+    groqKey: false,
+    googleGenAiKey: false
+  });
   const [showApiConfig, setShowApiConfig] = useState(false);
 
   const loadUserApiConfig = useCallback(async () => {
@@ -81,8 +91,14 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
     loadUserApiConfig();
   }, [loadUserApiConfig]);
 
+  const setLoadingState = (key: keyof LoadingStates, loading: boolean) => {
+    setLoadingStates(prev => ({ ...prev, [key]: loading }));
+  };
+
   const handleSaveIndividualKey = async (key: string, value: string) => {
-    setSavingApiConfig(true);
+    const loadingKey = key as keyof LoadingStates;
+    setLoadingState(loadingKey, true);
+    
     try {
       const response = await apiClient.post('/apiConfig', {
         [key]: value
@@ -158,12 +174,14 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         toast.error(getErrorMessage(key), { icon: <ErrorIcon /> });
       }
     } finally {
-      setSavingApiConfig(false);
+      setLoadingState(loadingKey, false);
     }
   };
 
   const handleDeleteIndividualKey = async (key: string) => {
-    setSavingApiConfig(true);
+    const loadingKey = key as keyof LoadingStates;
+    setLoadingState(loadingKey, true);
+    
     try {
       const response = await apiClient.post('/apiConfig', {
         [key]: '' // Empty key to delete
@@ -206,11 +224,9 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
       };
       toast.error(getDeleteErrorMessage(key), { icon: <ErrorIcon /> });
     } finally {
-      setSavingApiConfig(false);
+      setLoadingState(loadingKey, false);
     }
   };
-
-
 
   // Only show for FREE tier users
   if (userInfo?.accountTier !== 'FREE') {
@@ -310,7 +326,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     fontSize: '0.8rem'
                   }}>
                     Chat-GPT
-            </Typography>
+                  </Typography>
                 </Box>
 
                 {/* Groq & Google Bubble */}
@@ -351,7 +367,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   <Typography sx={{
                     color: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) 
                       ? (selectedProvider === 'groq-google' ? '#10B981' : '#E2E8F0')
-                      : '#E2E8F0',
+                      : '#64748B',
                     fontWeight: 600,
                     fontSize: '0.8rem'
                   }}>
@@ -361,20 +377,21 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
               </Box>
             )}
           </Box>
-          
+
+          {/* Right side: Status Indicators and Dropdown Arrow */}
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            {/* Configured Keys Bubbles */}
+            {/* Status Indicators */}
             <Box sx={{ display: 'flex', gap: 1 }}>
               {userApiConfig?.hasOpenAiKey && (
                 <Box sx={{
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 2,
-                  background: 'rgba(34, 197, 94, 0.2)',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  background: 'rgba(99, 102, 241, 0.2)',
+                  border: '1px solid rgba(99, 102, 241, 0.4)',
                   backdropFilter: 'blur(10px)'
                 }}>
-                  <Typography variant="caption" sx={{ color: '#22C55E', fontWeight: 600, fontSize: '0.7rem' }}>
+                  <Typography variant="caption" sx={{ color: '#6366F1', fontWeight: 600, fontSize: '0.7rem' }}>
                     OpenAI
                   </Typography>
                 </Box>
@@ -384,11 +401,11 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   px: 1.5,
                   py: 0.5,
                   borderRadius: 2,
-                  background: 'rgba(34, 197, 94, 0.2)',
-                  border: '1px solid rgba(34, 197, 94, 0.4)',
+                  background: 'rgba(16, 185, 129, 0.2)',
+                  border: '1px solid rgba(16, 185, 129, 0.4)',
                   backdropFilter: 'blur(10px)'
                 }}>
-                  <Typography variant="caption" sx={{ color: '#22C55E', fontWeight: 600, fontSize: '0.7rem' }}>
+                  <Typography variant="caption" sx={{ color: '#10B981', fontWeight: 600, fontSize: '0.7rem' }}>
                     Groq
                   </Typography>
                 </Box>
@@ -408,8 +425,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                 </Box>
               )}
             </Box>
-            
-
             
             {/* Dropdown Arrow */}
             <Box sx={{
@@ -484,13 +499,13 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     color: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasOpenAiKey) 
                       ? (selectedProvider === 'openai' ? '#6366F1' : '#E2E8F0')
                       : '#64748B',
-                  fontWeight: 600,
+                    fontWeight: 600,
                     fontSize: '0.9rem'
-                }}>
+                  }}>
                     Chat-GPT
-                </Typography>
-              </Box>
-            
+                  </Typography>
+                </Box>
+              
                 {/* Groq & Google Bubble */}
                 <Box
                   onClick={() => {
@@ -498,7 +513,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                       onProviderChange('groq-google');
                     }
                   }}
-                sx={{
+                  sx={{
                     px: 3,
                     py: 2,
                     borderRadius: 3,
@@ -514,7 +529,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                           background: selectedProvider === 'groq-google' 
                             ? 'rgba(16, 185, 129, 0.15)' 
                             : 'rgba(16, 185, 129, 0.05)',
-                    '&:hover': {
+                          '&:hover': {
                             borderColor: '#10B981',
                             background: 'rgba(16, 185, 129, 0.1)',
                             transform: 'translateY(-2px)',
@@ -535,14 +550,12 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     fontSize: '0.9rem'
                   }}>
                     Groq & Google
-                </Typography>
-              </Box>
+                  </Typography>
+                </Box>
               </Box>
             </Box>
-            
 
-            
-            {/* Chat-GPT API Key Input */}
+            {/* OpenAI API Key Input */}
             <Box sx={{ mb: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                 <Typography variant="subtitle2" sx={{ color: '#F8FAFC', fontWeight: 500 }}>
@@ -552,12 +565,13 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
               <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
                 <TextField
                   fullWidth
-                    label="Chat-GPT API Key"
+                  label="OpenAI API Key"
                   type={showOpenAiKey ? 'text' : 'password'}
                   value={openAiKey || userApiConfig?.openAiKey || ''}
                   onChange={(e) => setOpenAiKey(e.target.value)}
-                    placeholder={userApiConfig?.hasOpenAiKey ? "Update Chat-GPT API key..." : "sk-..."}
+                  placeholder={userApiConfig?.hasOpenAiKey ? "Update OpenAI API key..." : "sk-..."}
                   size="small"
+                  disabled={loadingStates.openAiKey}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -565,6 +579,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                           onClick={() => setShowOpenAiKey(!showOpenAiKey)}
                           edge="end"
                           size="small"
+                          disabled={loadingStates.openAiKey}
                           sx={{ color: '#94A3B8' }}
                         >
                           {showOpenAiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
@@ -576,8 +591,10 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: 'rgba(15, 23, 42, 0.3)',
                       borderRadius: 1,
+                      transition: 'all 0.3s ease',
                       '& fieldset': {
                         borderColor: userApiConfig?.hasOpenAiKey ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                        transition: 'border-color 0.3s ease',
                       },
                       '&:hover fieldset': {
                         borderColor: userApiConfig?.hasOpenAiKey ? '#22C55E' : '#EF4444',
@@ -585,91 +602,121 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                       '&.Mui-focused fieldset': {
                         borderColor: userApiConfig?.hasOpenAiKey ? '#22C55E' : '#EF4444',
                       },
+                      '&.Mui-disabled': {
+                        backgroundColor: 'rgba(15, 23, 42, 0.1)',
+                        opacity: 0.7,
+                      }
                     },
                     '& .MuiInputLabel-root': {
                       color: '#94A3B8',
+                      transition: 'color 0.3s ease',
                       '&.Mui-focused': {
                         color: userApiConfig?.hasOpenAiKey ? '#22C55E' : '#EF4444',
                       },
                     },
                     '& .MuiOutlinedInput-input': {
                       color: '#F8FAFC',
+                      transition: 'color 0.3s ease',
                     },
                   }}
                 />
-                {/* Single Button Logic: Save when editing, Delete when key exists, Disabled Save when nothing */}
-                {openAiKey.trim() !== '' ? (
-                  // Show Save Button when editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    onClick={() => handleSaveIndividualKey('openAiKey', openAiKey.trim())}
-                    disabled={savingApiConfig}
-                    sx={{
-                      borderColor: '#22C55E',
-                      color: '#22C55E',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#16A34A',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                ) : userApiConfig?.hasOpenAiKey ? (
-                  // Show Delete Button when key exists
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleDeleteIndividualKey('openAiKey')}
-                    disabled={savingApiConfig}
-                    sx={{
-                      borderColor: '#EF4444',
-                      color: '#EF4444',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#DC2626',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                      }
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </Button>
-                ) : (
-                  // Show Disabled Save Button when no key and not editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    disabled={true}
-                    sx={{
-                      borderColor: '#64748B',
-                      color: '#64748B',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:disabled': {
-                        borderColor: '#64748B',
-                        color: '#64748B'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                )}
+                {/* Action Button with Loading State */}
+                <Zoom in={true} style={{ transitionDelay: '100ms' }}>
+                  <Box>
+                    {openAiKey.trim() !== '' ? (
+                      // Show Save Button when editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        onClick={() => handleSaveIndividualKey('openAiKey', openAiKey.trim())}
+                        disabled={loadingStates.openAiKey}
+                        sx={{
+                          borderColor: '#22C55E',
+                          color: '#22C55E',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#16A34A',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#22C55E',
+                            color: '#22C55E',
+                          }
+                        }}
+                      >
+                        {loadingStates.openAiKey ? (
+                          <CircularProgress size={20} sx={{ color: '#22C55E' }} />
+                        ) : (
+                          <CheckIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : userApiConfig?.hasOpenAiKey ? (
+                      // Show Delete Button when key exists
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteIndividualKey('openAiKey')}
+                        disabled={loadingStates.openAiKey}
+                        sx={{
+                          borderColor: '#EF4444',
+                          color: '#EF4444',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#DC2626',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#EF4444',
+                            color: '#EF4444',
+                          }
+                        }}
+                      >
+                        {loadingStates.openAiKey ? (
+                          <CircularProgress size={20} sx={{ color: '#EF4444' }} />
+                        ) : (
+                          <DeleteIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : (
+                      // Show Disabled Save Button when no key and not editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        disabled={true}
+                        sx={{
+                          borderColor: '#64748B',
+                          color: '#64748B',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          '&:disabled': {
+                            borderColor: '#64748B',
+                            color: '#64748B'
+                          }
+                        }}
+                      >
+                        <CheckIcon fontSize="small" />
+                      </Button>
+                    )}
+                  </Box>
+                </Zoom>
               </Box>
             </Box>
 
@@ -689,6 +736,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   onChange={(e) => setGroqKey(e.target.value)}
                   placeholder={userApiConfig?.hasGroqKey ? "Update Groq API key..." : "gsk_..."}
                   size="small"
+                  disabled={loadingStates.groqKey}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -696,6 +744,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                           onClick={() => setShowGroqKey(!showGroqKey)}
                           edge="end"
                           size="small"
+                          disabled={loadingStates.groqKey}
                           sx={{ color: '#94A3B8' }}
                         >
                           {showGroqKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
@@ -707,8 +756,10 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: 'rgba(15, 23, 42, 0.3)',
                       borderRadius: 1,
+                      transition: 'all 0.3s ease',
                       '& fieldset': {
                         borderColor: userApiConfig?.hasGroqKey ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                        transition: 'border-color 0.3s ease',
                       },
                       '&:hover fieldset': {
                         borderColor: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
@@ -716,93 +767,121 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                       '&.Mui-focused fieldset': {
                         borderColor: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
                       },
+                      '&.Mui-disabled': {
+                        backgroundColor: 'rgba(15, 23, 42, 0.1)',
+                        opacity: 0.7,
+                      }
                     },
                     '& .MuiInputLabel-root': {
                       color: '#94A3B8',
+                      transition: 'color 0.3s ease',
                       '&.Mui-focused': {
                         color: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
                       },
                     },
                     '& .MuiOutlinedInput-input': {
                       color: '#F8FAFC',
+                      transition: 'color 0.3s ease',
                     },
                   }}
                 />
-                {/* Single Button Logic: Save when editing, Delete when key exists, Disabled Save when nothing */}
-                {groqKey.trim() !== '' ? (
-                  // Show Save Button when editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    onClick={() => handleSaveIndividualKey('groqKey', groqKey.trim())}
-                    disabled={savingApiConfig}
-                    sx={{
-                      borderColor: '#22C55E',
-                      color: '#22C55E',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#16A34A',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                ) : userApiConfig?.hasGroqKey ? (
-                  // Show Delete Button when key exists
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleDeleteIndividualKey('groqKey')}
-                    disabled={savingApiConfig}
-                    size="small"
-                    sx={{
-                      borderColor: '#EF4444',
-                      color: '#EF4444',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#DC2626',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                      }
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </Button>
-                ) : (
-                  // Show Disabled Save Button when no key and not editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    disabled={true}
-                    size="small"
-                    sx={{
-                      borderColor: '#64748B',
-                      color: '#64748B',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:disabled': {
-                        borderColor: '#64748B',
-                        color: '#64748B'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                )}
+                {/* Action Button with Loading State */}
+                <Zoom in={true} style={{ transitionDelay: '200ms' }}>
+                  <Box>
+                    {groqKey.trim() !== '' ? (
+                      // Show Save Button when editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        onClick={() => handleSaveIndividualKey('groqKey', groqKey.trim())}
+                        disabled={loadingStates.groqKey}
+                        sx={{
+                          borderColor: '#22C55E',
+                          color: '#22C55E',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#16A34A',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#22C55E',
+                            color: '#22C55E',
+                          }
+                        }}
+                      >
+                        {loadingStates.groqKey ? (
+                          <CircularProgress size={20} sx={{ color: '#22C55E' }} />
+                        ) : (
+                          <CheckIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : userApiConfig?.hasGroqKey ? (
+                      // Show Delete Button when key exists
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteIndividualKey('groqKey')}
+                        disabled={loadingStates.groqKey}
+                        sx={{
+                          borderColor: '#EF4444',
+                          color: '#EF4444',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#DC2626',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#EF4444',
+                            color: '#EF4444',
+                          }
+                        }}
+                      >
+                        {loadingStates.groqKey ? (
+                          <CircularProgress size={20} sx={{ color: '#EF4444' }} />
+                        ) : (
+                          <DeleteIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : (
+                      // Show Disabled Save Button when no key and not editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        disabled={true}
+                        sx={{
+                          borderColor: '#64748B',
+                          color: '#64748B',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          '&:disabled': {
+                            borderColor: '#64748B',
+                            color: '#64748B'
+                          }
+                        }}
+                      >
+                        <CheckIcon fontSize="small" />
+                      </Button>
+                    )}
+                  </Box>
+                </Zoom>
               </Box>
             </Box>
 
@@ -822,6 +901,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   onChange={(e) => setGoogleGenAiKey(e.target.value)}
                   placeholder={userApiConfig?.hasGoogleGenAiKey ? "Update Google Gen AI API key..." : "AIza..."}
                   size="small"
+                  disabled={loadingStates.googleGenAiKey}
                   InputProps={{
                     endAdornment: (
                       <InputAdornment position="end">
@@ -829,6 +909,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                           onClick={() => setShowGoogleGenAiKey(!showGoogleGenAiKey)}
                           edge="end"
                           size="small"
+                          disabled={loadingStates.googleGenAiKey}
                           sx={{ color: '#94A3B8' }}
                         >
                           {showGoogleGenAiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
@@ -840,100 +921,132 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                     '& .MuiOutlinedInput-root': {
                       backgroundColor: 'rgba(15, 23, 42, 0.3)',
                       borderRadius: 1,
+                      transition: 'all 0.3s ease',
                       '& fieldset': {
                         borderColor: userApiConfig?.hasGoogleGenAiKey ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
+                        transition: 'border-color 0.3s ease',
                       },
                       '&:hover fieldset': {
                         borderColor: userApiConfig?.hasGoogleGenAiKey ? '#22C55E' : '#EF4444',
                       },
-                    '&.Mui-focused fieldset': {
+                      '&.Mui-focused fieldset': {
                         borderColor: userApiConfig?.hasGoogleGenAiKey ? '#22C55E' : '#EF4444',
                       },
+                      '&.Mui-disabled': {
+                        backgroundColor: 'rgba(15, 23, 42, 0.1)',
+                        opacity: 0.7,
+                      }
                     },
                     '& .MuiInputLabel-root': {
-                      color: '#94A8B8',
+                      color: '#94A3B8',
+                      transition: 'color 0.3s ease',
                       '&.Mui-focused': {
                         color: userApiConfig?.hasGoogleGenAiKey ? '#22C55E' : '#EF4444',
                       },
                     },
                     '& .MuiOutlinedInput-input': {
                       color: '#F8FAFC',
+                      transition: 'color 0.3s ease',
                     },
                   }}
                 />
-                {/* Single Button Logic: Save when editing, Delete when key exists, Disabled Save when nothing */}
-                {googleGenAiKey.trim() !== '' ? (
-                  // Show Save Button when editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    onClick={() => handleSaveIndividualKey('googleGenAiKey', googleGenAiKey.trim())}
-                    disabled={savingApiConfig}
-                    sx={{
-                      borderColor: '#22C55E',
-                      color: '#22C55E',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#16A34A',
-                        backgroundColor: 'rgba(34, 197, 94, 0.1)'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                ) : userApiConfig?.hasGoogleGenAiKey ? (
-                  // Show Delete Button when key exists
-                  <Button
-                    variant="outlined"
-                    color="error"
-                    onClick={() => handleDeleteIndividualKey('googleGenAiKey')}
-                    disabled={savingApiConfig}
-                    sx={{
-                      borderColor: '#EF4444',
-                      color: '#EF4444',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:hover': {
-                        borderColor: '#DC2626',
-                        backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                      }
-                    }}
-                  >
-                    <DeleteIcon fontSize="small" />
-                  </Button>
-                ) : (
-                  // Show Disabled Save Button when no key and not editing
-                  <Button
-                    variant="outlined"
-                    color="success"
-                    disabled={true}
-                    sx={{
-                      borderColor: '#64748B',
-                      color: '#64748B',
-                      height: '40px',
-                      minWidth: '40px',
-                      width: '40px',
-                      padding: 0,
-                      margin: 0,
-                      borderRadius: '4px',
-                      '&:disabled': {
-                        borderColor: '#64748B',
-                        color: '#64748B'
-                      }
-                    }}
-                  >
-                    <CheckIcon fontSize="small" />
-                  </Button>
-                )}
+                {/* Action Button with Loading State */}
+                <Zoom in={true} style={{ transitionDelay: '300ms' }}>
+                  <Box>
+                    {googleGenAiKey.trim() !== '' ? (
+                      // Show Save Button when editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        onClick={() => handleSaveIndividualKey('googleGenAiKey', googleGenAiKey.trim())}
+                        disabled={loadingStates.googleGenAiKey}
+                        sx={{
+                          borderColor: '#22C55E',
+                          color: '#22C55E',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#16A34A',
+                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#22C55E',
+                            color: '#22C55E',
+                          }
+                        }}
+                      >
+                        {loadingStates.googleGenAiKey ? (
+                          <CircularProgress size={20} sx={{ color: '#22C55E' }} />
+                        ) : (
+                          <CheckIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : userApiConfig?.hasGoogleGenAiKey ? (
+                      // Show Delete Button when key exists
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        onClick={() => handleDeleteIndividualKey('googleGenAiKey')}
+                        disabled={loadingStates.googleGenAiKey}
+                        sx={{
+                          borderColor: '#EF4444',
+                          color: '#EF4444',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          transition: 'all 0.3s ease',
+                          '&:hover': {
+                            borderColor: '#DC2626',
+                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                            transform: 'scale(1.05)',
+                          },
+                          '&:disabled': {
+                            borderColor: '#EF4444',
+                            color: '#EF4444',
+                          }
+                        }}
+                      >
+                        {loadingStates.googleGenAiKey ? (
+                          <CircularProgress size={20} sx={{ color: '#EF4444' }} />
+                        ) : (
+                          <DeleteIcon fontSize="small" />
+                        )}
+                      </Button>
+                    ) : (
+                      // Show Disabled Save Button when no key and not editing
+                      <Button
+                        variant="outlined"
+                        color="success"
+                        disabled={true}
+                        sx={{
+                          borderColor: '#64748B',
+                          color: '#64748B',
+                          height: '40px',
+                          minWidth: '40px',
+                          width: '40px',
+                          padding: 0,
+                          margin: 0,
+                          borderRadius: '4px',
+                          '&:disabled': {
+                            borderColor: '#64748B',
+                            color: '#64748B'
+                          }
+                        }}
+                      >
+                        <CheckIcon fontSize="small" />
+                      </Button>
+                    )}
+                  </Box>
+                </Zoom>
               </Box>
             </Box>
           </Box>

@@ -36,8 +36,6 @@ import {
   Psychology as SkillsIcon,
   CheckCircle as CheckIcon,
   Error as ErrorIcon,
-  Info as InfoIcon,
-  Warning as WarningIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
