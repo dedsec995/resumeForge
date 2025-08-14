@@ -1587,7 +1587,6 @@ const CreateResumeSection = () => {
           downloadPDFLoading={downloadPDFLoading}
           downloadLatexLoading={downloadLatexLoading}
           regenerateLatexLoading={regenerateLatexLoading}
-          formatDate={formatDate}
           
           onSaveJson={handleSaveJson}
           saveJsonLoading={saveJsonLoading}

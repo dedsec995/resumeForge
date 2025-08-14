@@ -89,7 +89,6 @@ interface SessionDetailsDialogProps {
   downloadPDFLoading: string | null;
   downloadLatexLoading: string | null;
   regenerateLatexLoading: string | null;
-  formatDate: (timestamp: string) => string;
   onSaveJson: () => void;
   saveJsonLoading: boolean;
   structuredData: any;
@@ -328,7 +327,6 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   downloadPDFLoading,
   downloadLatexLoading,
   regenerateLatexLoading,
-  formatDate,
   onSaveJson,
   saveJsonLoading,
   structuredData,
