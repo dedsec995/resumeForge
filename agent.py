@@ -27,6 +27,7 @@ load_dotenv()
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 console = Console()
 
 # Log the current deciding score threshold
@@ -47,28 +48,40 @@ class AgentState(TypedDict):
     iteration_count: int
     user_id: str
     user_tier: str
-    user_api_key: Optional[str]
+    selected_provider: str
 
 
 def get_user_context(state):
     """Get user context from state"""
     user_id = state.get("user_id", "")
     user_tier = state.get("user_tier", "FREE")
-    user_api_key = state.get("user_api_key")
-    return user_id, user_tier, user_api_key
+    selected_provider = state.get("selected_provider", "openai")
+    return user_id, user_tier, selected_provider
 
 
-def get_user_api_key(user_id: str, user_tier: str) -> Optional[str]:
-    """Get user's API key if they are in FREE tier"""
+def get_user_api_keys(user_id: str, user_tier: str) -> Dict[str, Optional[str]]:
+    """Get user's API keys based on their tier"""
     if user_tier == "FREE":
         try:
             from database_operations import dbOps
             api_data = dbOps.getUserApiConfig(user_id)
-            return api_data.get("apiKey") if api_data else None
+            if api_data:
+                return {
+                    "openai": api_data.get("openAiKey"),
+                    "groq": api_data.get("groqKey"),
+                    "google": api_data.get("googleGenAiKey")
+                }
+            return {"openai": None, "groq": None, "google": None}
         except Exception as e:
-            console.print(f"[bold red]Error getting user API key: {e}[/bold red]")
-            return None
-    return None
+            console.print(f"[bold red]Error getting user API keys: {e}[/bold red]")
+            return {"openai": None, "groq": None, "google": None}
+    elif user_tier == "ADMI":
+        return {
+            "openai": OPENAI_API_KEY,
+            "groq": GROQ_API_KEY,
+            "google": GOOGLE_API_KEY
+        }
+    return {"openai": None, "groq": None, "google": None}
 
 
 def get_llm_for_task(
@@ -76,78 +89,86 @@ def get_llm_for_task(
     temperature: float,
     user_id: str,
     user_tier: str,
-    user_api_key: Optional[str],
+    selected_provider: str = "openai",
 ):
-
-    if user_tier == "FREE":
-        if user_api_key:
-            if task_name == "extract_info":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-3.5-turbo", api_key=user_api_key
-                )
-            elif task_name == "edit_technical_skills":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-4", api_key=user_api_key
-                )
-            elif task_name == "edit_experience":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-4", api_key=user_api_key
-                )
-            elif task_name == "edit_projects":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-4", api_key=user_api_key
-                )
-            elif task_name == "judge_quality":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-4", api_key=user_api_key
-                )
-            elif task_name == "keywords_editor":
-                return ChatOpenAI(
-                    temperature=temperature, model="gpt-3.5-turbo", api_key=user_api_key
-                )
-        else:
+    console.print(f"[bold blue]🔧 Getting LLM for task: {task_name}, provider: {selected_provider}, tier: {user_tier}[/bold blue]")
+    # Get API keys based on user tier
+    api_keys = get_user_api_keys(user_id, user_tier)
+    console.print(f"[bold cyan]🔑 API Keys available: {list(k for k, v in api_keys.items() if v)}[/bold cyan]")
+    
+    # Validate API keys based on selected provider
+    if selected_provider == "openai":
+        if not api_keys["openai"]:
             raise Exception(
                 "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
             )
-
-    elif user_tier == "ADMI":
+        # Use OpenAI for all tasks
+        if task_name == "extract_info":
+            return ChatOpenAI(
+                temperature=temperature, 
+                model="gpt-3.5-turbo", 
+                api_key=api_keys["openai"]
+            )
+        elif task_name in ["edit_technical_skills", "edit_experience", "edit_projects"]:
+            return ChatOpenAI(
+                temperature=temperature, 
+                model="gpt-4", 
+                api_key=api_keys["openai"]
+            )
+        elif task_name == "judge_quality":
+            # Always use OpenRouter for judging, regardless of selected provider
+            return ChatOpenRouter(
+                temperature=temperature, 
+                model="moonshotai/kimi-k2:free",
+                api_key=OPENROUTER_API_KEY
+            )
+        elif task_name == "keywords_editor":
+            return ChatOpenAI(
+                temperature=temperature, 
+                model="gpt-3.5-turbo", 
+                api_key=api_keys["openai"]
+            )
+    
+    elif selected_provider == "groq-google":
+        if not api_keys["groq"] or not api_keys["google"]:
+            raise Exception(
+                "API_KEY_ERROR: Please add both Groq and Google Gen AI API keys in the API Config section to continue."
+            )
+        # Use Groq + Google combination
         if task_name == "extract_info":
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemma-3-27b-it",
-                google_api_key=GOOGLE_API_KEY,
+                api_key=api_keys["google"]
             )
         elif task_name == "edit_technical_skills":
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemini-2.0-flash-exp",
-                google_api_key=GOOGLE_API_KEY,
+                api_key=api_keys["google"]
             )
-        elif task_name == "edit_experience":
+        elif task_name in ["edit_experience", "edit_projects"]:
             return ChatGroq(
                 temperature=temperature,
-                model_name="openai/gpt-oss-120b",
-                api_key=GROQ_API_KEY,
-            )
-        elif task_name == "edit_projects":
-            return ChatGroq(
-                temperature=temperature,
-                model_name="openai/gpt-oss-120b",
-                api_key=GROQ_API_KEY,
+                model="openai/gpt-oss-120b",
+                api_key=api_keys["groq"]
             )
         elif task_name == "judge_quality":
             return ChatOpenRouter(
-                temperature=temperature, model_name="moonshotai/kimi-k2:free"
+                temperature=temperature, 
+                model="moonshotai/kimi-k2:free",
+                api_key=OPENROUTER_API_KEY
             )
         elif task_name == "keywords_editor":
             return ChatGoogleGenerativeAI(
                 temperature=temperature,
                 model="gemma-3-27b-it",
-                google_api_key=GOOGLE_API_KEY,
+                api_key=api_keys["google"]
             )
-
-    return ChatGoogleGenerativeAI(
-        temperature=temperature, model="gemma-3-27b-it", google_api_key=GOOGLE_API_KEY
+    
+    # Default fallback
+    raise Exception(
+        f"API_KEY_ERROR: Invalid provider '{selected_provider}' or missing required API keys."
     )
 
 
@@ -161,10 +182,10 @@ def get_initial_data(state):
         k: v for k, v in resume_data.items() if k != "jobDescription"
     }
 
-    # Get user API key if available
+    # Get user context
     user_id = state.get("user_id", "")
     user_tier = state.get("user_tier", "FREE")
-    user_api_key = get_user_api_key(user_id, user_tier)
+    selected_provider = state.get("selected_provider", "openai")
 
     return {
         "resume_data": resume_data,
@@ -173,7 +194,7 @@ def get_initial_data(state):
         "iteration_count": 0,
         "user_id": user_id,
         "user_tier": user_tier,
-        "user_api_key": user_api_key,
+        "selected_provider": selected_provider,
     }
 
 
@@ -186,10 +207,10 @@ def extract_info(state):
         )
     )
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("extract_info", 0, user_id, user_tier, user_api_key)
+        llm = get_llm_for_task("extract_info", 0, user_id, user_tier, selected_provider)
 
         prompt = EXTRACT_INFO_PROMPT.format(job_description=state["job_description"])
         response = llm.invoke(prompt)
@@ -214,25 +235,21 @@ def extract_info(state):
 
     except Exception as e:
         error_msg = str(e)
-        if user_tier == "FREE":
-            if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                console.print(
-                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
-                )
-                raise Exception(
-                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
-                )
-            else:
-                console.print(
-                    f"[bold red]Error in extract_info: {error_msg}[/bold red]"
-                )
-                raise Exception(f"EXTRACT_INFO_ERROR: {error_msg}")
-        else:
-            # For ADMI tier, show generic model error
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
             console.print(
-                f"[bold red]Error in extract_info with model: {error_msg}[/bold red]"
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
             )
-            raise Exception(f"MODEL_ERROR: Error occurred in extract_info model")
+            raise Exception(
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
+            )
+        else:
+            console.print(
+                f"[bold red]Error in extract_info: {error_msg}[/bold red]"
+            )
+            raise Exception(f"EXTRACT_INFO_ERROR: {error_msg}")
 
 
 def edit_technical_skills(state):
@@ -240,11 +257,11 @@ def edit_technical_skills(state):
         Panel("Editing Technical Skills...", title="Progress", border_style="blue")
     )
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
         llm = get_llm_for_task(
-            "edit_technical_skills", 0.6, user_id, user_tier, user_api_key
+            "edit_technical_skills", 0.6, user_id, user_tier, selected_provider
         )
 
         original_skills_section = state["tailored_resume_data"].get(
@@ -284,36 +301,30 @@ def edit_technical_skills(state):
 
     except Exception as e:
         error_msg = str(e)
-        if user_tier == "FREE":
-            if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                console.print(
-                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
-                )
-                raise Exception(
-                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
-                )
-            else:
-                console.print(
-                    f"[bold red]Error in edit_technical_skills: {error_msg}[/bold red]"
-                )
-                raise Exception(f"EDIT_SKILLS_ERROR: {error_msg}")
-        else:
-            # For ADMI tier, show generic model error
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
             console.print(
-                f"[bold red]Error in edit_technical_skills with model: {error_msg}[/bold red]"
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
             )
             raise Exception(
-                f"MODEL_ERROR: Error occurred in edit_technical_skills model"
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
             )
+        else:
+            console.print(
+                f"[bold red]Error in edit_technical_skills: {error_msg}[/bold red]"
+            )
+            raise Exception(f"EDIT_SKILLS_ERROR: {error_msg}")
 
 
 def edit_experience(state):
     console.print(Panel("Editing Experience...", title="Progress", border_style="blue"))
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("edit_experience", 0.3, user_id, user_tier, user_api_key)
+        llm = get_llm_for_task("edit_experience", 0.3, user_id, user_tier, selected_provider)
 
         original_experience_section = state["tailored_resume_data"].get(
             "workExperience", []
@@ -378,10 +389,10 @@ def edit_experience(state):
 def edit_projects(state):
     console.print(Panel("Editing Projects...", title="Progress", border_style="blue"))
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("edit_projects", 0.3, user_id, user_tier, user_api_key)
+        llm = get_llm_for_task("edit_projects", 0.3, user_id, user_tier, selected_provider)
 
         original_projects_section = state["tailored_resume_data"].get("projects", [])
 
@@ -418,25 +429,21 @@ def edit_projects(state):
 
     except Exception as e:
         error_msg = str(e)
-        if user_tier == "FREE":
-            if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                console.print(
-                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
-                )
-                raise Exception(
-                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
-                )
-            else:
-                console.print(
-                    f"[bold red]Error in edit_projects: {error_msg}[/bold red]"
-                )
-                raise Exception(f"EDIT_PROJECTS_ERROR: {error_msg}")
-        else:
-            # For ADMI tier, show generic model error
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
             console.print(
-                f"[bold red]Error in edit_projects with model: {error_msg}[/bold red]"
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
             )
-            raise Exception(f"MODEL_ERROR: Error occurred in edit_projects model")
+            raise Exception(
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
+            )
+        else:
+            console.print(
+                f"[bold red]Error in edit_projects: {error_msg}[/bold red]"
+            )
+            raise Exception(f"EDIT_PROJECTS_ERROR: {error_msg}")
 
 
 def judge_resume_quality(state):
@@ -444,10 +451,10 @@ def judge_resume_quality(state):
         Panel("Judging Resume Quality...", title="Progress", border_style="blue")
     )
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("judge_quality", 0.1, user_id, user_tier, user_api_key)
+        llm = get_llm_for_task("judge_quality", 0.1, user_id, user_tier, selected_provider)
         iteration_count = state.get("iteration_count", 0) + 1
 
         prompt = JUDGE_QUALITY_PROMPT.format(
@@ -485,27 +492,21 @@ def judge_resume_quality(state):
 
     except Exception as e:
         error_msg = str(e)
-        if user_tier == "FREE":
-            if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                console.print(
-                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
-                )
-                raise Exception(
-                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
-                )
-            else:
-                console.print(
-                    f"[bold red]Error in judge_resume_quality: {error_msg}[/bold red]"
-                )
-                raise Exception(f"JUDGE_QUALITY_ERROR: {error_msg}")
-        else:
-            # For ADMI tier, show generic model error
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
             console.print(
-                f"[bold red]Error in judge_resume_quality with model: {error_msg}[/bold red]"
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
             )
             raise Exception(
-                f"MODEL_ERROR: Error occurred in judge_resume_quality model"
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
             )
+        else:
+            console.print(
+                f"[bold red]Error in judge_resume_quality: {error_msg}[/bold red]"
+            )
+            raise Exception(f"JUDGE_QUALITY_ERROR: {error_msg}")
 
 
 def keywords_editor(state):
@@ -515,10 +516,10 @@ def keywords_editor(state):
         )
     )
 
-    user_id, user_tier, user_api_key = get_user_context(state)
+    user_id, user_tier, selected_provider = get_user_context(state)
 
     try:
-        llm = get_llm_for_task("keywords_editor", 0, user_id, user_tier, user_api_key)
+        llm = get_llm_for_task("keywords_editor", 0, user_id, user_tier, selected_provider)
 
         job_description = state["job_description"]
         resume_data = state["tailored_resume_data"]
@@ -543,25 +544,21 @@ def keywords_editor(state):
 
     except Exception as e:
         error_msg = str(e)
-        if user_tier == "FREE":
-            if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
-                console.print(
-                    "[bold red]Error: API key authentication failed. Please check your OpenAI API key.[/bold red]"
-                )
-                raise Exception(
-                    "API_KEY_ERROR: API key authentication failed. Please verify your OpenAI API key is correct."
-                )
-            else:
-                console.print(
-                    f"[bold red]Error in keywords_editor: {error_msg}[/bold red]"
-                )
-                raise Exception(f"KEYWORDS_EDITOR_ERROR: {error_msg}")
-        else:
-            # For ADMI tier, show generic model error
+        if "API_KEY_ERROR" in error_msg:
+            # Re-raise API key errors as-is
+            raise e
+        elif "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
             console.print(
-                f"[bold red]Error in keywords_editor with model: {error_msg}[/bold red]"
+                "[bold red]Error: API key authentication failed. Please check your API keys.[/bold red]"
             )
-            raise Exception(f"MODEL_ERROR: Error occurred in keywords_editor model")
+            raise Exception(
+                "API_KEY_ERROR: API key authentication failed. Please verify your API keys are correct."
+            )
+        else:
+            console.print(
+                f"[bold red]Error in keywords_editor: {error_msg}[/bold red]"
+            )
+            raise Exception(f"KEYWORDS_EDITOR_ERROR: {error_msg}")
 
 
 def finalize_and_print_json(state):

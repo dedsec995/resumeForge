@@ -109,6 +109,7 @@ class JobDescriptionRequest(BaseModel):
 
 class WorkflowSessionRequest(BaseModel):
     sessionId: str
+    selectedProvider: Optional[str] = "openai"
     
     
 class CompanyPositionResponse(BaseModel):
@@ -157,6 +158,7 @@ class CreateResumeRequest(BaseModel):
     jobDescription: str
     jobTitle: Optional[str] = ""
     companyName: Optional[str] = ""
+    selectedProvider: Optional[str] = "openai"
 
 
 class CreateResumeResponse(BaseModel):
@@ -201,7 +203,9 @@ class GenerateLatexResponse(BaseModel):
 
 # API Config Models
 class ApiConfigRequest(BaseModel):
-    apiKey: str
+    openAiKey: Optional[str] = None
+    groqKey: Optional[str] = None
+    googleGenAiKey: Optional[str] = None
 
 
 class ApiConfigResponse(BaseModel):
@@ -610,6 +614,28 @@ async def fullWorkflowEndpoint(
         if not session_data:
             raise HTTPException(status_code=404, detail="Resume session not found")
         
+        # Get user data to check tier and API keys
+        user_data = dbOps.getUser(userId)
+        user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
+        selected_provider = request.selectedProvider or session_data.get("selectedProvider", "openai")
+        print(f"Processing workflow with provider: {selected_provider} for user tier: {user_tier}")
+        
+        # Validate API keys for FREE users
+        if user_tier == "FREE":
+            api_config = dbOps.getUserApiConfig(userId)
+            if selected_provider == "openai":
+                if not api_config or not api_config.get("openAiKey"):
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
+                    )
+            elif selected_provider == "groq-google":
+                if not api_config or not api_config.get("groqKey") or not api_config.get("googleGenAiKey"):
+                    raise HTTPException(
+                        status_code=400, 
+                        detail="API_KEY_ERROR: Please add both Groq and Google Gen AI API keys in the API Config section to continue."
+                    )
+        
         if session_data.get("status") == "processing":
             return WorkflowResponse(
                 success=True,
@@ -630,15 +656,16 @@ async def fullWorkflowEndpoint(
 
         # Add session to pipeline
         job_description = session_data.get("jobDescription", "")
-        pipeline_added = dbOps.addToPipeline(userId, request.sessionId, job_description)
+        pipeline_added = dbOps.addToPipeline(userId, request.sessionId, job_description, selected_provider)
         
         if not pipeline_added:
             raise HTTPException(status_code=500, detail="Failed to add session to processing queue")
 
-        # Update session status to queued
+        # Update session status to queued and store selected provider
         queuedUpdateData = {
             "status": "queued",
             "queuedAt": datetime.now().isoformat(),
+            "selectedProvider": request.selectedProvider,
         }
         dbOps.updateSession(userId, request.sessionId, queuedUpdateData)
 
@@ -701,7 +728,8 @@ async def createResumeSessionEndpoint(
 ):
     """Create a new resume session with job description"""
     try:
-        sessionId = dbOps.createSession(userId, request.jobDescription)
+        print(f"Creating session with provider: {request.selectedProvider}")
+        sessionId = dbOps.createSession(userId, request.jobDescription, request.selectedProvider)
         
         if sessionId:
             return CreateResumeResponse(
@@ -1180,7 +1208,17 @@ async def updateApiConfigEndpoint(
     try:
         from datetime import datetime
 
-        apiData = {"apiKey": request.apiKey, "timestamp": datetime.now().isoformat()}
+        # Get existing API configuration to merge with new keys
+        existingApiData = dbOps.getUserApiConfig(userId) or {}
+        
+        # Build API data by merging existing keys with new ones
+        # Only update keys that are provided in the request
+        apiData = {
+            "openAiKey": request.openAiKey if request.openAiKey is not None else existingApiData.get("openAiKey", ""),
+            "groqKey": request.groqKey if request.groqKey is not None else existingApiData.get("groqKey", ""),
+            "googleGenAiKey": request.googleGenAiKey if request.googleGenAiKey is not None else existingApiData.get("googleGenAiKey", ""),
+            "timestamp": datetime.now().isoformat()
+        }
 
         success = dbOps.updateUserApiConfig(userId, apiData)
 
@@ -1216,9 +1254,15 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
                 success=True, apiData={}, message="No API configuration found"
             )
 
-        # Don't return the actual API key for security
+        # Return the actual API keys for display in input fields
+        # This is secure as it's only accessible to the authenticated user
         safeApiData = {
-            "hasApiKey": bool(apiData.get("apiKey")),
+            "openAiKey": apiData.get("openAiKey", ""),
+            "groqKey": apiData.get("groqKey", ""),
+            "googleGenAiKey": apiData.get("googleGenAiKey", ""),
+            "hasOpenAiKey": bool(apiData.get("openAiKey")),
+            "hasGroqKey": bool(apiData.get("groqKey")),
+            "hasGoogleGenAiKey": bool(apiData.get("googleGenAiKey")),
             "timestamp": apiData.get("timestamp", ""),
             "lastUpdated": apiData.get("timestamp", ""),
         }

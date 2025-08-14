@@ -43,7 +43,7 @@ class DatabaseOperations:
     # Session Pipeline Operations
 
 
-    def addToPipeline(self, userId: str, sessionId: str, jobDescription: str):
+    def addToPipeline(self, userId: str, sessionId: str, jobDescription: str, selectedProvider: str = "openai"):
         """Add a session to the processing pipeline"""
         try:
             pipelineRef = self.db.collection("sessionPipeline").document(sessionId)
@@ -51,6 +51,7 @@ class DatabaseOperations:
                 "sessionId": sessionId,
                 "userId": userId,
                 "jobDescription": jobDescription,
+                "selectedProvider": selectedProvider,
                 "status": "queued",
                 "addedAt": firestore.SERVER_TIMESTAMP,
                 "startedAt": None,
@@ -60,7 +61,7 @@ class DatabaseOperations:
                 "maxRetries": 3
             }
             pipelineRef.set(pipelineData)
-            print(f"Session {sessionId} added to pipeline")
+            print(f"Session {sessionId} added to pipeline with selectedProvider: {selectedProvider}")
             return True
         except Exception as e:
             print(f"Error adding session to pipeline: {e}")
@@ -301,9 +302,10 @@ class DatabaseOperations:
             return False
 
     # Session Operations
-    def createSession(self, userId, jobDescription):
+    def createSession(self, userId, jobDescription, selectedProvider="openai"):
         """Create new resume session"""
         try:
+            print(f"Creating session with selectedProvider: {selectedProvider}")
             sessionId = str(uuid.uuid4())
             sessionRef = (
                 self.db.collection("users")
@@ -316,6 +318,7 @@ class DatabaseOperations:
                 "sessionId": sessionId,
                 "userId": userId,
                 "jobDescription": jobDescription,
+                "selectedProvider": selectedProvider,
                 "timestamp": firestore.SERVER_TIMESTAMP,
                 "status": "created",
                 "metadata": {
@@ -337,6 +340,7 @@ class DatabaseOperations:
             }
 
             sessionRef.set(sessionData)
+            print(f"Session {sessionId} created with selectedProvider: {selectedProvider}")
 
             # Update user's total sessions count
             userRef = self.db.collection("users").document(userId)
@@ -366,7 +370,9 @@ class DatabaseOperations:
             sessionDoc = sessionRef.get()
 
             if sessionDoc.exists:
-                return sessionDoc.to_dict()
+                session_data = sessionDoc.to_dict()
+                print(f"Retrieved session {sessionId} with selectedProvider: {session_data.get('selectedProvider')}")
+                return session_data
             return None
         except Exception as e:
             print(f"Error getting session: {e}")

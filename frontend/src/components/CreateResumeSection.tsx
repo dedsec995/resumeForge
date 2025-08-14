@@ -11,29 +11,30 @@ import {
   Grow,
   Slide,
   TextField,
-  InputAdornment,
-  IconButton,
-  Collapse
 } from '@mui/material';
 import { 
   Add as AddIcon,
   WorkOutline as ResumeIcon,
   Description as DescriptionIcon,
   Star as StarIcon,
-  Visibility as VisibilityIcon,
-  VisibilityOff as VisibilityOffIcon,
-  Save as SaveIcon,
-  Delete as DeleteIcon,
+  Search as SearchIcon,
+  Error as ErrorIcon,
+  CheckCircle as SuccessIcon,
+  Warning as WarningIcon,
   Key as KeyIcon,
-  Search as SearchIcon
+  Download as DownloadIcon,
+  ContentCopy as CopyIcon,
+  Save as SaveIcon,
+  Refresh as RefreshIcon,
 } from '@mui/icons-material';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../utils/apiClient';
 import { toast } from 'react-hot-toast';
 
 // Import reusable components
 import { ResumeSessionCard, NewResumeForm, FirstTimeUserWelcome } from './ResumeComponents';
 import SessionDetailsDialog from './SessionDetailsDialog';
+import ApiKeysConfiguration from './ApiKeysConfiguration';
 
 interface ResumeSession {
   sessionId: string;
@@ -108,21 +109,58 @@ const CreateResumeSection = () => {
 
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
-  const [userApiConfig, setUserApiConfig] = useState<{ hasApiKey?: boolean; timestamp?: string; lastUpdated?: string } | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
-  const [apiKey, setApiKey] = useState('');
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [savingApiConfig, setSavingApiConfig] = useState(false);
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'groq-google'>('groq-google');
 
+
+
+
+  // Update individual session status in real-time
+  const updateSessionStatus = useCallback(async (sessionId: string) => {
+    try {
+      const response = await apiClient.get(`/sessionStatus/${sessionId}`);
+      // The sessionStatus endpoint returns status directly, not wrapped in success field
+      const newStatus = response.data.status;
+      
+      console.log(`Updating session ${sessionId} status to: ${newStatus}`, response.data);
+      
+      // Only update if status actually changed
+      setSessions(prevSessions => {
+        const session = prevSessions.find(s => s.sessionId === sessionId);
+        if (session && session.status !== newStatus) {
+          console.log(`Session ${sessionId} status changed from ${session.status} to ${newStatus}`);
+          return prevSessions.map(s => 
+            s.sessionId === sessionId 
+              ? { ...s, status: newStatus }
+              : s
+          );
+        }
+        return prevSessions;
+      });
+      
+      // Also update selected session if it's the same session and status changed
+      if (selectedSession && selectedSession.sessionId === sessionId && selectedSession.status !== newStatus) {
+        console.log(`Selected session ${sessionId} status changed from ${selectedSession.status} to ${newStatus}`);
+        setSelectedSession(prev => prev ? { ...prev, status: newStatus } : null);
+      }
+    } catch (error) {
+      console.error('Error updating session status:', error);
+    }
+  }, [selectedSession]);
 
   // Load existing sessions on component mount
   useEffect(() => {
     loadSessions();
     loadGlobalCounter();
     loadIndividualCounter();
-    loadUserApiConfig();
     loadUserInfo();
   }, []);
+
+  useEffect(() => {
+    if (userInfo?.accountTier && userInfo.accountTier !== 'FREE') {
+      setSelectedProvider('groq-google');
+    }
+  }, [userInfo?.accountTier]);
 
   // Real-time status updates for active sessions
   useEffect(() => {
@@ -156,7 +194,10 @@ const CreateResumeSection = () => {
     }, 3000); // Poll every 3 seconds
 
     return () => clearInterval(interval);
-  }, [sessions, selectedSession, dialogOpen]);
+  }, [sessions, selectedSession, dialogOpen, updateSessionStatus]);
+
+  // Simple provider selection - no auto-override
+  // User manually selects what they want, no complex logic
 
   const loadGlobalCounter = async () => {
     try {
@@ -212,7 +253,7 @@ const CreateResumeSection = () => {
       }
     } catch (error) {
       console.error('Error loading sessions:', error);
-      toast.error('Failed to load resume sessions');
+      toast.error('Failed to load resume sessions', { icon: <ErrorIcon /> });
     } finally {
       setLoading(false);
     }
@@ -233,54 +274,23 @@ const CreateResumeSection = () => {
     setLoadingMore(false);
   };
 
-  // Update individual session status in real-time
-  const updateSessionStatus = async (sessionId: string) => {
-    try {
-      const response = await apiClient.get(`/sessionStatus/${sessionId}`);
-      // The sessionStatus endpoint returns status directly, not wrapped in success field
-      const newStatus = response.data.status;
-      
-      console.log(`Updating session ${sessionId} status to: ${newStatus}`, response.data);
-      
-      // Only update if status actually changed
-      setSessions(prevSessions => {
-        const session = prevSessions.find(s => s.sessionId === sessionId);
-        if (session && session.status !== newStatus) {
-          console.log(`Session ${sessionId} status changed from ${session.status} to ${newStatus}`);
-          return prevSessions.map(s => 
-            s.sessionId === sessionId 
-              ? { ...s, status: newStatus }
-              : s
-          );
-        }
-        return prevSessions;
-      });
-      
-      // Also update selected session if it's the same session and status changed
-      if (selectedSession && selectedSession.sessionId === sessionId && selectedSession.status !== newStatus) {
-        console.log(`Selected session ${sessionId} status changed from ${selectedSession.status} to ${newStatus}`);
-        setSelectedSession(prev => prev ? { ...prev, status: newStatus } : null);
-      }
-    } catch (error) {
-      console.error('Error updating session status:', error);
-    }
-  };
-
   const handleSubmit = async () => {
     if (!jobDescription.trim()) {
-      toast.error('Please enter a job description');
+      toast.error('Please enter a job description', { icon: <ErrorIcon /> });
       return;
     }
 
     try {
       setSubmitting(true);
+
       const response = await apiClient.post('/createResumeSession', {
-        jobDescription: jobDescription.trim()
+        jobDescription: jobDescription.trim(),
+        selectedProvider: selectedProvider
       });
 
       if (response.data.success) {
         const sessionId = response.data.sessionId;
-        toast.success('Resume session created! Starting automatic processing...');
+        toast.success('Resume session created! Starting automatic processing...', { icon: <SuccessIcon /> });
         setJobDescription('');
         
         // Automatically start the workflow
@@ -288,12 +298,14 @@ const CreateResumeSection = () => {
           setWorkflowLoading(sessionId);
           
           // Start the workflow
+
           const workflowResponse = await apiClient.post('/fullWorkflow', {
-            sessionId: sessionId
+            sessionId: sessionId,
+            selectedProvider: selectedProvider
           });
 
           if (workflowResponse.data.success) {
-            toast.success('Processing started! Creating your tailored resume...');
+            toast.success('Processing started! Creating your tailored resume...', { icon: <SuccessIcon /> });
             
             // Start polling for status updates
             const pollInterval = setInterval(async () => {
@@ -321,7 +333,7 @@ const CreateResumeSection = () => {
                 if (status === 'completed') {
                   clearInterval(pollInterval);
                   setWorkflowLoading(null);
-                  toast.success(`Resume processing completed! Final score: ${statusResponse.data.currentScore}/100`);
+                  toast.success(`Resume processing completed! Final score: ${statusResponse.data.currentScore}/100`, { icon: <SuccessIcon /> });
                   
                   // Refresh the sessions list to show updated status
                   loadSessions();
@@ -348,7 +360,7 @@ const CreateResumeSection = () => {
                 } else if (status === 'failed') {
                   clearInterval(pollInterval);
                   setWorkflowLoading(null);
-                  toast.error(`Processing failed: ${statusResponse.data.error || 'Unknown error'}`);
+                  toast.error(`Processing failed: ${statusResponse.data.error || 'Unknown error'}`, { icon: <ErrorIcon /> });
                   
                   // Refresh the sessions list
                   loadSessions();
@@ -364,7 +376,7 @@ const CreateResumeSection = () => {
                 console.error('Error polling status:', pollError);
                 clearInterval(pollInterval);
                 setWorkflowLoading(null);
-                toast.error('Error checking processing status');
+                toast.error('Error checking processing status', { icon: <ErrorIcon /> });
               }
             }, 3000); // Poll every 3 seconds
             
@@ -372,7 +384,7 @@ const CreateResumeSection = () => {
             setTimeout(() => {
               clearInterval(pollInterval);
               setWorkflowLoading(null);
-              toast.error('Processing timeout. Please check the session manually.');
+              toast.error('Processing timeout. Please check the session manually.', { icon: <WarningIcon /> });
               loadSessions();
               loadGlobalCounter(); // Refresh the global counter
               loadIndividualCounter(); // Refresh the individual counter
@@ -380,23 +392,55 @@ const CreateResumeSection = () => {
             
           } else {
             setWorkflowLoading(null);
-            toast.error('Failed to start processing');
+            toast.error('Failed to start processing', { icon: <ErrorIcon /> });
           }
         } catch (workflowError) {
           console.error('Error starting workflow:', workflowError);
           setWorkflowLoading(null);
-          toast.error('Failed to start automatic processing. You can start it manually.');
+          
+          // Handle specific workflow errors with provider context
+          const errorResponse = workflowError as { response?: { data?: { detail?: string } } };
+          if (errorResponse.response?.data?.detail?.includes('API_KEY_ERROR')) {
+            const getApiKeyErrorMessage = () => {
+              if (selectedProvider === 'openai') {
+                return 'OpenAI API key required. Please add your OpenAI API key below.';
+              } else if (selectedProvider === 'groq-google') {
+                return 'Groq and Google API keys required. Please add both keys below.';
+              }
+              return 'API keys required. Please add your API keys below.';
+            };
+            
+            toast.error(getApiKeyErrorMessage(), { duration: 6000, icon: <KeyIcon /> });
+          } else if (errorResponse.response?.data?.detail?.includes('INVALID_API_KEY')) {
+            const getInvalidKeyMessage = () => {
+              if (selectedProvider === 'openai') {
+                return 'Invalid OpenAI API key. Please check your key.';
+              } else if (selectedProvider === 'groq-google') {
+                return 'Invalid Groq or Google API key. Please verify both keys.';
+              }
+              return 'Invalid API key. Please check your keys.';
+            };
+            
+            toast.error(getInvalidKeyMessage(), { duration: 6000, icon: <KeyIcon /> });
+          } else if (errorResponse.response?.data?.detail?.includes('MODEL_ERROR')) {
+            toast.error('AI model unavailable. Please try again later.', { 
+              duration: 5000, 
+              icon: <WarningIcon />
+            });
+          } else {
+            toast.error('Failed to start processing. You can retry manually.', { icon: <ErrorIcon /> });
+          }
         }
         
         loadSessions(); // Refresh the sessions list and update form visibility
         loadGlobalCounter(); // Refresh the global counter
         loadIndividualCounter(); // Refresh the individual counter
       } else {
-        toast.error('Failed to create resume session');
+        toast.error('Failed to create resume session', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error creating session:', error);
-      toast.error('Failed to create resume session');
+      toast.error('Failed to create resume session', { icon: <ErrorIcon /> });
     } finally {
       setSubmitting(false);
     }
@@ -464,12 +508,12 @@ const CreateResumeSection = () => {
             }
           } else {
             console.error('Failed to load session data:', response);
-            toast.error('Failed to load session details');
+            toast.error('Failed to load session details', { icon: <ErrorIcon /> });
             setDialogOpen(false);
           }
         } catch (error) {
           console.error('Error fetching session:', error);
-          toast.error('Failed to load session details');
+          toast.error('Failed to load session details', { icon: <ErrorIcon /> });
           setDialogOpen(false);
         } finally {
           setDialogLoading(false);
@@ -481,7 +525,7 @@ const CreateResumeSection = () => {
       
     } catch (error) {
       console.error('Error opening session dialog:', error);
-      toast.error('Failed to open session details');
+      toast.error('Failed to open session details', { icon: <ErrorIcon /> });
       setDialogOpen(false);
       setDialogLoading(false);
     }
@@ -495,25 +539,20 @@ const CreateResumeSection = () => {
     try {
               const response = await apiClient.delete(`/deleteResumeSession/${sessionId}`);
       if (response.data.success) {
-        toast.success('Session deleted successfully');
+        toast.success('Session deleted successfully', { icon: <SuccessIcon /> });
         loadSessions(); // Refresh the sessions list
         // Note: We don't decrement the global counter when deleting sessions
         // as the global counter represents total job descriptions processed, not current sessions
       }
     } catch (error) {
       console.error('Error deleting session:', error);
-      toast.error('Failed to delete session');
+      toast.error('Failed to delete session', { icon: <ErrorIcon /> });
     }
   };
 
   const handleStartWorkflow = async (sessionId: string) => {
     if (!sessionId) {
-      toast.error('No session selected');
-      return;
-    }
-
-    // Check if user has API key for FREE tier
-    if (!checkApiKeyRequirement()) {
+      toast.error('No session selected', { icon: <ErrorIcon /> });
       return;
     }
 
@@ -521,12 +560,14 @@ const CreateResumeSection = () => {
       setWorkflowLoading(sessionId); // Set loading for specific session
       
       // Start the workflow
+
       const response = await apiClient.post('/fullWorkflow', {
-        sessionId: sessionId
+        sessionId: sessionId,
+        selectedProvider: selectedProvider
       });
 
       if (response.data.success) {
-        toast.success('Workflow queued! Your resume will be processed in order...');
+        toast.success('Workflow queued! Your resume will be processed in order...', { icon: <SuccessIcon /> });
         
         // Start polling for status updates
         const pollInterval = setInterval(async () => {
@@ -554,7 +595,7 @@ const CreateResumeSection = () => {
             if (status === 'completed') {
               clearInterval(pollInterval);
               setWorkflowLoading(null); // Clear loading for this session
-              toast.success(`Workflow completed! Final score: ${statusResponse.data.currentScore}/100`);
+              toast.success(`Workflow completed! Final score: ${statusResponse.data.currentScore}/100`, { icon: <SuccessIcon /> });
               
               // Refresh the session data to show updated results
               await handleViewSession(sessionId);
@@ -563,36 +604,39 @@ const CreateResumeSection = () => {
               clearInterval(pollInterval);
               setWorkflowLoading(null); // Clear loading for this session
               
-              // Handle different error types
+              // Handle different error types with provider-specific messages
               if (statusResponse.data.errorType === 'API_KEY_ERROR') {
-                // Check if user has API key configured to provide appropriate message
-                if (userApiConfig?.hasApiKey) {
-                  toast.error(
-                    'Invalid API Key: Your OpenAI API key appears to be incorrect or expired. Please update it below.',
-                    { 
-                      duration: 8000,
-                      icon: '❌'
-                    }
-                  );
-                } else {
-                  toast.error(
-                    'API Key Required: Please add your OpenAI API key below to continue.',
-                    { 
-                      duration: 8000,
-                      icon: '🔑'
-                    }
-                  );
-                }
+                const getApiKeyErrorMessage = () => {
+                  if (selectedProvider === 'openai') {
+                    return 'OpenAI API key required. Please add your OpenAI API key below.';
+                  } else if (selectedProvider === 'groq-google') {
+                    return 'Groq and Google API keys required. Please add both keys below.';
+                  }
+                  return 'API keys required. Please add your API keys below.';
+                };
+                
+                toast.error(getApiKeyErrorMessage(), { duration: 6000, icon: <KeyIcon /> });
+              } else if (statusResponse.data.errorType === 'INVALID_API_KEY') {
+                const getInvalidKeyMessage = () => {
+                  if (selectedProvider === 'openai') {
+                    return 'Invalid OpenAI API key. Please check your key.';
+                  } else if (selectedProvider === 'groq-google') {
+                    return 'Invalid Groq or Google API key. Please verify both keys.';
+                  }
+                  return 'Invalid API key. Please check your keys.';
+                };
+                
+                toast.error(getInvalidKeyMessage(), { duration: 6000, icon: <KeyIcon /> });
               } else if (statusResponse.data.errorType === 'MODEL_ERROR') {
                 toast.error(
-                  'Model Error: There was an issue with the AI model. Please try again later.',
+                  'AI model unavailable. Please try again later.',
                   { 
                     duration: 5000,
-                    icon: '🤖'
+                    icon: <WarningIcon />
                   }
                 );
               } else {
-                toast.error(`Workflow failed: ${statusResponse.data.error || 'Unknown error'}`);
+                toast.error(`Processing failed: ${statusResponse.data.error || 'Unknown error'}`, { icon: <ErrorIcon /> });
               }
               
               // Refresh the session data to show error status
@@ -614,7 +658,7 @@ const CreateResumeSection = () => {
           if (workflowLoading === sessionId) {
             setWorkflowLoading(null); // Clear loading for this session
             toast('Workflow is taking longer than expected. Please check the session later.', { 
-              icon: '⚠️',
+              icon: <WarningIcon />,
               duration: 5000 
             });
           }
@@ -622,7 +666,7 @@ const CreateResumeSection = () => {
         
       } else {
         setWorkflowLoading(null); // Clear loading for this session
-        toast.error('Failed to start workflow');
+        toast.error('Failed to start workflow', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error starting workflow:', error);
@@ -631,41 +675,44 @@ const CreateResumeSection = () => {
       // Check if it's an API key error from the response
       const errorResponse = error as { response?: { data?: { detail?: string } } };
       if (errorResponse.response?.data?.detail?.includes('API_KEY_ERROR')) {
-        // Check if user has API key configured to provide appropriate message
-        if (userApiConfig?.hasApiKey) {
-          toast.error(
-            'Invalid API Key: Your OpenAI API key appears to be incorrect or expired. Please update it below.',
-            { 
-              duration: 8000,
-              icon: '❌'
-            }
-          );
-        } else {
-          toast.error(
-            'API Key Required: Please add your OpenAI API key below to continue.',
-            { 
-              duration: 8000,
-              icon: '🔑'
-            }
-          );
-        }
+        const getApiKeyErrorMessage = () => {
+          if (selectedProvider === 'openai') {
+            return 'OpenAI API key required. Please add your OpenAI API key below.';
+          } else if (selectedProvider === 'groq-google') {
+            return 'Groq and Google API keys required. Please add both keys below.';
+          }
+          return 'API keys required. Please add your API keys below.';
+        };
+        
+        toast.error(getApiKeyErrorMessage(), { duration: 6000, icon: <KeyIcon /> });
+      } else if (errorResponse.response?.data?.detail?.includes('INVALID_API_KEY')) {
+        const getInvalidKeyMessage = () => {
+          if (selectedProvider === 'openai') {
+            return 'Invalid OpenAI API key. Please check your key.';
+          } else if (selectedProvider === 'groq-google') {
+            return 'Invalid Groq or Google API key. Please verify both keys.';
+          }
+          return 'Invalid API key. Please check your keys.';
+        };
+        
+        toast.error(getInvalidKeyMessage(), { duration: 6000, icon: <KeyIcon /> });
       } else if (errorResponse.response?.data?.detail?.includes('MODEL_ERROR')) {
         toast.error(
-          'Model Error: There was an issue with the AI model. Please try again later.',
+          'AI model unavailable. Please try again later.',
           { 
             duration: 5000,
-            icon: '🤖'
+            icon: <WarningIcon />
           }
         );
       } else {
-        toast.error('Failed to start resume workflow');
+        toast.error('Failed to start workflow. Please try again.', { icon: <ErrorIcon /> });
       }
     }
   };
 
   const handleDownloadPDF = async (sessionId: string) => {
     if (!sessionId) {
-      toast.error('No session selected');
+      toast.error('No session selected', { icon: <ErrorIcon /> });
       return;
     }
 
@@ -677,14 +724,14 @@ const CreateResumeSection = () => {
       try {
         latexResponse = await apiClient.post(`/generateLatex/${sessionId}`);
         if (latexResponse.data.success) {
-          toast.success('LaTeX file generated successfully!');
+          toast.success('LaTeX file generated successfully!', { icon: <SuccessIcon /> });
           await handleViewSession(sessionId);
         } else {
           throw new Error('Failed to generate LaTeX file');
         }
       } catch (latexError) {
         console.error('Error generating LaTeX file:', latexError);
-        toast.error('Failed to generate LaTeX file');
+        toast.error('Failed to generate LaTeX file', { icon: <ErrorIcon /> });
         return;
       }
 
@@ -722,15 +769,15 @@ const CreateResumeSection = () => {
         link.remove();
         window.URL.revokeObjectURL(url);
         
-        toast.success('PDF downloaded successfully!');
+        toast.success('PDF downloaded successfully!', { icon: <DownloadIcon /> });
         await handleViewSession(sessionId);
       } catch (pdfError) {
         console.error('Error downloading PDF:', pdfError);
-        toast.error('Failed to download PDF. Please try again.');
+        toast.error('Failed to download PDF. Please try again.', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error in PDF download process:', error);
-      toast.error('Failed to process PDF download');
+              toast.error('Failed to process PDF download', { icon: <ErrorIcon /> });
     } finally {
       setDownloadPDFLoading(null);
     }
@@ -740,7 +787,7 @@ const CreateResumeSection = () => {
 
   const handleDownloadLatexFile = async (sessionId: string) => {
     if (!sessionId) {
-      toast.error('No session selected');
+      toast.error('No session selected', { icon: <ErrorIcon /> });
       return;
     }
 
@@ -778,10 +825,10 @@ const CreateResumeSection = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
       
-      toast.success('LaTeX file downloaded successfully!');
+              toast.success('LaTeX file downloaded successfully!', { icon: <DownloadIcon /> });
     } catch (error) {
       console.error('Error downloading LaTeX:', error);
-      toast.error('Failed to download LaTeX file');
+      toast.error('Failed to download LaTeX file', { icon: <ErrorIcon /> });
     } finally {
       setDownloadLatexLoading(null);
     }
@@ -802,13 +849,13 @@ const CreateResumeSection = () => {
           setSelectedSession(sessionResponse.data.sessionData);
         }
         
-        toast.success('LaTeX regenerated successfully!');
+        toast.success('LaTeX regenerated successfully!', { icon: <RefreshIcon /> });
       } else {
-        toast.error('Failed to regenerate LaTeX');
+        toast.error('Failed to regenerate LaTeX', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error regenerating LaTeX:', error);
-      toast.error('Failed to regenerate LaTeX');
+              toast.error('Failed to regenerate LaTeX', { icon: <ErrorIcon /> });
     } finally {
       setRegenerateLatexLoading(null);
     }
@@ -829,23 +876,14 @@ const CreateResumeSection = () => {
   const handleCopyToClipboard = async (content: string, type: string) => {
     try {
       await navigator.clipboard.writeText(content);
-      toast.success(`${type} copied to clipboard!`);
+              toast.success(`${type} copied to clipboard!`, { icon: <CopyIcon /> });
     } catch (error) {
       console.error('Failed to copy to clipboard:', error);
-      toast.error('Failed to copy to clipboard');
+      toast.error('Failed to copy to clipboard', { icon: <ErrorIcon /> });
     }
   };
 
-  const loadUserApiConfig = async () => {
-    try {
-      const response = await apiClient.get('/apiConfig');
-      if (response.data.success) {
-        setUserApiConfig(response.data.apiData);
-      }
-    } catch (error) {
-      console.error('Error loading API config:', error);
-    }
-  };
+
 
   const loadUserInfo = async () => {
     try {
@@ -862,79 +900,15 @@ const CreateResumeSection = () => {
     }
   };
 
-  const handleSaveApiConfig = async () => {
-    if (!apiKey.trim()) {
-      toast.error('Please enter an API key');
-      return;
-    }
 
-    setSavingApiConfig(true);
-    try {
-      const response = await apiClient.post('/apiConfig', {
-        apiKey: apiKey.trim()
-      });
-      
-      if (response.data.success) {
-        setApiKey('');
-        setShowApiKey(false);
-        await loadUserApiConfig();
-        toast.success('API key saved securely!');
-      } else {
-        toast.error('Failed to save API key.');
-      }
-    } catch (error) {
-      console.error('Error saving API config:', error);
-      toast.error('Failed to save API key. Make sure the backend is running.');
-    } finally {
-      setSavingApiConfig(false);
-    }
-  };
 
-  const handleDeleteApiKey = async () => {
-    setSavingApiConfig(true);
-    try {
-      const response = await apiClient.post('/apiConfig', {
-        apiKey: '' // Empty key to delete
-      });
-      
-      if (response.data.success) {
-        setUserApiConfig(null);
-        toast.success('API key deleted successfully!');
-      } else {
-        toast.error('Failed to delete API key.');
-      }
-    } catch (error) {
-      console.error('Error deleting API config:', error);
-      toast.error('Failed to delete API key.');
-    } finally {
-      setSavingApiConfig(false);
-    }
-  };
 
-  const checkApiKeyRequirement = () => {
-    // Debug: Log user tier information
-    console.log('Debug - User tier:', userInfo?.accountTier, 'Has API key:', userApiConfig?.hasApiKey);
-    
-    // Only check API key requirement for FREE tier users
-    if (userInfo?.accountTier === 'FREE') {
-      if (!userApiConfig?.hasApiKey) {
-        toast.error(
-          'API Key Required: Please add your OpenAI API key below to continue.',
-          { 
-            duration: 8000,
-            icon: '🔑'
-          }
-        );
-        return false;
-      }
-    }
-    // Admin users (ADMI tier) don't need API key - they use environment variables
-    return true;
-  };
+
+
 
   const handleSaveJson = async () => {
     if (!selectedSession || !structuredData) {
-      toast.error('No data to save');
+              toast.error('No data to save', { icon: <ErrorIcon /> });
       return;
     }
 
@@ -947,7 +921,7 @@ const CreateResumeSection = () => {
       });
 
       if (response.data.success) {
-        toast.success('Resume data updated successfully!');
+        toast.success('Resume data updated successfully!', { icon: <SaveIcon /> });
         
         // Update the selectedSession with the new data to ensure hasChanges is immediately correct
         if (selectedSession) {
@@ -963,11 +937,11 @@ const CreateResumeSection = () => {
         // Stay on the current tab (Edit JSON tab) instead of switching
         // setActiveTab(1); // Removed automatic tab switching
       } else {
-        toast.error('Failed to update resume data');
+        toast.error('Failed to update resume data', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error saving resume data:', error);
-      toast.error('Failed to save resume data');
+              toast.error('Failed to save resume data', { icon: <ErrorIcon /> });
     } finally {
       setSaveJsonLoading(false);
     }
@@ -1017,14 +991,14 @@ const CreateResumeSection = () => {
         setSearchResults(response.data.sessions);
         setDisplayedSessions(response.data.sessions);
         setTotalSessionsCount(response.data.totalSessions);
-        toast.success(response.data.message);
+        toast.success(response.data.message, { icon: <SuccessIcon /> });
       } else {
         console.log('🔍 Search failed with response:', response.data);
-        toast.error('Search failed');
+        toast.error('Search failed', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('🔍 Search error:', error);
-      toast.error('Search failed');
+      toast.error('Search failed', { icon: <ErrorIcon /> });
     } finally {
       setIsSearching(false);
       console.log('🔍 Search completed');
@@ -1179,6 +1153,107 @@ const CreateResumeSection = () => {
                           </Typography>
                         </Box>
 
+                        {/* User Tier Badge */}
+                        <Box sx={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 1,
+                          px: 2,
+                          py: 0.5,
+                          borderRadius: 2,
+                          background: userInfo?.accountTier === 'FREE' 
+                            ? 'rgba(34, 197, 94, 0.1)' 
+                            : 'rgba(239, 68, 68, 0.1)',
+                          border: userInfo?.accountTier === 'FREE' 
+                            ? '1px solid rgba(34, 197, 94, 0.3)' 
+                            : '1px solid rgba(239, 68, 68, 0.3)',
+                          backdropFilter: 'blur(10px)'
+                        }}>
+                          <Box sx={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: userInfo?.accountTier === 'FREE' ? '#22C55E' : '#EF4444',
+                            animation: 'pulse 2s infinite'
+                          }} />
+                          <Typography
+                            variant="body2"
+                            sx={{
+                              color: userInfo?.accountTier === 'FREE' ? '#22C55E' : '#EF4444',
+                              fontWeight: 600,
+                              fontSize: '0.875rem'
+                            }}
+                          >
+                            {userInfo?.accountTier || 'FREE'} USER
+                          </Typography>
+                        </Box>
+
+                        {/* Provider Selection for ADMIN Users */}
+                        {userInfo?.accountTier !== 'FREE' && (
+                          <Box sx={{ display: 'flex', gap: 2, ml: 2 }}>
+                            {/* Chat-GPT Bubble */}
+                            <Box
+                              onClick={() => setSelectedProvider('openai')}
+                              sx={{
+                                px: 2,
+                                py: 1,
+                                borderRadius: 2.5,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '2px solid',
+                                borderColor: selectedProvider === 'openai' ? '#6366F1' : 'rgba(99, 102, 241, 0.3)',
+                                background: selectedProvider === 'openai' 
+                                  ? 'rgba(99, 102, 241, 0.15)' 
+                                  : 'rgba(99, 102, 241, 0.05)',
+                                '&:hover': {
+                                  borderColor: '#6366F1',
+                                  background: 'rgba(99, 102, 241, 0.1)',
+                                  transform: 'scale(1.05)',
+                                  boxShadow: '0 4px 12px rgba(99, 102, 241, 0.2)'
+                                }
+                              }}
+                            >
+                              <Typography sx={{
+                                color: selectedProvider === 'openai' ? '#6366F1' : '#E2E8F0',
+                                fontWeight: 600,
+                                fontSize: '0.8rem'
+                              }}>
+                                Chat-GPT
+                              </Typography>
+                            </Box>
+
+                            {/* Groq & Google Bubble */}
+                            <Box
+                              onClick={() => setSelectedProvider('groq-google')}
+                              sx={{
+                                px: 2,
+                                py: 1,
+                                borderRadius: 2.5,
+                                cursor: 'pointer',
+                                transition: 'all 0.3s ease',
+                                border: '2px solid',
+                                borderColor: selectedProvider === 'groq-google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
+                                background: selectedProvider === 'groq-google' 
+                                  ? 'rgba(16, 185, 129, 0.15)' 
+                                  : 'rgba(16, 185, 129, 0.05)',
+                                '&:hover': {
+                                  borderColor: '#10B981',
+                                  background: 'rgba(16, 185, 129, 0.1)',
+                                  transform: 'scale(1.05)',
+                                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)'
+                                }
+                              }}
+                            >
+                              <Typography sx={{
+                                color: selectedProvider === 'groq-google' ? '#10B981' : '#E2E8F0',
+                                fontWeight: 600,
+                                fontSize: '0.8rem'
+                              }}>
+                                Groq & Google
+                              </Typography>
+                            </Box>
+                          </Box>
+                        )}
 
                       </Box>
 
@@ -1201,17 +1276,17 @@ const CreateResumeSection = () => {
                           py: 2,
                           fontSize: '1rem',
                           fontWeight: 600,
-                          border: '2px solid rgba(99, 102, 241, 0.4)',
-                          color: '#6366F1',
+                          border: '2px solid rgba(34, 197, 94, 0.6)',
+                          color: '#FFFFFF',
                           borderRadius: 3,
-                          background: 'rgba(99, 102, 241, 0.05)',
+                          background: 'linear-gradient(135deg, #22C55E, #16A34A)',
                           backdropFilter: 'blur(10px)',
                           whiteSpace: 'nowrap',
                           '&:hover': {
-                            borderColor: '#6366F1',
-                            backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                            borderColor: '#16A34A',
+                            backgroundColor: 'linear-gradient(135deg, #16A34A, #15803D)',
                             transform: 'translateY(-2px)',
-                            boxShadow: '0 8px 25px rgba(99, 102, 241, 0.3)'
+                            boxShadow: '0 8px 25px rgba(34, 197, 94, 0.4)'
                           },
                           transition: 'all 0.3s ease-in-out',
                           position: 'relative',
@@ -1223,7 +1298,7 @@ const CreateResumeSection = () => {
                             left: '-100%',
                             width: '100%',
                             height: '100%',
-                            background: 'linear-gradient(90deg, transparent, rgba(99, 102, 241, 0.2), transparent)',
+                            background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent)',
                             transition: 'left 0.5s',
                           },
                           '&:hover::before': {
@@ -1239,201 +1314,15 @@ const CreateResumeSection = () => {
               </Box>
             </Grow>
 
-            {/* API Key Configuration - Full width, outside the flex container */}
-            {userInfo?.accountTier === 'FREE' && (
-              <Slide direction="up" in timeout={1400}>
-                <Box sx={{ mt: 4 }}>
-                  <Collapse in={!userApiConfig?.hasApiKey} timeout={500}>
-                    <Paper
-                      elevation={2}
-                      sx={{
-                        p: 3,
-                        background: 'rgba(239, 68, 68, 0.1)',
-                        border: '1px solid rgba(239, 68, 68, 0.3)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(10px)',
-                        width: '100%',
-                      }}
-                    >
-                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <KeyIcon sx={{ color: '#EF4444', fontSize: 20 }} />
-                          <Typography variant="h6" sx={{ color: '#F8FAFC', fontWeight: 600 }}>
-                            OpenAI API Key Required
-                          </Typography>
-                        </Box>
-                        
-                        {/* User Tier Badge */}
-                        <Box sx={{
-                          px: 2,
-                          py: 0.5,
-                          borderRadius: 2,
-                          background: userInfo?.accountTier === 'FREE' 
-                            ? 'rgba(239, 68, 68, 0.2)' 
-                            : 'rgba(34, 197, 94, 0.2)',
-                          border: userInfo?.accountTier === 'FREE' 
-                            ? '1px solid rgba(239, 68, 68, 0.4)' 
-                            : '1px solid rgba(34, 197, 94, 0.4)',
-                          backdropFilter: 'blur(10px)'
-                        }}>
-                          <Typography variant="caption" sx={{ 
-                            color: userInfo?.accountTier === 'FREE' ? '#EF4444' : '#22C55E',
-                            fontWeight: 600,
-                            fontSize: '0.75rem'
-                          }}>
-                            {userInfo?.accountTier || 'FREE'} USER
-                          </Typography>
-                        </Box>
+
+
+            {/* AI Provider & API Keys Configuration Component */}
+            <ApiKeysConfiguration 
+              userInfo={userInfo} 
+              selectedProvider={selectedProvider}
+              onProviderChange={setSelectedProvider}
+            />
                       </Box>
-                      
-                      <Typography variant="body2" sx={{ color: '#E2E8F0', mb: 3, opacity: 0.9 }}>
-                        Enter your OpenAI API key to enable AI-powered resume tailoring. Your key will be stored securely and encrypted.
-                      </Typography>
-                      
-                      <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-end' }}>
-                        <TextField
-                          fullWidth
-                          label="OpenAI API Key"
-                          type={showApiKey ? 'text' : 'password'}
-                          value={apiKey}
-                          onChange={(e) => setApiKey(e.target.value)}
-                          placeholder="sk-..."
-                          size="small"
-                          InputProps={{
-                            endAdornment: (
-                              <InputAdornment position="end">
-                                <IconButton
-                                  onClick={() => setShowApiKey(!showApiKey)}
-                                  edge="end"
-                                  size="small"
-                                  sx={{ color: '#94A3B8' }}
-                                >
-                                  {showApiKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                                </IconButton>
-                              </InputAdornment>
-                            ),
-                          }}
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                              borderRadius: 1,
-                              '& fieldset': {
-                                borderColor: 'rgba(239, 68, 68, 0.3)',
-                              },
-                              '&:hover fieldset': {
-                                borderColor: '#EF4444',
-                              },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#EF4444',
-                              },
-                            },
-                            '& .MuiInputLabel-root': {
-                              color: '#94A3B8',
-                              '&.Mui-focused': {
-                                color: '#EF4444',
-                              },
-                            },
-                            '& .MuiOutlinedInput-input': {
-                              color: '#F8FAFC',
-                            },
-                          }}
-                        />
-                        
-                        <Button
-                          variant="contained"
-                          onClick={handleSaveApiConfig}
-                          disabled={savingApiConfig || !apiKey.trim()}
-                          startIcon={<SaveIcon />}
-                          size="small"
-                          sx={{
-                            background: 'linear-gradient(135deg, #EF4444 0%, #DC2626 100%)',
-                            '&:hover': {
-                              background: 'linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)'
-                            },
-                            '&:disabled': {
-                              background: 'rgba(239, 68, 68, 0.3)',
-                              color: 'rgba(248, 250, 252, 0.5)'
-                            },
-                            whiteSpace: 'nowrap'
-                          }}
-                        >
-                          {savingApiConfig ? 'Saving...' : 'Save Key'}
-                        </Button>
-                      </Box>
-                    </Paper>
-                  </Collapse>
-                  
-                  {/* API Key Configured Status */}
-                  <Collapse in={!!userApiConfig?.hasApiKey} timeout={500}>
-                    <Paper
-                      elevation={2}
-                      sx={{
-                        p: 2,
-                        background: 'rgba(34, 197, 94, 0.1)',
-                        border: '1px solid rgba(34, 197, 94, 0.3)',
-                        borderRadius: 2,
-                        backdropFilter: 'blur(10px)',
-                        width: '100%',
-                      }}
-                    >
-                      <Box sx={{ 
-                        display: 'flex', 
-                        alignItems: 'center', 
-                        justifyContent: 'space-between',
-                        width: '100%',
-                        gap: 2
-                      }}>
-                        <Box sx={{ 
-                          display: 'flex', 
-                          alignItems: 'center', 
-                          gap: 2,
-                          flex: 1,
-                          minWidth: 0
-                        }}>
-                          <KeyIcon sx={{ color: '#22C55E', fontSize: 20, flexShrink: 0 }} />
-                          <Typography variant="body2" sx={{ 
-                            color: '#22C55E', 
-                            fontWeight: 600,
-                            flexShrink: 0
-                          }}>
-                            API Key Configured
-                          </Typography>
-                          <Typography variant="caption" sx={{ 
-                            color: '#94A3B8',
-                            ml: 1,
-                            opacity: 0.8
-                          }}>
-                            • Last updated: {userApiConfig?.timestamp ? new Date(userApiConfig.timestamp).toLocaleString() : 'Unknown'}
-                          </Typography>
-                        </Box>
-                        
-                        <Button
-                          variant="outlined"
-                          color="error"
-                          onClick={handleDeleteApiKey}
-                          disabled={savingApiConfig}
-                          startIcon={<DeleteIcon />}
-                          size="small"
-                          sx={{
-                            borderColor: '#EF4444',
-                            color: '#EF4444',
-                            flexShrink: 0,
-                            whiteSpace: 'nowrap',
-                            '&:hover': {
-                              borderColor: '#DC2626',
-                              backgroundColor: 'rgba(239, 68, 68, 0.1)'
-                            }
-                          }}
-                        >
-                          {savingApiConfig ? 'Deleting...' : 'Remove'}
-                        </Button>
-                      </Box>
-                    </Paper>
-                  </Collapse>
-                </Box>
-              </Slide>
-            )}
-          </Box>
         </Fade>
 
         {/* Global Processing Indicator */}

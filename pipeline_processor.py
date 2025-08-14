@@ -93,11 +93,17 @@ class PipelineProcessor:
                 **resume_data,
             }
             
+            # Get selected provider from session data
+            selected_provider = session_data.get("selectedProvider", "openai")
+            print(f"Session data selectedProvider: {session_data.get('selectedProvider')}")
+            print(f"Pipeline processing session {session_id} with provider: {selected_provider}")
+            
             # Run the workflow
             workflow_input = {
                 "resume_data": combined_data,
                 "user_id": user_id,
                 "user_tier": user_tier,
+                "selected_provider": selected_provider,
             }
             
             result = workflow(workflow_input)

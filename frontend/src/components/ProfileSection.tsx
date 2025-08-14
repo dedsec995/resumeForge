@@ -35,7 +35,9 @@ import {
   Star as StarIcon,
   Psychology as SkillsIcon,
   CheckCircle as CheckIcon,
-
+  Error as ErrorIcon,
+  Info as InfoIcon,
+  Warning as WarningIcon,
 } from '@mui/icons-material';
 import { toast } from 'react-hot-toast';
 import { useState, useEffect } from 'react';
@@ -108,15 +110,15 @@ const ProfileSection = () => {
                                  response.data.resumeData.projects?.length === 0;
             
             if (isNewProfile) {
-              toast.success('Welcome! Please fill in your profile information.');
+              toast.success('Welcome! Please fill in your profile information.', { icon: <CheckIcon /> });
             }
           } else if (isMounted) {
-            toast.error('Failed to load resume');
+            toast.error('Failed to load resume', { icon: <ErrorIcon /> });
           }
         } catch (error) {
           console.error('Error loading resume:', error);
           if (isMounted) {
-            toast.error('Failed to connect to API. Make sure the backend is running.');
+            toast.error('Failed to connect to API. Make sure the backend is running.', { icon: <ErrorIcon /> });
           }
         } finally {
           if (isMounted) {
@@ -172,13 +174,13 @@ const ProfileSection = () => {
         // Update original data after successful save
         setOriginalResumeData(JSON.parse(JSON.stringify(resumeData)));
         setHasUnsavedChanges(false);
-        toast.success('Resume changes saved to LaTeX file successfully!');
+        toast.success('Resume changes saved to LaTeX file successfully!', { icon: <CheckIcon /> });
       } else {
-        toast.error('Failed to save resume changes.');
+        toast.error('Failed to save resume changes.', { icon: <ErrorIcon /> });
       }
     } catch (error) {
       console.error('Error saving resume:', error);
-      toast.error('Failed to save resume changes. Make sure the backend is running.');
+              toast.error('Failed to save resume changes. Make sure the backend is running.', { icon: <ErrorIcon /> });
     } finally {
       setSaving(false);
     }
