@@ -16,7 +16,7 @@ import {
 import { 
   WorkOutline as ResumeIcon,
   Person as ProfileIcon,
-  Add as CreateIcon,
+  Description as CreateIcon,
   Home as HomeIcon,
   AccountCircle,
   Logout as LogoutIcon,
@@ -35,7 +35,7 @@ const Navbar = () => {
   const authenticatedNavigationItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Profile', path: '/profile', icon: <ProfileIcon /> },
-    { label: 'Create Resume', path: '/create-resume', icon: <CreateIcon /> },
+    { label: 'Resumes', path: '/create-resume', icon: <CreateIcon /> },
     { label: 'About Us', path: '/about', icon: <AboutIcon /> }
   ];
 
