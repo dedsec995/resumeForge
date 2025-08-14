@@ -120,10 +120,26 @@ const CreateResumeSection = () => {
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'groq-google'>('groq-google');
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'groq-google'>('openai');
 
+  // Helper functions for provider management
+  const saveSelectedProvider = async (provider: 'openai' | 'groq-google') => {
+    try {
+      const response = await apiClient.post('/apiConfig', {
+        selectedProvider: provider
+      });
+      if (response.data.success) {
+        console.log(`Selected provider saved: ${provider}`);
+      }
+    } catch (error) {
+      console.error('Error saving selected provider:', error);
+    }
+  };
 
-
+  const handleProviderChange = useCallback((provider: 'openai' | 'groq-google') => {
+    setSelectedProvider(provider);
+    saveSelectedProvider(provider);
+  }, []);
 
   // Update individual session status in real-time
   const updateSessionStatus = useCallback(async (sessionId: string) => {
@@ -164,13 +180,18 @@ const CreateResumeSection = () => {
     loadGlobalCounter();
     loadIndividualCounter();
     loadUserInfo();
+    loadApiConfig();
   }, []);
 
+  // Set default provider for non-FREE users if no provider is saved
   useEffect(() => {
     if (userInfo?.accountTier && userInfo.accountTier !== 'FREE') {
-      setSelectedProvider('groq-google');
+      // Only set to groq-google if it's the default openai (meaning no saved preference)
+      if (selectedProvider === 'openai') {
+        handleProviderChange('groq-google');
+      }
     }
-  }, [userInfo?.accountTier]);
+  }, [userInfo?.accountTier, selectedProvider, handleProviderChange]);
 
   // Real-time status updates for active sessions
   useEffect(() => {
@@ -294,8 +315,7 @@ const CreateResumeSection = () => {
       setSubmitting(true);
 
       const response = await apiClient.post('/createResumeSession', {
-        jobDescription: jobDescription.trim(),
-        selectedProvider: selectedProvider
+        jobDescription: jobDescription.trim()
       });
 
       if (response.data.success) {
@@ -310,8 +330,7 @@ const CreateResumeSection = () => {
           // Start the workflow
 
           const workflowResponse = await apiClient.post('/fullWorkflow', {
-            sessionId: sessionId,
-            selectedProvider: selectedProvider
+            sessionId: sessionId
           });
 
           if (workflowResponse.data.success) {
@@ -572,8 +591,7 @@ const CreateResumeSection = () => {
       // Start the workflow
 
       const response = await apiClient.post('/fullWorkflow', {
-        sessionId: sessionId,
-        selectedProvider: selectedProvider
+        sessionId: sessionId
       });
 
       if (response.data.success) {
@@ -918,6 +936,20 @@ const CreateResumeSection = () => {
     }
   };
 
+  const loadApiConfig = async () => {
+    try {
+      const response = await apiClient.get('/apiConfig');
+      if (response.data.success && response.data.apiData) {
+        const savedProvider = response.data.apiData.selectedProvider;
+        if (savedProvider && (savedProvider === 'openai' || savedProvider === 'groq-google')) {
+          setSelectedProvider(savedProvider);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading API config:', error);
+    }
+  };
+
 
 
 
@@ -1211,7 +1243,7 @@ const CreateResumeSection = () => {
                           <Box sx={{ display: 'flex', gap: 2, ml: 2 }}>
                             {/* Chat-GPT Bubble */}
                             <Box
-                              onClick={() => setSelectedProvider('openai')}
+                              onClick={() => handleProviderChange('openai')}
                               sx={{
                                 px: 2,
                                 py: 1,
@@ -1242,7 +1274,7 @@ const CreateResumeSection = () => {
 
                             {/* Groq & Google Bubble */}
                             <Box
-                              onClick={() => setSelectedProvider('groq-google')}
+                              onClick={() => handleProviderChange('groq-google')}
                               sx={{
                                 px: 2,
                                 py: 1,
@@ -1320,7 +1352,7 @@ const CreateResumeSection = () => {
             <ApiKeysConfiguration 
               userInfo={userInfo} 
               selectedProvider={selectedProvider}
-              onProviderChange={setSelectedProvider}
+              onProviderChange={handleProviderChange}
             />
                       </Box>
         </Fade>

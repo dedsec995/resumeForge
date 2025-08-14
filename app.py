@@ -206,6 +206,7 @@ class ApiConfigRequest(BaseModel):
     openAiKey: Optional[str] = None
     groqKey: Optional[str] = None
     googleGenAiKey: Optional[str] = None
+    selectedProvider: Optional[str] = None
 
 
 class ApiConfigResponse(BaseModel):
@@ -617,12 +618,14 @@ async def fullWorkflowEndpoint(
         # Get user data to check tier and API keys
         user_data = dbOps.getUser(userId)
         user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
-        selected_provider = request.selectedProvider or session_data.get("selectedProvider", "openai")
-        print(f"Processing workflow with provider: {selected_provider} for user tier: {user_tier}")
+        
+        # Get API config and selected provider from database
+        api_config = dbOps.getUserApiConfig(userId)
+        selected_provider = (api_config.get("selectedProvider", "") if api_config else "") or "openai"
+        print(f"Processing workflow with provider from DB: {selected_provider} for user tier: {user_tier}")
         
         # Validate API keys for FREE users
         if user_tier == "FREE":
-            api_config = dbOps.getUserApiConfig(userId)
             if selected_provider == "openai":
                 if not api_config or not api_config.get("openAiKey"):
                     raise HTTPException(
@@ -665,7 +668,7 @@ async def fullWorkflowEndpoint(
         queuedUpdateData = {
             "status": "queued",
             "queuedAt": datetime.now().isoformat(),
-            "selectedProvider": request.selectedProvider,
+            "selectedProvider": selected_provider,
         }
         dbOps.updateSession(userId, request.sessionId, queuedUpdateData)
 
@@ -728,8 +731,11 @@ async def createResumeSessionEndpoint(
 ):
     """Create a new resume session with job description"""
     try:
-        print(f"Creating session with provider: {request.selectedProvider}")
-        sessionId = dbOps.createSession(userId, request.jobDescription, request.selectedProvider)
+        # Get selected provider from database
+        api_config = dbOps.getUserApiConfig(userId)
+        selected_provider = (api_config.get("selectedProvider", "") if api_config else "") or "openai"
+        print(f"Creating session with provider from DB: {selected_provider}")
+        sessionId = dbOps.createSession(userId, request.jobDescription, selected_provider)
         
         if sessionId:
             return CreateResumeResponse(
@@ -1217,6 +1223,7 @@ async def updateApiConfigEndpoint(
             "openAiKey": request.openAiKey if request.openAiKey is not None else existingApiData.get("openAiKey", ""),
             "groqKey": request.groqKey if request.groqKey is not None else existingApiData.get("groqKey", ""),
             "googleGenAiKey": request.googleGenAiKey if request.googleGenAiKey is not None else existingApiData.get("googleGenAiKey", ""),
+            "selectedProvider": request.selectedProvider if request.selectedProvider is not None else existingApiData.get("selectedProvider", ""),
             "timestamp": datetime.now().isoformat()
         }
 
@@ -1251,7 +1258,19 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
 
         if apiData is None:
             return GetApiConfigResponse(
-                success=True, apiData={}, message="No API configuration found"
+                success=True, 
+                apiData={
+                    "openAiKey": "",
+                    "groqKey": "",
+                    "googleGenAiKey": "",
+                    "selectedProvider": "",
+                    "hasOpenAiKey": False,
+                    "hasGroqKey": False,
+                    "hasGoogleGenAiKey": False,
+                    "timestamp": "",
+                    "lastUpdated": "",
+                }, 
+                message="No API configuration found"
             )
 
         # Return the actual API keys for display in input fields
@@ -1260,6 +1279,7 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
             "openAiKey": apiData.get("openAiKey", ""),
             "groqKey": apiData.get("groqKey", ""),
             "googleGenAiKey": apiData.get("googleGenAiKey", ""),
+            "selectedProvider": apiData.get("selectedProvider", ""),
             "hasOpenAiKey": bool(apiData.get("openAiKey")),
             "hasGroqKey": bool(apiData.get("groqKey")),
             "hasGoogleGenAiKey": bool(apiData.get("googleGenAiKey")),
