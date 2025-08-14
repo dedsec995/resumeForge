@@ -634,37 +634,29 @@ def keywords_editor(state):
             raise Exception(f"KEYWORDS_EDITOR_ERROR: {error_msg}")
 
 
-def finalize_and_print_json(state):
-    console.print(
-        Panel("Finalizing Processed Resume...", title="Complete", border_style="green")
-    )
-    final_json = state["tailored_resume_data"]
-
-    full_final_json = state["resume_data"].copy()
-    full_final_json["resumeData"] = final_json
-    full_final_json["jobDescription"] = state["job_description"]
-    full_final_json["status"] = "processed"
-
-    # Include location in the final output
-    full_final_json["location"] = state.get("location", "Open to Relocation")
-
-    # Removed verbose JSON output - using summary instead
-    console.print(
-        f"[green]✓ Resume processing completed. Session: {full_final_json.get('sessionId', 'N/A')}[/green]"
-    )
-    return {"tailored_resume_data": full_final_json}
-
-
 def decide_after_judging(state):
+    resume_data = state.get("resume_data", {})
+    edit_summary_enabled = resume_data.get("edit_summary")
+
     if state["score"] < DECIDING_SCORE and state["iteration_count"] < 3:
         console.print(
             Panel(
-                f"Score {state['score']}/10 is below threshold ({DECIDING_SCORE}). Re-editing technical skills. Iteration: {state['iteration_count']}",
+                f"Score {state['score']}/10 is below threshold ({DECIDING_SCORE}). Re-editing. Iteration: {state['iteration_count']}",
                 title="Decision",
                 border_style="red",
             )
         )
-        return "edit_technical_skills"
+        # Route to edit_summary if enabled, otherwise edit_technical_skills
+        if edit_summary_enabled:
+            console.print(
+                "[bold blue]Routing back to edit_summary for improvement[/bold blue]"
+            )
+            return "edit_summary"
+        else:
+            console.print(
+                "[bold blue]Routing back to edit_technical_skills for improvement[/bold blue]"
+            )
+            return "edit_technical_skills"
     else:
         console.print(
             Panel(
@@ -674,6 +666,29 @@ def decide_after_judging(state):
             )
         )
         return "keywords_editor"
+
+
+def decide_after_extract_info(state):
+    """Decide whether to edit summary or skip to technical skills"""
+    resume_data = state.get("resume_data", {})
+    if resume_data.get("edit_summary"):
+        console.print(
+            Panel(
+                "Summary editing enabled - proceeding to edit summary",
+                title="Decision",
+                border_style="blue",
+            )
+        )
+        return "edit_summary"
+    else:
+        console.print(
+            Panel(
+                "Summary editing disabled - skipping to technical skills",
+                title="Decision",
+                border_style="yellow",
+            )
+        )
+        return "edit_technical_skills"
 
 
 def workflow(inputs):
@@ -687,12 +702,23 @@ def workflow(inputs):
     workflow.add_node("edit_projects", edit_projects)
     workflow.add_node("judge_resume_quality", judge_resume_quality)
     workflow.add_node("keywords_editor", keywords_editor)
-    workflow.add_node("finalize_and_print_json", finalize_and_print_json)
 
     workflow.set_entry_point("get_initial_data")
     workflow.add_edge("get_initial_data", "extract_info")
-    workflow.add_edge("extract_info", "edit_summary")
+
+    # Add conditional edge after extract_info
+    workflow.add_conditional_edges(
+        "extract_info",
+        decide_after_extract_info,
+        {
+            "edit_summary": "edit_summary",
+            "edit_technical_skills": "edit_technical_skills",
+        },
+    )
+
+    # Add edge from edit_summary to edit_technical_skills
     workflow.add_edge("edit_summary", "edit_technical_skills")
+
     workflow.add_edge("edit_technical_skills", "edit_experience")
     workflow.add_edge("edit_experience", "edit_projects")
     workflow.add_edge("edit_projects", "judge_resume_quality")
@@ -701,13 +727,23 @@ def workflow(inputs):
         "judge_resume_quality",
         decide_after_judging,
         {
+            "edit_summary": "edit_summary",
             "edit_technical_skills": "edit_technical_skills",
             "keywords_editor": "keywords_editor",
         },
     )
-    workflow.add_edge("keywords_editor", "finalize_and_print_json")
-    workflow.add_edge("finalize_and_print_json", END)
+    workflow.add_edge("keywords_editor", END)
 
     app = workflow.compile()
+    mermaid_code = app.get_graph().draw_mermaid()
+    draw_mermaid_png(mermaid_syntax=mermaid_code, output_file_path="graph.png")
     result = app.invoke(inputs)
-    return result
+
+    final_json = result["tailored_resume_data"]
+    full_final_json = result["resume_data"].copy()
+    full_final_json["resumeData"] = final_json
+    full_final_json["jobDescription"] = result["job_description"]
+    full_final_json["status"] = "processed"
+    full_final_json["location"] = result.get("location", "Open to Relocation")
+
+    return {"tailored_resume_data": full_final_json}

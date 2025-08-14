@@ -8,6 +8,89 @@ import latexcodec
 from unidecode import unidecode
 
 
+# Global character mapping for LaTeX escaping
+LATEX_ESCAPES = {
+    # Basic LaTeX special characters
+    "%": "\\%",
+    "&": "\\&",
+    "#": "\\#",
+    "^": "\\textasciicircum{}",
+    "_": "\\_",
+    "~": "\\textasciitilde{}",
+    "\\": "\\textbackslash{}",
+    "{": "\\{",
+    "}": "\\}",
+    "|": "\\textbar{}",
+    "`": "\\textasciigrave{}",
+    "'": "\\textquotesingle{}",
+    '"': "\\textquotedbl{}",
+    ";": "\\;",
+    "/": "\\/",
+    # Mathematical symbols
+    "°": "\\textdegree{}",
+    "±": "\\textpm{}",
+    "×": "\\texttimes{}",
+    "÷": "\\textdiv{}",
+    "≤": "\\textleq{}",
+    "≥": "\\textgeq{}",
+    "≠": "\\textneq{}",
+    "≈": "\\textapprox{}",
+    "∞": "\\textinfty{}",
+    "∑": "\\textsum{}",
+    "∏": "\\textprod{}",
+    "∫": "\\textint{}",
+    "√": "\\textsqrt{}",
+    # Greek letters
+    "α": "\\textalpha{}",
+    "β": "\\textbeta{}",
+    "γ": "\\textgamma{}",
+    "δ": "\\textdelta{}",
+    "ε": "\\textepsilon{}",
+    "μ": "\\textmu{}",
+    "π": "\\textpi{}",
+    "σ": "\\textsigma{}",
+    "τ": "\\texttau{}",
+    "φ": "\\textphi{}",
+    "ω": "\\textomega{}",
+    # Currency symbols
+    "€": "\\texteuro{}",
+    "£": "\\textsterling{}",
+    "¥": "\\textyen{}",
+    "¢": "\\textcent{}",
+    # Other common symbols
+    "©": "\\textcopyright{}",
+    "®": "\\textregistered{}",
+    "™": "\\texttrademark{}",
+    "§": "\\textsection{}",
+    "¶": "\\textparagraph{}",
+    "†": "\\textdagger{}",
+    "‡": "\\textdaggerdbl{}",
+    "•": "\\textbullet{}",
+    "–": "\\textendash{}",
+    "—": "\\textemdash{}",
+    "…": "\\textellipsis{}",
+    # Special characters that might cause issues
+    "→": "\\textrightarrow{}",
+    "←": "\\textleftarrow{}",
+    "↑": "\\textuparrow{}",
+    "↓": "\\textdownarrow{}",
+    "⇒": "\\textRightarrow{}",
+    "⇐": "\\textLeftarrow{}",
+    "⇔": "\\textLeftrightarrow{}",
+    "∈": "\\textin{}",
+    "∉": "\\textnotin{}",
+    "⊂": "\\textsubset{}",
+    "⊃": "\\textsupset{}",
+    "∪": "\\textcup{}",
+    "∩": "\\textcap{}",
+    "∅": "\\textemptyset{}",
+    "∇": "\\textnabla{}",
+    "∂": "\\textpartial{}",
+    "∆": "\\textDelta{}",
+    "$": "\\$",
+}
+
+
 def normalize_unicode_text(text):
     """
     Normalize Unicode text using Python's built-in unicodedata and unidecode.
@@ -60,113 +143,24 @@ def escape_latex_comprehensive(text):
     except Exception as e:
         # Fallback to basic escaping if latexcodec fails
         print(f"Warning: latexcodec failed, using fallback escaping: {e}")
-        return escape_latex_fallback(normalized_text)
+        return escape_latex_basic(normalized_text)
 
 
-def escape_latex_fallback(text):
+def escape_latex_basic(text):
     """
-    Fallback LaTeX escaping for when latexcodec is not available or fails.
-    This is a more comprehensive version of the original function.
+    Basic LaTeX escaping using the global character mapping.
     """
     if not text:
         return text
 
-    # Comprehensive mapping of special characters to LaTeX commands
-    latex_escapes = {
-        # Basic LaTeX special characters
-        "%": "\\%",
-        "&": "\\&",
-        "#": "\\#",
-        "^": "\\textasciicircum{}",
-        "_": "\\_",
-        "~": "\\textasciitilde{}",
-        "\\": "\\textbackslash{}",
-        "{": "\\{",
-        "}": "\\}",
-        "|": "\\textbar{}",
-        "`": "\\textasciigrave{}",
-        "'": "\\textquotesingle{}",
-        '"': "\\textquotedbl{}",
-        ";": "\\;",
-        "/": "\\/",
-        # Mathematical symbols
-        "°": "\\textdegree{}",
-        "±": "\\textpm{}",
-        "×": "\\texttimes{}",
-        "÷": "\\textdiv{}",
-        "≤": "\\textleq{}",
-        "≥": "\\textgeq{}",
-        "≠": "\\textneq{}",
-        "≈": "\\textapprox{}",
-        "∞": "\\textinfty{}",
-        "∑": "\\textsum{}",
-        "∏": "\\textprod{}",
-        "∫": "\\textint{}",
-        "√": "\\textsqrt{}",
-        # Greek letters
-        "α": "\\textalpha{}",
-        "β": "\\textbeta{}",
-        "γ": "\\textgamma{}",
-        "δ": "\\textdelta{}",
-        "ε": "\\textepsilon{}",
-        "μ": "\\textmu{}",
-        "π": "\\textpi{}",
-        "σ": "\\textsigma{}",
-        "τ": "\\texttau{}",
-        "φ": "\\textphi{}",
-        "ω": "\\textomega{}",
-        # Currency symbols
-        "€": "\\texteuro{}",
-        "£": "\\textsterling{}",
-        "¥": "\\textyen{}",
-        "¢": "\\textcent{}",
-        # Other common symbols
-        "©": "\\textcopyright{}",
-        "®": "\\textregistered{}",
-        "™": "\\texttrademark{}",
-        "§": "\\textsection{}",
-        "¶": "\\textparagraph{}",
-        "†": "\\textdagger{}",
-        "‡": "\\textdaggerdbl{}",
-        "•": "\\textbullet{}",
-        "–": "\\textendash{}",
-        "—": "\\textemdash{}",
-        "…": "\\textellipsis{}",
-        # Special characters that might cause issues
-        "→": "\\textrightarrow{}",
-        "←": "\\textleftarrow{}",
-        "↑": "\\textuparrow{}",
-        "↓": "\\textdownarrow{}",
-        "⇒": "\\textRightarrow{}",
-        "⇐": "\\textLeftarrow{}",
-        "⇔": "\\textLeftrightarrow{}",
-        "∈": "\\textin{}",
-        "∉": "\\textnotin{}",
-        "⊂": "\\textsubset{}",
-        "⊃": "\\textsupset{}",
-        "∪": "\\textcup{}",
-        "∩": "\\textcap{}",
-        "∅": "\\textemptyset{}",
-        "∇": "\\textnabla{}",
-        "∂": "\\textpartial{}",
-        "∆": "\\textDelta{}",
-        "∏": "\\textprod{}",
-        "∑": "\\textsum{}",
-        "∫": "\\textint{}",
-        "$": "\\$",
-    }
-
     # Apply the escapes
     escaped_text = text
-    for char, escape in latex_escapes.items():
+    for char, escape in LATEX_ESCAPES.items():
         escaped_text = escaped_text.replace(char, escape)
 
     # Handle special cases for LaTeX commands that might be problematic
     # Replace multiple backslashes with single backslash
     escaped_text = re.sub(r"\\{2,}", r"\\", escaped_text)
-
-    # Handle special LaTeX command sequences that might cause issues
-    escaped_text = re.sub(r"\\textbackslash\\{", r"\\textbackslash\\{", escaped_text)
 
     return escaped_text
 
@@ -205,122 +199,7 @@ def escape_latex_for_content(text):
     except Exception as e:
         # Fallback to basic escaping if latexcodec fails
         print(f"Warning: latexcodec failed, using fallback escaping: {e}")
-        return escape_latex_fallback_smart(normalized_text)
-
-
-def escape_latex_fallback_smart(text):
-    """
-    Smart fallback LaTeX escaping that handles $, <, and > symbols correctly.
-    """
-    if not text:
-        return text
-
-    # Handle $ symbols intelligently (same logic as above)
-    text = text.replace("$|$", "___PIPE_SEPARATOR___")
-    text = text.replace("$", "\\$")
-    text = text.replace("___PIPE_SEPARATOR___", "$|$")
-
-    # Always handle < and > symbols with our custom escaping
-    text = text.replace("<", "\\textless{}")
-    text = text.replace(">", "\\textgreater{}")
-
-    # Comprehensive mapping of special characters to LaTeX commands
-    latex_escapes = {
-        # Basic LaTeX special characters
-        "%": "\\%",
-        "&": "\\&",
-        "#": "\\#",
-        "^": "\\textasciicircum{}",
-        "_": "\\_",
-        "~": "\\textasciitilde{}",
-        "{": "\\{",
-        "}": "\\}",
-        "|": "\\textbar{}",
-        "`": "\\textasciigrave{}",
-        "'": "\\textquotesingle{}",
-        '"': "\\textquotedbl{}",
-        ";": "\\;",
-        "/": "\\/",
-        # Mathematical symbols
-        "°": "\\textdegree{}",
-        "±": "\\textpm{}",
-        "×": "\\texttimes{}",
-        "÷": "\\textdiv{}",
-        "≤": "\\textleq{}",
-        "≥": "\\textgeq{}",
-        "≠": "\\textneq{}",
-        "≈": "\\textapprox{}",
-        "∞": "\\textinfty{}",
-        "∑": "\\textsum{}",
-        "∏": "\\textprod{}",
-        "∫": "\\textint{}",
-        "√": "\\textsqrt{}",
-        # Greek letters
-        "α": "\\textalpha{}",
-        "β": "\\textbeta{}",
-        "γ": "\\textgamma{}",
-        "δ": "\\textdelta{}",
-        "ε": "\\textepsilon{}",
-        "μ": "\\textmu{}",
-        "π": "\\textpi{}",
-        "σ": "\\textsigma{}",
-        "τ": "\\texttau{}",
-        "φ": "\\textphi{}",
-        "ω": "\\textomega{}",
-        # Currency symbols
-        "€": "\\texteuro{}",
-        "£": "\\textsterling{}",
-        "¥": "\\textyen{}",
-        "¢": "\\textcent{}",
-        # Other common symbols
-        "©": "\\textcopyright{}",
-        "®": "\\textregistered{}",
-        "™": "\\texttrademark{}",
-        "§": "\\textsection{}",
-        "¶": "\\textparagraph{}",
-        "†": "\\textdagger{}",
-        "‡": "\\textdaggerdbl{}",
-        "•": "\\textbullet{}",
-        "–": "\\textendash{}",
-        "—": "\\textemdash{}",
-        "…": "\\textellipsis{}",
-        # Special characters that might cause issues
-        "→": "\\textrightarrow{}",
-        "←": "\\textleftarrow{}",
-        "↑": "\\textuparrow{}",
-        "↓": "\\textdownarrow{}",
-        "⇒": "\\textRightarrow{}",
-        "⇐": "\\textLeftarrow{}",
-        "⇔": "\\textLeftrightarrow{}",
-        "∈": "\\textin{}",
-        "∉": "\\textnotin{}",
-        "⊂": "\\textsubset{}",
-        "⊃": "\\textsupset{}",
-        "∪": "\\textcup{}",
-        "∩": "\\textcap{}",
-        "∅": "\\textemptyset{}",
-        "∇": "\\textnabla{}",
-        "∂": "\\textpartial{}",
-        "∆": "\\textDelta{}",
-        "∏": "\\textprod{}",
-        "∑": "\\textsum{}",
-        "∫": "\\textint{}",
-        # Note: $ is handled separately above
-    }
-
-    # Apply the escapes
-    escaped_text = text
-    for char, escape in latex_escapes.items():
-        escaped_text = escaped_text.replace(char, escape)
-
-    # Handle special cases for LaTeX commands that might be problematic
-    # Replace multiple backslashes with single backslash
-    escaped_text = re.sub(r"\\{2,}", r"\\", escaped_text)
-
-    # Handle special LaTeX command sequences that might cause issues
-    escaped_text = re.sub(r"\\textbackslash\\{", r"\\textbackslash\\{", escaped_text)
-
-    return escaped_text
+        return escape_latex_basic(normalized_text)
 
 
 def clean_latex_output(text):
@@ -344,18 +223,6 @@ def clean_latex_output(text):
     text = text.replace("\\$|\\$", "$|$")
 
     return text
-
-
-def sanitize_latex_content(text):
-    """
-    Comprehensive sanitization for LaTeX content.
-    Uses the best available method for LaTeX escaping.
-    """
-    if not text:
-        return text
-
-    # Use the comprehensive LaTeX escaping
-    return escape_latex_comprehensive(text)
 
 
 def generate_invisible_keywords_template(invisible_keywords):
@@ -516,7 +383,7 @@ def generate_summary_template(summary_data):
     summary_content = f"""%-----------SUMMARY-----------
 \\section{{Summary}}
   {summary_latex}
-\\vspace{{-10pt}}
+\\vspace{{-6pt}}
 %-----------SUMMARY END-----------"""
 
     return summary_content
@@ -708,21 +575,6 @@ def generate_projects_template(projects_data):
 %-----------PROJECTS END-----------"""
 
     return projects_content
-
-
-def generate_invisible_keywords_template(invisible_keywords):
-    """Generate the invisible keywords section for ATS"""
-    if not invisible_keywords:
-        return ""
-
-    # Escape special characters in invisible keywords
-    safe_keywords = escape_latex_comprehensive(invisible_keywords)
-
-    return f"""% Start invisible text (rendering mode 3 = invisible)
-\\pdfliteral direct {{3 Tr}}
-{safe_keywords}
-% Restore normal rendering mode (0 = fill text)
-\\pdfliteral direct {{0 Tr}}"""
 
 
 def generate_complete_resume_template(resume_data, location="Open to Relocation"):
