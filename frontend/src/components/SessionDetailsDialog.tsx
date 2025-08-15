@@ -333,6 +333,32 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   onStructuredDataChange,
   selectedProvider
 }) => {
+  const splitDurationToStartEnd = (duration: string) => {
+    if (!duration) return { startTime: '', endTime: '' };
+    
+    // Handle different separator formats
+    const separators = [' - ', ' -- ', ' to ', ' until '];
+    let startTime = '';
+    let endTime = '';
+    
+    for (const separator of separators) {
+      if (duration.includes(separator)) {
+        const parts = duration.split(separator);
+        startTime = parts[0]?.trim() || '';
+        endTime = parts[1]?.trim() || '';
+        break;
+      }
+    }
+    
+    // If no separator found, treat the whole string as start time
+    if (!startTime && !endTime) {
+      startTime = duration.trim();
+    }
+    
+    return { startTime, endTime };
+  };
+
+
     // Function to detect if there are changes
     const hasChanges = React.useMemo(() => {
       if (!structuredData || !selectedSession?.tailoredResume) return false;
@@ -852,7 +878,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                               alignItems: 'center',
                               gap: 1
                             }}>
-                              💼 Work Experience
+                              💼 Experience
                             </Typography>
                             <Stack spacing={2}>
                               {(Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience?.workExperience || []).map((exp: Record<string, unknown>, index: number) => (
@@ -920,21 +946,66 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         }}
                                       />
                                     </Grid>
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={12} sm={3}>
                                       <TextField
                                         fullWidth
-                                        label="Duration"
-                                        value={(exp?.duration || exp?.dates || '') as string}
+                                        label="Start Time"
+                                        value={(() => {
+                                          if (exp?.startTime) return exp.startTime as string;
+                                          if (exp?.duration) {
+                                            const { startTime } = splitDurationToStartEnd(exp.duration as string);
+                                            return startTime;
+                                          }
+                                          return '';
+                                        })()}
                                         onChange={(e) => {
                                           const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
                                           const newExp = [...workExpArray];
-                                          newExp[index] = { ...newExp[index], duration: e.target.value, dates: e.target.value };
+                                          newExp[index] = { ...newExp[index], startTime: e.target.value };
                                           onStructuredDataChange({
                                             ...structuredData,
                                             workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
                                           });
                                         }}
                                         size="small"
+                                        placeholder="Jan 2022"
+                                        sx={{
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.775rem'
+                                          },
+                                          '& .MuiInputBase-root': { 
+                                            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                                            color: '#E2E8F0',
+                                            fontSize: '0.775rem',
+                                            '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                                          }
+                                        }}
+                                      />
+                                    </Grid>
+                                    <Grid item xs={12} md={3}>
+                                      <TextField
+                                        fullWidth
+                                        label="End Time"
+                                        value={(() => {
+                                          if (exp?.endTime) return exp.endTime as string;
+                                          if (exp?.duration) {
+                                            const { endTime } = splitDurationToStartEnd(exp.duration as string);
+                                            return endTime;
+                                          }
+                                          return '';
+                                        })()}
+                                        onChange={(e) => {
+                                          const workExpArray = Array.isArray(structuredData.workExperience) ? structuredData.workExperience : structuredData.workExperience.workExperience || [];
+                                          const newExp = [...workExpArray];
+                                          newExp[index] = { ...newExp[index], endTime: e.target.value };
+                                          onStructuredDataChange({
+                                            ...structuredData,
+                                            workExperience: Array.isArray(structuredData.workExperience) ? newExp : { workExperience: newExp }
+                                          });
+                                        }}
+                                        size="small"
+                                        placeholder="Present"
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',

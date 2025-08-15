@@ -55,8 +55,8 @@ const ProfileSection = () => {
     'Personal Info',
     'Summary',
     'Certifications',
-    'Technical Skills',
-    'Work Experience',
+    'Skills',
+    'Experience',
     'Projects',
     'Education'
   ];
@@ -76,9 +76,9 @@ const ProfileSection = () => {
         return <StarIcon sx={iconSx} />;
       case 'Certifications':
         return <CheckIcon sx={iconSx} />;
-      case 'Technical Skills':
+      case 'Skills':
         return <SkillsIcon sx={iconSx} />;
-      case 'Work Experience':
+      case 'Experience':
         return <WorkIcon sx={iconSx} />;
       case 'Projects':
         return <CodeIcon sx={iconSx} />;
@@ -100,8 +100,10 @@ const ProfileSection = () => {
       try {
         const response = await apiClient.get('/parseResume');
         if (isMounted && response.data.success) {
-          setResumeData(response.data.resumeData);
-          setOriginalResumeData(JSON.parse(JSON.stringify(response.data.resumeData))); // Deep copy
+          // Clean up any existing startTime/endTime fields from loaded data
+          const cleanedData = cleanStartEndTimesFromLoadedData(response.data.resumeData);
+          setResumeData(cleanedData);
+          setOriginalResumeData(JSON.parse(JSON.stringify(cleanedData))); // Deep copy
           setHasLoaded(true);
           setHasUnsavedChanges(false); // Reset changes flag
 
@@ -162,13 +164,72 @@ const ProfileSection = () => {
     setCurrentSection(newValue);
   };
 
+  const cleanStartEndTimesFromLoadedData = (data: any) => {
+    if (data.workExperience && Array.isArray(data.workExperience)) {
+      const updatedData = { ...data };
+      updatedData.workExperience = data.workExperience.map((job: any) => {
+        // Remove startTime and endTime fields if they exist in loaded data
+        const cleanJob = { ...job };
+        delete cleanJob.startTime;
+        delete cleanJob.endTime;
+        return cleanJob;
+      });
+      return updatedData;
+    }
+    return data;
+  };
+
+  const combineStartEndTimes = (data: any) => {
+    if (data.workExperience && Array.isArray(data.workExperience)) {
+      const updatedData = { ...data };
+      updatedData.workExperience = data.workExperience.map((job: any) => {
+        if (job.startTime || job.endTime) {
+          // Get the current values from the UI fields
+          let startTime = job.startTime || '';
+          let endTime = job.endTime || '';
+          
+          // If one field is missing, try to extract it from the existing duration
+          if (!startTime && job.duration) {
+            const { startTime: existingStart } = splitDurationToStartEnd(job.duration);
+            startTime = existingStart;
+          }
+          if (!endTime && job.duration) {
+            const { endTime: existingEnd } = splitDurationToStartEnd(job.duration);
+            endTime = existingEnd;
+          }
+          
+          // Combine the times
+          const combinedDuration = startTime && endTime ? `${startTime} -- ${endTime}` : (startTime || endTime);
+          
+          // Create a clean job object with only the necessary fields
+          const cleanJob = { ...job };
+          
+          // Remove startTime and endTime fields to prevent database pollution
+          delete cleanJob.startTime;
+          delete cleanJob.endTime;
+          
+          // Update duration field
+          cleanJob.duration = combinedDuration;
+          
+          return cleanJob;
+        }
+        return job;
+      });
+      return updatedData;
+    }
+    return data;
+  };
+
   const handleSaveResume = async () => {
     if (!resumeData) return;
 
     setSaving(true);
     try {
+      // Combine start and end times before saving
+      const dataToSave = combineStartEndTimes(resumeData);
+      
       const response = await apiClient.post('/updateResume', {
-        resumeData: resumeData
+        resumeData: dataToSave
       });
 
       if (response.data.success) {
@@ -201,6 +262,31 @@ const ProfileSection = () => {
       current[keys[keys.length - 1]] = value;
       return newData;
     });
+  };
+
+  const splitDurationToStartEnd = (duration: string) => {
+    if (!duration) return { startTime: '', endTime: '' };
+    
+    // Handle different separator formats
+    const separators = [' - ', ' -- ', ' to ', ' until '];
+    let startTime = '';
+    let endTime = '';
+    
+    for (const separator of separators) {
+      if (duration.includes(separator)) {
+        const parts = duration.split(separator);
+        startTime = parts[0]?.trim() || '';
+        endTime = parts[1]?.trim() || '';
+        break;
+      }
+    }
+    
+    // If no separator found, treat the whole string as start time
+    if (!startTime && !endTime) {
+      startTime = duration.trim();
+    }
+    
+    return { startTime, endTime };
   };
 
   const moveItemUp = (arrayPath: string, index: number) => {
@@ -713,7 +799,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 3: // Technical Skills
+      case 3: // Skills
         return (
           <Grow in timeout={800}>
             <Box>
@@ -901,7 +987,7 @@ const ProfileSection = () => {
           </Grow>
         );
 
-      case 4: // Work Experience
+      case 4: // Experience
         return (
           <Grow in timeout={800}>
             <Box>
@@ -1088,39 +1174,90 @@ const ProfileSection = () => {
                           }}
                         />
                       </Grid>
-                      <Grid item xs={12} md={6}>
-                        <TextField
-                          fullWidth
-                          label="Duration"
-                          value={job.duration || ''}
-                          onChange={(e) => updateResumeData(`workExperience.${jobIndex}.duration`, e.target.value)}
-                          placeholder="Jan 2022 - Present"
-                          sx={{
-                            '& .MuiOutlinedInput-root': {
-                              backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                              borderRadius: 2,
-                              '& fieldset': {
-                                borderColor: 'rgba(99, 102, 241, 0.3)',
+                                             <Grid item xs={12} md={3}>
+                         <TextField
+                           fullWidth
+                           label="Start Time"
+                           value={(() => {
+                             if (job.startTime) return job.startTime;
+                             if (job.duration) {
+                               const { startTime } = splitDurationToStartEnd(job.duration);
+                               return startTime;
+                             }
+                             return '';
+                           })()}
+                           onChange={(e) => {
+                             updateResumeData(`workExperience.${jobIndex}.startTime`, e.target.value);
+                           }}
+                           placeholder="Jan 2022"
+                           sx={{
+                             '& .MuiOutlinedInput-root': {
+                               backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                               borderRadius: 2,
+                               '& fieldset': {
+                                 borderColor: 'rgba(99, 102, 241, 0.3)',
+                               },
+                               '&:hover fieldset': {
+                                 borderColor: '#6366F1',
+                               },
+                               '&.Mui-focused fieldset': {
+                                 borderColor: '#6366F1',
+                               },
+                             },
+                             '& .MuiInputLabel-root': {
+                               color: '#94A3B8',
+                               '&.Mui-focused': {
+                                 color: '#6366F1',
+                               },
+                             },
+                             '& .MuiInputBase-input': {
+                               color: '#F8FAFC',
+                             },
+                           }}
+                         />
+                       </Grid>
+                                              <Grid item xs={12} md={3}>
+                          <TextField
+                            fullWidth
+                            label="End Time"
+                            value={(() => {
+                              if (job.endTime) return job.endTime;
+                              if (job.duration) {
+                                const { endTime } = splitDurationToStartEnd(job.duration);
+                                return endTime;
+                              }
+                              return '';
+                            })()}
+                                                       onChange={(e) => {
+                             updateResumeData(`workExperience.${jobIndex}.endTime`, e.target.value);
+                           }}
+                            placeholder="Present"
+                            sx={{
+                              '& .MuiOutlinedInput-root': {
+                                backgroundColor: 'rgba(15, 23, 42, 0.3)',
+                                borderRadius: 2,
+                                '& fieldset': {
+                                  borderColor: 'rgba(99, 102, 241, 0.3)',
+                                },
+                                '&:hover fieldset': {
+                                  borderColor: '#6366F1',
+                                },
+                                '&.Mui-focused fieldset': {
+                                  borderColor: '#6366F1',
+                                },
                               },
-                              '&:hover fieldset': {
-                                borderColor: '#6366F1',
+                              '& .MuiInputLabel-root': {
+                                color: '#94A3B8',
+                                '&.Mui-focused': {
+                                  color: '#6366F1',
+                                },
                               },
-                              '&.Mui-focused fieldset': {
-                                borderColor: '#6366F1',
+                              '& .MuiInputBase-input': {
+                                color: '#F8FAFC',
                               },
-                            },
-                            '& .MuiInputLabel-root': {
-                              color: '#94A3B8',
-                              '&.Mui-focused': {
-                                color: '#6366F1',
-                              },
-                            },
-                            '& .MuiInputBase-input': {
-                              color: '#F8FAFC',
-                            },
-                          }}
-                        />
-                      </Grid>
+                            }}
+                          />
+                        </Grid>
                     </Grid>
 
                     <Box sx={{ mt: 2, mb: 1.5 }}>

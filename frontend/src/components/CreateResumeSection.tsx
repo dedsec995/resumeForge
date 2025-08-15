@@ -121,6 +121,8 @@ const CreateResumeSection = () => {
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
   const [selectedProvider, setSelectedProvider] = useState<'openai' | 'groq-google'>('openai');
+  // Flag to prevent auto-switching after initial load
+  const [hasSetInitialProvider, setHasSetInitialProvider] = useState(false);
 
   // Helper functions for provider management
   const saveSelectedProvider = async (provider: 'openai' | 'groq-google') => {
@@ -139,6 +141,8 @@ const CreateResumeSection = () => {
   const handleProviderChange = useCallback((provider: 'openai' | 'groq-google') => {
     setSelectedProvider(provider);
     saveSelectedProvider(provider);
+    // Mark as manually set to prevent future auto-changes
+    setHasSetInitialProvider(true);
   }, []);
 
   // Update individual session status in real-time
@@ -183,15 +187,20 @@ const CreateResumeSection = () => {
     loadApiConfig();
   }, []);
 
-  // Set default provider for non-FREE users if no provider is saved
+  // Set default provider for non-FREE users ONLY on initial load, not on manual changes
+  // ADMI and other non-FREE users get 'groq-google' as default on first login
   useEffect(() => {
-    if (userInfo?.accountTier && userInfo.accountTier !== 'FREE') {
+    // Auto-set provider for users who are not FREE (including ADMI) on first login only
+    if (userInfo?.accountTier && 
+        userInfo.accountTier !== 'FREE' && 
+        !hasSetInitialProvider) {
       // Only set to groq-google if it's the default openai (meaning no saved preference)
       if (selectedProvider === 'openai') {
+        console.log(`Setting default provider to groq-google for ${userInfo.accountTier} user`);
         handleProviderChange('groq-google');
       }
     }
-  }, [userInfo?.accountTier, selectedProvider, handleProviderChange]);
+  }, [userInfo?.accountTier, selectedProvider, handleProviderChange, hasSetInitialProvider]);
 
   // Real-time status updates for active sessions
   useEffect(() => {
@@ -503,7 +512,10 @@ const CreateResumeSection = () => {
             if (sessionData.tailoredResume) {
               console.log('Setting structured data:', sessionData.tailoredResume);
               console.log('Projects in tailoredResume:', sessionData.tailoredResume.projects);
-              setStructuredData(sessionData.tailoredResume);
+              
+              // Clean up any existing startTime/endTime fields from loaded data
+              const cleanedData = cleanStartEndTimesFromLoadedData(sessionData.tailoredResume);
+              setStructuredData(cleanedData);
             }
             
             // If the session is still processing or queued, start auto-refresh
@@ -945,8 +957,12 @@ const CreateResumeSection = () => {
           setSelectedProvider(savedProvider);
         }
       }
+      // Always mark as set after loading API config to prevent auto-changes
+      setHasSetInitialProvider(true);
     } catch (error) {
       console.error('Error loading API config:', error);
+      // Even on error, mark as set to prevent auto-changes
+      setHasSetInitialProvider(true);
     }
   };
 
@@ -955,6 +971,75 @@ const CreateResumeSection = () => {
 
 
 
+
+  const splitDurationToStartEnd = (duration: string) => {
+    if (!duration) return { startTime: '', endTime: '' };
+    
+    const separators = [' - ', ' -- ', ' to ', ' until '];
+    let startTime = '';
+    let endTime = '';
+    
+    for (const separator of separators) {
+      if (duration.includes(separator)) {
+        const parts = duration.split(separator);
+        startTime = parts[0]?.trim() || '';
+        endTime = parts[1]?.trim() || '';
+        break;
+      }
+    }
+    
+    if (!startTime && !endTime) {
+      startTime = duration.trim();
+    }
+    
+    return { startTime, endTime };
+  };
+
+  const cleanStartEndTimesFromLoadedData = (data: any) => {
+    if (data.workExperience && Array.isArray(data.workExperience)) {
+      const updatedData = { ...data };
+      updatedData.workExperience = data.workExperience.map((job: any) => {
+        const cleanJob = { ...job };
+        delete cleanJob.startTime;
+        delete cleanJob.endTime;
+        return cleanJob;
+      });
+      return updatedData;
+    }
+    return data;
+  };
+
+  const combineStartEndTimes = (data: any) => {
+    if (data.workExperience && Array.isArray(data.workExperience)) {
+      const updatedData = { ...data };
+      updatedData.workExperience = data.workExperience.map((job: any) => {
+        if (job.startTime || job.endTime) {
+          let startTime = job.startTime || '';
+          let endTime = job.endTime || '';
+          
+          if (!startTime && job.duration) {
+            const { startTime: existingStart } = splitDurationToStartEnd(job.duration);
+            startTime = existingStart;
+          }
+          if (!endTime && job.duration) {
+            const { endTime: existingEnd } = splitDurationToStartEnd(job.duration);
+            endTime = existingEnd;
+          }
+          
+          const combinedDuration = startTime && endTime ? `${startTime} -- ${endTime}` : (startTime || endTime);
+          const cleanJob = { ...job };
+          delete cleanJob.startTime;
+          delete cleanJob.endTime;
+          cleanJob.duration = combinedDuration;
+          
+          return cleanJob;
+        }
+        return job;
+      });
+      return updatedData;
+    }
+    return data;
+  };
 
   const handleSaveJson = async () => {
     if (!selectedSession || !structuredData) {
@@ -965,27 +1050,24 @@ const CreateResumeSection = () => {
     try {
       setSaveJsonLoading(true);
 
-      // Update the session with the new structured data
+      const dataToSave = combineStartEndTimes(structuredData);
+
       const response = await apiClient.post(`/updateSessionJson/${selectedSession.sessionId}`, {
-        tailoredResume: structuredData
+        tailoredResume: dataToSave
       });
 
       if (response.data.success) {
         toast.success('Resume data updated successfully!', { icon: <SaveIcon /> });
         
-        // Update the selectedSession with the new data to ensure hasChanges is immediately correct
         if (selectedSession) {
           setSelectedSession({
             ...selectedSession,
-            tailoredResume: structuredData
+            tailoredResume: dataToSave
           });
         }
         
-        // Refresh the session data to show updated content
         await handleViewSession(selectedSession.sessionId);
         
-        // Stay on the current tab (Edit JSON tab) instead of switching
-        // setActiveTab(1); // Removed automatic tab switching
       } else {
         toast.error('Failed to update resume data', { icon: <ErrorIcon /> });
       }
@@ -998,23 +1080,19 @@ const CreateResumeSection = () => {
   };
 
   const handleCloseDialog = () => {
-    // Store the current session status before closing
     const currentSessionStatus = selectedSession?.status;
     
     setDialogOpen(false);
     setSelectedSession(null);
     
-    setStructuredData(null); // Clear structured data when closing
+    setStructuredData(null);
     
-    // Clean up any refresh intervals
     const windowWithCleanup = window as { sessionRefreshCleanup?: () => void };
     if (windowWithCleanup.sessionRefreshCleanup) {
       windowWithCleanup.sessionRefreshCleanup();
       windowWithCleanup.sessionRefreshCleanup = undefined;
     }
     
-    // Only refresh sessions if the session was active (processing/queued) when dialog closed
-    // This prevents unnecessary refreshes for completed/failed sessions
     if (currentSessionStatus === 'processing' || currentSessionStatus === 'queued') {
       setTimeout(() => {
         loadSessions();
@@ -1022,19 +1100,15 @@ const CreateResumeSection = () => {
     }
   };
 
-  // Search functions
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     
-    console.log('🔍 Starting search with query:', searchQuery);
     setIsSearching(true);
     
     try {
       const searchUrl = `/searchResumeSessions?query=${encodeURIComponent(searchQuery.trim())}`;
-      console.log('🔍 Making API call to:', searchUrl);
       
       const response = await apiClient.get(searchUrl);
-      console.log('🔍 Search response received:', response.data);
       
       if (response.data.success) {
         console.log('🔍 Search successful, found sessions:', response.data.sessions);
@@ -1051,12 +1125,10 @@ const CreateResumeSection = () => {
       toast.error('Search failed', { icon: <ErrorIcon /> });
     } finally {
       setIsSearching(false);
-      console.log('🔍 Search completed');
     }
   };
 
   const handleClearSearch = () => {
-    console.log('🔍 Clearing search, resetting to all sessions');
     setSearchQuery('');
     setSearchResults([]);
     setDisplayedSessions(sessions);

@@ -489,11 +489,14 @@ def run_workflow_sync(userId: str, sessionId: str):
         }
 
         try:
-            # Pass user context to workflow
+            selected_provider = session_data.get("selectedProvider", "openai")
+            print(f"Background workflow using provider: {selected_provider}")
+            
             workflow_input = {
                 "resume_data": combined_data,
                 "user_id": userId,
                 "user_tier": user_tier,
+                "selected_provider": selected_provider,
             }
 
             result = workflow(workflow_input)
