@@ -6,6 +6,8 @@ import Layout from './components/Layout';
 import LandingPage from './components/LandingPage';
 import ProfileSection from './components/ProfileSection';
 import CreateResumeSection from './components/CreateResumeSection';
+import FlowPage from './components/FlowPage';
+import SimpleFlowPage from './components/SimpleFlowPage';
 import AboutUsSection from './components/AboutUsSection';
 import AuthPage from './components/AuthPage';
 import { AuthProvider } from './contexts/AuthContext';
@@ -36,6 +38,8 @@ function App() {
               <Route index element={<LandingPage />} />
               <Route path="profile" element={<ProfileSection />} />
               <Route path="create-resume" element={<CreateResumeSection />} />
+              <Route path="flow" element={<FlowPage />} />
+              <Route path="simple-flow" element={<SimpleFlowPage />} />
               <Route path="about" element={<AboutUsSection />} />
             </Route>
             <Route path="/auth" element={<AuthPage />} />

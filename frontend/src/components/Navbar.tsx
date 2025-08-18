@@ -21,7 +21,8 @@ import {
   AccountCircle,
   Logout as LogoutIcon,
   Info as AboutIcon,
-  Login as LoginIcon
+  Login as LoginIcon,
+  AccountTree as FlowIcon
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -36,11 +37,15 @@ const Navbar = () => {
     { label: 'Home', path: '/', icon: <HomeIcon /> },
     { label: 'Profile', path: '/profile', icon: <ProfileIcon /> },
     { label: 'Resumes', path: '/create-resume', icon: <CreateIcon /> },
+    { label: 'Flow', path: '/flow', icon: <FlowIcon /> },
+    { label: 'Simple Flow', path: '/simple-flow', icon: <FlowIcon /> },
     { label: 'About Us', path: '/about', icon: <AboutIcon /> }
   ];
 
   const publicNavigationItems = [
     { label: 'Home', path: '/', icon: <HomeIcon /> },
+    { label: 'Flow', path: '/flow', icon: <FlowIcon /> },
+    { label: 'Simple Flow', path: '/simple-flow', icon: <FlowIcon /> },
     { label: 'About Us', path: '/about', icon: <AboutIcon /> }
   ];
 

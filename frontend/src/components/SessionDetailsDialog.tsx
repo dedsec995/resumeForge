@@ -23,7 +23,8 @@ import {
   Code as CodeIcon,
   Refresh as RefreshIcon,
   ContentCopy as CopyIcon,
-  QuestionAnswer as QuestionAnswerIcon
+  QuestionAnswer as QuestionAnswerIcon,
+  Star as StarIcon
 } from '@mui/icons-material';
 import { questionsAPI } from '../utils/apiClient';
 import AddressTab from './AddressTab';
@@ -1133,8 +1134,9 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                   background: 'rgba(15, 23, 42, 0.6)',
                                   border: '1px solid rgba(99, 102, 241, 0.1)'
                                 }}>
-                                  <Grid container spacing={1}>
-                                    <Grid item xs={12} sm={6}>
+                                  <Grid container spacing={2}>
+                                    {/* First row: Project Name (40%) and Tech Stack (60%) */}
+                                    <Grid item xs={12} sm={4.8}>
                                       <TextField
                                         fullWidth
                                         label="Project Name"
@@ -1168,44 +1170,10 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                         }}
                                       />
                                     </Grid>
-                                    <Grid item xs={12} sm={6}>
+                                    <Grid item xs={12} sm={7.2}>
                                       <TextField
                                         fullWidth
-                                        label="Link/URL"
-                                        value={(project?.projectLink || project?.link || project?.url || '') as string}
-                                        onChange={(e) => {
-                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
-                                          const newProjects = [...projectsArray];
-                                          newProjects[index] = { 
-                                            ...newProjects[index], 
-                                            link: e.target.value,
-                                            url: e.target.value,
-                                            projectLink: e.target.value 
-                                          };
-                                          onStructuredDataChange({
-                                            ...structuredData,
-                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
-                                          });
-                                        }}
-                                        size="small"
-                                        sx={{
-                                          '& .MuiInputLabel-root': { 
-                                            color: 'rgba(226, 232, 240, 0.7)',
-                                            fontSize: '0.775rem'
-                                          },
-                                          '& .MuiInputBase-root': { 
-                                            backgroundColor: 'rgba(15, 23, 42, 0.8)',
-                                            color: '#E2E8F0',
-                                            fontSize: '0.775rem',
-                                            '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
-                                          }
-                                        }}
-                                      />
-                                    </Grid>
-                                    <Grid item xs={12}>
-                                      <TextField
-                                        fullWidth
-                                        label="Technologies (comma separated)"
+                                        label="Tech Stack (comma-separated)"
                                         value={Array.isArray(project?.techStack) ? (project.techStack as string[]).join(', ') : 
                                                Array.isArray(project?.technologies) ? (project.technologies as string[]).join(', ') :
                                                (project?.techStack || project?.technologies || '') as string}
@@ -1224,6 +1192,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                           });
                                         }}
                                         size="small"
+                                        placeholder="React, Node.js, MongoDB"
                                         sx={{
                                           '& .MuiInputLabel-root': { 
                                             color: 'rgba(226, 232, 240, 0.7)',
@@ -1234,18 +1203,101 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
                                             color: '#E2E8F0',
                                             fontSize: '0.775rem',
                                             '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                                          },
+                                          '& .MuiFormHelperText-root': {
+                                            color: '#64748B',
+                                            fontSize: '0.7rem'
                                           }
                                         }}
                                       />
                                     </Grid>
+                                    
+                                    {/* Second row: Project Link (70%) and Link Text (30%) */}
+                                    <Grid item xs={12} sm={8.4}>
+                                      <TextField
+                                        fullWidth
+                                        label="Project Link (Optional)"
+                                        value={(project?.projectLink || project?.link || project?.url || '') as string}
+                                        onChange={(e) => {
+                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
+                                          const newProjects = [...projectsArray];
+                                          newProjects[index] = { 
+                                            ...newProjects[index], 
+                                            link: e.target.value,
+                                            url: e.target.value,
+                                            projectLink: e.target.value 
+                                          };
+                                          onStructuredDataChange({
+                                            ...structuredData,
+                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
+                                          });
+                                        }}
+                                        size="small"
+                                        placeholder="https://github.com/username/project"
+                                        sx={{
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.775rem'
+                                          },
+                                          '& .MuiInputBase-root': { 
+                                            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                                            color: '#E2E8F0',
+                                            fontSize: '0.775rem',
+                                            '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                                          },
+                                          '& .MuiFormHelperText-root': {
+                                            color: '#64748B',
+                                            fontSize: '0.7rem'
+                                          }
+                                        }}
+                                      />
+                                    </Grid>
+                                    <Grid item xs={12} sm={3.6}>
+                                      <TextField
+                                        fullWidth
+                                        label="Link Text (Optional)"
+                                        value={(project?.linkText || '') as string}
+                                        onChange={(e) => {
+                                          const projectsArray = Array.isArray(structuredData.projects) ? structuredData.projects : structuredData.projects.projects || [];
+                                          const newProjects = [...projectsArray];
+                                          newProjects[index] = { 
+                                            ...newProjects[index], 
+                                            linkText: e.target.value
+                                          };
+                                          onStructuredDataChange({
+                                            ...structuredData,
+                                            projects: Array.isArray(structuredData.projects) ? newProjects : { projects: newProjects }
+                                          });
+                                        }}
+                                        size="small"
+                                        placeholder="GitHub, Live Demo, etc."
+                                        sx={{
+                                          '& .MuiInputLabel-root': { 
+                                            color: 'rgba(226, 232, 240, 0.7)',
+                                            fontSize: '0.775rem'
+                                          },
+                                          '& .MuiInputBase-root': { 
+                                            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+                                            color: '#E2E8F0',
+                                            fontSize: '0.775rem',
+                                            '& fieldset': { borderColor: 'rgba(99, 102, 241, 0.3)' }
+                                          },
+                                          '& .MuiFormHelperText-root': {
+                                            color: '#64748B',
+                                            fontSize: '0.7rem'
+                                          }
+                                        }}
+                                      />
+                                    </Grid>
+                                    
                                     <Grid item xs={12}>
-                                                                              <TextField
+                                      <TextField
                                         fullWidth
                                         multiline
                                         minRows={2}
                                         maxRows={15}
-                                        label="Bullet Points (one per line)"
-                                        placeholder="Built a full-stack application&#10;Implemented responsive design&#10;Integrated third-party APIs"
+                                        label="Project Details"
+                                        placeholder="Type your project details here. Press Enter for new bullet points.&#10;Example:&#10;• Built a real-time chat application&#10;• Implemented user authentication&#10;• Use **text** for bold formatting"
                                         value={
                                           typeof project?.bulletPoints === 'string' ? project.bulletPoints as string :
                                           Array.isArray(project?.bulletPoints) ? (project.bulletPoints as string[]).join('\n') : 
