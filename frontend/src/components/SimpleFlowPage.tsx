@@ -1,14 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Typography,
   Paper,
   Container,
+  IconButton,
   Chip,
   Fade
 } from '@mui/material';
 import {
   AccountTree as FlowIcon,
+  PlayArrow as PlayIcon,
+  Pause as PauseIcon,
+  Refresh as RestartIcon,
+  SkipNext as NextIcon,
+  SkipPrevious as PrevIcon,
   DataObject as DataIcon,
   Psychology as AIIcon,
   Speed as ProcessIcon
@@ -45,6 +51,8 @@ interface FlowConnection {
   label: string;
   isPhantom?: boolean;
 }
+
+
 
 // Simplified flow nodes - just 4 components
 const flowNodes: FlowNode[] = [
@@ -115,10 +123,69 @@ const flowConnections: FlowConnection[] = [
 ];
 
 const SimpleFlowPage: React.FC = () => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [isPlaying, setIsPlaying] = useState(false);
   const [selectedNode, setSelectedNode] = useState<string | null>(null);
 
-  const getNodeStatus = () => {
-    return 'completed'; // All nodes are always completed/visible
+  // Auto-play animation
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (isPlaying && currentStep < flowNodes.length - 1) {
+      interval = setInterval(() => {
+        setCurrentStep(prev => prev + 1);
+      }, 2000);
+    } else if (currentStep >= flowNodes.length - 1) {
+      setIsPlaying(false);
+    }
+    return () => clearInterval(interval);
+  }, [isPlaying, currentStep]);
+
+  const handlePlay = () => {
+    setIsPlaying(!isPlaying);
+  };
+
+  const handleRestart = () => {
+    setCurrentStep(0);
+    setIsPlaying(false);
+  };
+
+  const handleNext = () => {
+    if (currentStep < flowNodes.length - 1) {
+      setCurrentStep(prev => prev + 1);
+    }
+  };
+
+  const handlePrev = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+
+  const getNodeStatus = (index: number) => {
+    if (index < currentStep) return 'completed';
+    if (index === currentStep) return 'active';
+    return 'pending';
+  };
+
+  const getConnectionStatus = (connectionFrom: string, connectionTo: string) => {
+    // Phantom connections animate when we reach the last step
+    const isPhantomConnection = connectionFrom.includes('phantom') || connectionTo.includes('phantom') ||
+      (connectionFrom === 'edit_technical_skills' && connectionTo === 'phantom_right_bottom') ||
+      (connectionFrom === 'phantom_right_bottom' && connectionTo === 'phantom_right_top') ||
+      (connectionFrom === 'phantom_right_top' && connectionTo === 'extract_info');
+    
+    if (isPhantomConnection) {
+      // All phantom connections animate together when we reach the last real node
+      if (currentStep >= flowNodes.length - 1) return 'active';
+      return 'pending';
+    }
+    
+    // Regular connections animate based on source node completion
+    const fromIndex = flowNodes.findIndex(n => n.id === connectionFrom);
+    if (fromIndex === -1) return 'pending';
+    if (currentStep > fromIndex) return 'completed';
+    if (currentStep === fromIndex + 1) return 'active';
+    return 'pending';
   };
 
   const getNodeIcon = (type: string) => {
@@ -169,6 +236,70 @@ const SimpleFlowPage: React.FC = () => {
         </Typography>
       </Box>
 
+      {/* Control Panel */}
+      <Paper 
+        elevation={3}
+        sx={{ 
+          p: 2, 
+          mb: 3,
+          background: 'rgba(15, 23, 42, 0.6)',
+          border: '1px solid rgba(99, 102, 241, 0.2)',
+          borderRadius: 2,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 2
+        }}
+      >
+        <IconButton 
+          onClick={handlePrev} 
+          disabled={currentStep === 0}
+          sx={{ color: '#6366F1' }}
+        >
+          <PrevIcon />
+        </IconButton>
+        
+        <IconButton 
+          onClick={handlePlay}
+          sx={{ 
+            color: '#6366F1',
+            backgroundColor: isPlaying ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+            '&:hover': { backgroundColor: 'rgba(99, 102, 241, 0.2)' }
+          }}
+        >
+          {isPlaying ? <PauseIcon /> : <PlayIcon />}
+        </IconButton>
+        
+        <IconButton 
+          onClick={handleNext} 
+          disabled={currentStep === flowNodes.length - 1}
+          sx={{ color: '#6366F1' }}
+        >
+          <NextIcon />
+        </IconButton>
+        
+        <IconButton 
+          onClick={handleRestart}
+          sx={{ color: '#6366F1' }}
+        >
+          <RestartIcon />
+        </IconButton>
+
+        <Box sx={{ mx: 2 }}>
+          <Chip 
+            label={`Step ${currentStep + 1} of ${flowNodes.length}`}
+            sx={{ 
+              backgroundColor: 'rgba(99, 102, 241, 0.2)',
+              color: '#E2E8F0'
+            }}
+          />
+        </Box>
+
+        <Typography variant="body2" sx={{ color: '#94A3B8' }}>
+          {flowNodes[currentStep]?.label || 'Start'}
+        </Typography>
+      </Paper>
+
 
 
       {/* Simple Flow Diagram */}
@@ -196,9 +327,12 @@ const SimpleFlowPage: React.FC = () => {
          }}>
           {/* Flow Nodes */}
           {[...flowNodes, ...phantomNodes].map((node, index) => {
-            const status = getNodeStatus();
+            // Only animate real flow nodes (first 4), phantoms stay hidden
+            const nodeIndex = index < flowNodes.length ? index : -1;
+            const status = node.type === 'phantom' ? 'completed' : getNodeStatus(nodeIndex);
             const isActive = status === 'active';
             const isCompleted = status === 'completed';
+            const isPending = status === 'pending';
             
             const getShapeStyle = (nodeType: NodeType) => {
               switch (nodeType) {
@@ -238,23 +372,14 @@ const SimpleFlowPage: React.FC = () => {
               }
             };
 
-            const getNodePosition = () => {
-              if (node.type === 'phantom') {
-                const alignedIndex = flowNodes.findIndex(n => n.id === (node as PhantomNode).position.alignWith);
-                return {
-                  left: `${(node as PhantomNode).position.x}%`,
-                  top: `${alignedIndex * 120 + 40}px`
-                };
-              } else {
-                const flowNode = node as FlowNode;
-                return {
-                  left: flowNode.id === 'edit_summary' ? '30%' : '50%',
-                  top: `${index * 120 + 40}px`
-                };
-              }
-            };
-
-            const nodePosition = getNodePosition();
+            // Simple positioning like FlowPage.tsx
+            const isPhantom = node.type === 'phantom';
+            const leftPosition = isPhantom 
+              ? `${(node as PhantomNode).position.x}%`
+              : node.id === 'edit_summary' ? '30%' : '50%';
+            const topPosition = isPhantom 
+              ? `${flowNodes.findIndex(n => n.id === (node as PhantomNode).position.alignWith) * 120 + 40}px`
+              : `${nodeIndex * 120 + 40}px`;
 
             return (
               <Fade in timeout={500 + index * 100} key={node.id}>
@@ -264,27 +389,32 @@ const SimpleFlowPage: React.FC = () => {
                     onClick={() => setSelectedNode(selectedNode === node.id ? null : node.id)}
                     sx={{
                       position: 'absolute',
-                      left: nodePosition.left,
-                      top: nodePosition.top,
+                      left: leftPosition,
+                      top: topPosition,
                       transform: node.type === 'decision' ? 'translateX(-50%) rotate(45deg)' : 'translateX(-50%)',
                       ...getShapeStyle(node.type),
                       transformOrigin: 'center center',
-                      background: isActive 
-                        ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.3) 0%, rgba(245, 158, 11, 0.2) 100%)'
-                        : isCompleted 
-                          ? 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.2) 100%)'
-                          : 'rgba(15, 23, 42, 0.8)',
+                      background: isPending
+                        ? 'rgba(15, 23, 42, 0.4)'
+                        : isActive 
+                          ? 'linear-gradient(135deg, rgba(245, 158, 11, 0.4) 0%, rgba(245, 158, 11, 0.2) 100%)'
+                          : 'linear-gradient(135deg, rgba(16, 185, 129, 0.3) 0%, rgba(16, 185, 129, 0.2) 100%)',
                       border: `3px solid ${
-                        isCompleted ? '#10B981' : 
+                        isPending ? '#64748B' :
                         isActive ? '#F59E0B' : 
-                        '#64748B'
+                        '#10B981'
                       }`,
                       cursor: 'pointer',
-                      transition: 'all 0.3s ease-in-out',
+                      transition: 'all 0.6s cubic-bezier(0.4, 0, 0.2, 1)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      boxShadow: isActive ? `0 0 20px ${node.color}40` : 'none',
+                      boxShadow: isPending 
+                        ? 'none'
+                        : isActive 
+                          ? `0 0 25px ${node.color}60, 0 0 50px ${node.color}30`
+                          : `0 0 15px rgba(16, 185, 129, 0.4)`,
+                      animation: isActive ? 'pulse 2s ease-in-out infinite' : 'none',
                       '&:hover': {
                         transform: node.type === 'decision' ? 'translateX(-50%) rotate(45deg) scale(1.02)' : 'translateX(-50%) scale(1.02)',
                         boxShadow: `0 4px 15px ${node.color}40`
@@ -320,31 +450,33 @@ const SimpleFlowPage: React.FC = () => {
 
                   {/* Status Chip - Hide for phantom nodes */}
                   {node.type !== 'phantom' && (
-                    <Chip
-                      size="small"
-                      label={
-                        isCompleted ? 'Completed' : 
-                        isActive ? 'Processing' : 
-                        'Pending'
-                      }
-                      sx={{
-                        position: 'absolute',
-                        left: nodePosition.left,
-                        top: `${index * 120 + 15}px`,
-                        transform: 'translateX(-50%)',
-                        backgroundColor: `${
-                          isCompleted ? '#10B981' : 
-                          isActive ? '#F59E0B' : 
-                          '#64748B'
-                        }20`,
-                        color: isCompleted ? '#10B981' : 
-                               isActive ? '#F59E0B' : 
-                               '#64748B',
-                        fontSize: '0.5rem',
-                        height: '18px',
-                        zIndex: 10
-                      }}
-                    />
+                  <Chip
+                    size="small"
+                    label={
+                        isPending ? 'Waiting' :
+                      isActive ? 'Processing' : 
+                        'Completed'
+                    }
+                    sx={{
+                      position: 'absolute',
+                      left: leftPosition,
+                      top: `${nodeIndex * 120 + 15}px`,
+                      transform: 'translateX(-50%)',
+                      backgroundColor: `${
+                          isPending ? '#64748B' :
+                        isActive ? '#F59E0B' : 
+                          '#10B981'
+                      }20`,
+                        color: isPending ? '#64748B' :
+                             isActive ? '#F59E0B' : 
+                               '#10B981',
+                      fontSize: '0.5rem',
+                      height: '18px',
+                        zIndex: 10,
+                        animation: isActive ? 'pulse 1.5s ease-in-out infinite' : 'none',
+                        transition: 'all 0.4s ease-in-out'
+                    }}
+                  />
                   )}
                 </Box>
               </Fade>
@@ -450,6 +582,12 @@ const SimpleFlowPage: React.FC = () => {
               
               if (!fromNode || !toNode) return null;
               
+              // Get connection animation status
+              const connectionStatus = getConnectionStatus(connection.from, connection.to);
+              const isConnectionActive = connectionStatus === 'active';
+              const isConnectionCompleted = connectionStatus === 'completed';
+              const isConnectionPending = connectionStatus === 'pending';
+              
               // Special handling for phantom connections (loop back using 3 separate arrows)
               if (connection.isPhantom) {
                 // Calculate positions for phantom and regular nodes
@@ -483,22 +621,50 @@ const SimpleFlowPage: React.FC = () => {
                       y1={start.y}
                       x2={`${end.x}%`}
                       y2={end.y}
-                      stroke="#64748B"
-                      strokeWidth="2"
-                      strokeDasharray="5,5"
+                      stroke={isConnectionCompleted ? '#10B981' : 
+                             isConnectionActive ? '#F59E0B' : '#64748B'}
+                      strokeWidth={isConnectionActive ? "3" : "2"}
+                      strokeDasharray={isConnectionActive ? "0" : "5,5"}
                       markerEnd={toNode.type !== 'phantom' ? "url(#loop-arrowhead)" : "none"}
-                      opacity={0.5}
+                      opacity={isConnectionPending ? 0.3 : 
+                              isConnectionActive ? 1 : 0.7}
+                      style={{
+                        filter: isConnectionActive ? 'drop-shadow(0 0 4px currentColor)' : 'none',
+                        transition: 'all 0.6s ease-in-out'
+                      }}
                     />
+                    
+                    {/* Animated flow particle for active connections */}
+                    {isConnectionActive && (
+                      <circle
+                        r="3"
+                        fill="#F59E0B"
+                        opacity={0.8}
+                        style={{
+                          filter: 'drop-shadow(0 0 6px #F59E0B)'
+                        }}
+                      >
+                        <animateMotion
+                          dur="2s"
+                          repeatCount="indefinite"
+                          path={`M ${start.x}% ${start.y} L ${end.x}% ${end.y}`}
+                        />
+                      </circle>
+                    )}
                     
                     {/* Show label only on the last phantom connection */}
                     {connection.label && (
                       <text
                         x={`${(start.x + end.x) / 2}%`}
                         y={(start.y + end.y) / 2}
-                        fill="#94A3B8"
+                        fill={isConnectionActive ? '#F59E0B' : '#94A3B8'}
                         fontSize="10"
                         textAnchor="middle"
                         dy="-5"
+                        style={{
+                          transition: 'all 0.4s ease-in-out',
+                          fontWeight: isConnectionActive ? 'bold' : 'normal'
+                        }}
                       >
                         {connection.label}
                       </text>
@@ -557,10 +723,10 @@ const SimpleFlowPage: React.FC = () => {
                       refY="3.5"
                       orient="auto"
                     >
-                                              <polygon
-                          points="0 0, 10 3.5, 0 7"
+                      <polygon
+                        points="0 0, 10 3.5, 0 7"
                           fill="#64748B"
-                        />
+                      />
                     </marker>
                   </defs>
                   
@@ -569,21 +735,49 @@ const SimpleFlowPage: React.FC = () => {
                     y1={start.y}
                     x2={`${end.x}%`}
                     y2={end.y}
-                    stroke="#64748B"
-                    strokeWidth="2"
-                    strokeDasharray="5,5"
+                    stroke={isConnectionCompleted ? '#10B981' : 
+                           isConnectionActive ? '#F59E0B' : '#64748B'}
+                    strokeWidth={isConnectionActive ? "3" : "2"}
+                    strokeDasharray={isConnectionActive ? "0" : "5,5"}
                     markerEnd={`url(#arrowhead-${index})`}
-                    opacity={0.5}
+                    opacity={isConnectionPending ? 0.3 : 
+                            isConnectionActive ? 1 : 0.7}
+                    style={{
+                      filter: isConnectionActive ? 'drop-shadow(0 0 4px currentColor)' : 'none',
+                      transition: 'all 0.6s ease-in-out'
+                    }}
                   />
+                  
+                  {/* Animated flow particle for active connections */}
+                  {isConnectionActive && (
+                    <circle
+                      r="3"
+                      fill="#F59E0B"
+                      opacity={0.8}
+                      style={{
+                        filter: 'drop-shadow(0 0 6px #F59E0B)'
+                      }}
+                    >
+                      <animateMotion
+                        dur="2s"
+                        repeatCount="indefinite"
+                        path={`M ${start.x}% ${start.y} L ${end.x}% ${end.y}`}
+                      />
+                    </circle>
+                  )}
                   
                   {connection.label && (
                     <text
                       x={`${(start.x + end.x) / 2}%`}
                       y={(start.y + end.y) / 2}
-                      fill="#94A3B8"
+                      fill={isConnectionActive ? '#F59E0B' : '#94A3B8'}
                       fontSize="10"
                       textAnchor="middle"
                       dy="-5"
+                      style={{
+                        transition: 'all 0.4s ease-in-out',
+                        fontWeight: isConnectionActive ? 'bold' : 'normal'
+                      }}
                     >
                       {connection.label}
                     </text>
