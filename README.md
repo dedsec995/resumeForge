@@ -2,6 +2,12 @@
 
 This project is an AI agent that tailors a LaTeX resume to a specific job description using Langgraph and Groq.
 
+## Workflow
+
+The AI agent follows a sophisticated workflow to optimize resumes:
+
+![ResumeForge Workflow](graph.gif)
+
 ## Setup
 
 1.  **Install LaTeX:** You need to have a LaTeX distribution installed on your system. You can use a tool like TeX Live, MiKTeX, or MacTeX.

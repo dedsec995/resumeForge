@@ -1,6 +1,5 @@
 import json, os, re
 from typing import TypedDict, Dict, Any, Optional
-from langchain_core.runnables.graph_mermaid import draw_mermaid_png
 from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -9,7 +8,7 @@ from openrouter import ChatOpenRouter
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
-from utils import clean_the_text, extract_and_parse_json, parse_keywords_from_json
+from utils import extract_and_parse_json
 from prompts import (
     EXTRACT_INFO_PROMPT,
     EDIT_SUMMARY_PROMPT,
@@ -735,8 +734,6 @@ def workflow(inputs):
     workflow.add_edge("keywords_editor", END)
 
     app = workflow.compile()
-    mermaid_code = app.get_graph().draw_mermaid()
-    draw_mermaid_png(mermaid_syntax=mermaid_code, output_file_path="graph.png")
     result = app.invoke(inputs)
 
     final_json = result["tailored_resume_data"]
@@ -746,4 +743,17 @@ def workflow(inputs):
     full_final_json["status"] = "processed"
     full_final_json["location"] = result.get("location", "Open to Relocation")
 
-    return {"tailored_resume_data": full_final_json}
+    full_final_json["company_name"] = result.get("company_name", "Not Found")
+    full_final_json["position"] = result.get("position", "Not Found")
+
+    # Return all necessary fields at the top level for pipeline processor
+    return {
+        "tailored_resume_data": full_final_json,
+        "score": result.get("score", 0.0),
+        "feedback": result.get("feedback", ""),
+        "downsides": result.get("downsides", ""),
+        "iteration_count": result.get("iteration_count", 0),
+        "company_name": result.get("company_name", "Not Found"),
+        "position": result.get("position", "Not Found"),
+        "location": result.get("location", "Open to Relocation"),
+    }
