@@ -44,7 +44,6 @@ CONSTRAINTS:
 - Maintain professional tone and readability
 - Ensure the summary flows naturally
 - Do not exceed 5 sentences
-- Focus on relevant experience and skills
 
 Your response must be ONLY the updated summary text, wrapped in ```json ... ``` format.
 
@@ -53,6 +52,9 @@ Job Description:
 
 Original Summary:
 {original_summary}
+
+Entire Resume Data:
+{resume_data}
 """
 
 # Edit technical skills section

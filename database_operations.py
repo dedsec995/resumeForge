@@ -34,7 +34,6 @@ class DatabaseOperations:
                 "totalJobDescriptions": firestore.Increment(1),
                 "lastUpdated": firestore.SERVER_TIMESTAMP
             }, merge=True)
-            print("Global counter incremented")
             return True
         except Exception as e:
             print(f"Error incrementing global counter: {e}")
@@ -61,7 +60,6 @@ class DatabaseOperations:
                 "maxRetries": 3
             }
             pipelineRef.set(pipelineData)
-            print(f"Session {sessionId} added to pipeline with selectedProvider: {selectedProvider}")
             return True
         except Exception as e:
             print(f"Error adding session to pipeline: {e}")
@@ -105,7 +103,6 @@ class DatabaseOperations:
                 updateData.update(additionalData)
             
             pipelineRef.update(updateData)
-            print(f"Pipeline session {sessionId} status updated to: {status}")
             return True
         except Exception as e:
             print(f"Error updating pipeline session status: {e}")
@@ -116,7 +113,6 @@ class DatabaseOperations:
         try:
             pipelineRef = self.db.collection("sessionPipeline").document(sessionId)
             pipelineRef.delete()
-            print(f"Session {sessionId} removed from pipeline")
             return True
         except Exception as e:
             print(f"Error removing session from pipeline: {e}")
@@ -146,7 +142,6 @@ class DatabaseOperations:
     def cleanupProcessingSessionsOnStartup(self):
         """Clean up any sessions that were processing when server restarted"""
         try:
-            print("Starting cleanup of processing sessions...")
             
             # Find all sessions with "processing" status
             pipelineRef = self.db.collection("sessionPipeline")
@@ -200,7 +195,6 @@ class DatabaseOperations:
     def createUser(self, userId, email, displayName=None):
         """Create new user document with default structure"""
         try:
-            print(f"Creating user document for: {userId}")
             userRef = self.db.collection("users").document(userId)
 
             userData = {
@@ -235,7 +229,6 @@ class DatabaseOperations:
                 },
             }
 
-            print(f"Setting user data in Firestore...")
             userRef.set(userData)
             print(f"User created successfully: {userId}")
             return True
@@ -275,7 +268,6 @@ class DatabaseOperations:
             }
 
             userRef.update(updateData)
-            print(f"Profile updated for user: {userId}")
             return True
         except Exception as e:
             print(f"Error updating profile: {e}")
@@ -292,7 +284,6 @@ class DatabaseOperations:
             # Check if document exists first
             if userRef.get().exists:
                 userRef.update({"lastLoginAt": firestore.SERVER_TIMESTAMP})
-                print(f"Updated last login for user: {userId}")
                 return True
             else:
                 print(f"User document not found for last login update: {userId}")
@@ -305,7 +296,6 @@ class DatabaseOperations:
     def createSession(self, userId, jobDescription, selectedProvider="openai"):
         """Create new resume session"""
         try:
-            print(f"Creating session with selectedProvider: {selectedProvider}")
             sessionId = str(uuid.uuid4())
             sessionRef = (
                 self.db.collection("users")
@@ -371,7 +361,6 @@ class DatabaseOperations:
 
             if sessionDoc.exists:
                 session_data = sessionDoc.to_dict()
-                print(f"Retrieved session {sessionId} with selectedProvider: {session_data.get('selectedProvider')}")
                 return session_data
             return None
         except Exception as e:
@@ -414,7 +403,6 @@ class DatabaseOperations:
             updateData["metadata.lastUpdated"] = firestore.SERVER_TIMESTAMP
             sessionRef.update(updateData)
 
-            print(f"Session updated: {sessionId}")
             return True
         except Exception as e:
             print(f"Error updating session: {e}")

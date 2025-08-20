@@ -94,14 +94,8 @@ def get_llm_for_task(
     user_tier: str,
     selected_provider: str = "openai",
 ):
-    console.print(
-        f"[bold blue]🔧 Getting LLM for task: {task_name}, provider: {selected_provider}, tier: {user_tier}[/bold blue]"
-    )
     # Get API keys based on user tier
     api_keys = get_user_api_keys(user_id, user_tier)
-    console.print(
-        f"[bold cyan]🔑 API Keys available: {list(k for k, v in api_keys.items() if v)}[/bold cyan]"
-    )
 
     # Validate API keys based on selected provider
     if selected_provider == "openai":
@@ -237,10 +231,6 @@ def extract_info(state):
             company = "Not Found"
             position = "Not Found"
             location = "Open to Relocation"
-
-        console.log(company)
-        console.log(position)
-        console.log(location)
         return {"company_name": company, "position": position, "location": location}
 
     except Exception as e:
@@ -289,6 +279,7 @@ def edit_summary(state):
             feedback_context=feedback_context,
             job_description=state["job_description"],
             original_summary=original_summary,
+            resume_data=json.dumps(state["tailored_resume_data"], indent=2),
         )
 
         response = llm.invoke(prompt)
@@ -670,7 +661,7 @@ def decide_after_judging(state):
 def decide_after_extract_info(state):
     """Decide whether to edit summary or skip to technical skills"""
     resume_data = state.get("resume_data", {})
-    if resume_data.get("edit_summary"):
+    if resume_data.get("summary"):
         console.print(
             Panel(
                 "Summary editing enabled - proceeding to edit summary",

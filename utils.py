@@ -8,7 +8,6 @@ import shutil
 def clean_the_text(content):
     latex_match = re.search(r"```latex(.*)```", content, re.DOTALL)
     if not latex_match:
-        print("No LaTeX content found.")
         return
     latex_content = latex_match.group(1)
     return latex_content
@@ -86,9 +85,6 @@ def safe_write_file(file_path: str, content: str, encoding: str = "utf-8") -> bo
         return True
 
     except PermissionError:
-        print(
-            f"Permission denied writing to {file_path}, trying alternative approach..."
-        )
         try:
             # Try writing to a temporary file first, then moving it
             temp_dir = tempfile.gettempdir()
@@ -102,9 +98,7 @@ def safe_write_file(file_path: str, content: str, encoding: str = "utf-8") -> bo
             return True
 
         except Exception as e:
-            print(f"Failed to write file {file_path}: {e}")
             return False
 
     except Exception as e:
-        print(f"Error writing file {file_path}: {e}")
         return False
