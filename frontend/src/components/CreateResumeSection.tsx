@@ -35,6 +35,7 @@ import {
   Refresh as RefreshIcon,
   Close as CloseIcon,
   Psychology as AIIcon,
+  Merge as MergeIcon,
 } from '@mui/icons-material';
 import { useState, useEffect, useCallback } from 'react';
 import apiClient from '../utils/apiClient';
@@ -97,6 +98,7 @@ const CreateResumeSection = () => {
   const [downloadPDFLoading, setDownloadPDFLoading] = useState<string | null>(null);
   const [downloadLatexLoading, setDownloadLatexLoading] = useState<string | null>(null);
   const [regenerateLatexLoading, setRegenerateLatexLoading] = useState<string | null>(null);
+  const [mergeSkillsLoading, setMergeSkillsLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
   const [userProfileData, setUserProfileData] = useState<any>(null);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
@@ -906,6 +908,41 @@ const CreateResumeSection = () => {
     }
   };
 
+  const handleMergeSkills = async (sessionId: string) => {
+    if (!sessionId) return;
+    
+    setMergeSkillsLoading(sessionId);
+    try {
+      // Call the mergeSkills endpoint to merge personal skills with AI skills
+      const response = await apiClient.post(`/mergeSkills/${sessionId}`);
+      
+      if (response.data.success) {
+        // Refresh the session data to get the updated merged skills
+        const sessionResponse = await apiClient.get(`/getResumeSession/${sessionId}`);
+        if (sessionResponse.data.success && sessionResponse.data.sessionData) {
+          const updatedSession = sessionResponse.data.sessionData;
+          setSelectedSession(updatedSession);
+          
+          // Also update structuredData so both JSON tabs show the updated data
+          if (updatedSession.tailoredResume) {
+            // Clean up any existing startTime/endTime fields from loaded data
+            const cleanedData = cleanStartEndTimesFromLoadedData(updatedSession.tailoredResume);
+            setStructuredData(cleanedData);
+          }
+        }
+        
+        toast.success('Skills merged successfully! Personal skills have been added to matching AI categories.', { icon: <MergeIcon /> });
+      } else {
+        toast.error('Failed to merge skills', { icon: <ErrorIcon /> });
+      }
+    } catch (error) {
+      console.error('Error merging skills:', error);
+      toast.error('Failed to merge skills', { icon: <ErrorIcon /> });
+    } finally {
+      setMergeSkillsLoading(null);
+    }
+  };
+
   const formatDate = (timestamp: string) => {
     return new Date(timestamp).toLocaleString();
   };
@@ -1702,11 +1739,13 @@ const CreateResumeSection = () => {
           onDownloadPDF={handleDownloadPDF}
           onRegenerateLatex={handleRegenerateLatex}
           onDownloadLatexFile={handleDownloadLatexFile}
+          onMergeSkills={handleMergeSkills}
           onCopyToClipboard={handleCopyToClipboard}
           workflowLoading={workflowLoading}
           downloadPDFLoading={downloadPDFLoading}
           downloadLatexLoading={downloadLatexLoading}
           regenerateLatexLoading={regenerateLatexLoading}
+          mergeSkillsLoading={mergeSkillsLoading}
           
           onSaveJson={handleSaveJson}
           saveJsonLoading={saveJsonLoading}

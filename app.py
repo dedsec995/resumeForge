@@ -535,7 +535,6 @@ def run_workflow_sync(userId: str, sessionId: str):
             try:
                 from resume_templates import generate_complete_resume_template
 
-                # Get location from the workflow result
                 location = result.get("location", "Open to Relocation")
                 latex_content = generate_complete_resume_template(
                     tailored_resume.get("resumeData", {}), location
@@ -1485,6 +1484,82 @@ async def updateSessionJsonEndpoint(
         raise HTTPException(
             status_code=500, detail=f"Failed to update session JSON: {str(e)}"
         )
+
+
+@app.post("/mergeSkills/{session_id}")
+async def mergeSkillsEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+    try:
+        import re
+        
+        charLimit = 115  # Maximum characters allowed per skills category (category name + skills)
+        
+        sessionData = dbOps.getSession(userId, session_id)
+        if not sessionData or not sessionData.get("tailoredResume"):
+            raise HTTPException(status_code=404, detail="Resume session not found")
+
+        userData = dbOps.getUser(userId)
+        if not userData or not userData.get("profile"):
+            raise HTTPException(status_code=400, detail="No user profile data found")
+
+        personalSkills = userData["profile"].get("technicalSkillsCategories", [])
+        aiSkills = sessionData["tailoredResume"].get("technicalSkillsCategories", [])
+        
+        if not personalSkills or not aiSkills:
+            return {"success": True, "message": "No skills to merge"}
+
+        mergedSkills = []
+        
+        for aiCategory in aiSkills:
+            categoryName = aiCategory.get("categoryName", "").strip()
+            skillsText = aiCategory.get("skills", "").strip()
+            
+            if not categoryName or not skillsText:
+                continue
+                
+            cleanedSkillsText = re.sub(r'\s*\([^)]*\)', '', skillsText)
+            skillsList = [skill.strip() for skill in cleanedSkillsText.split(",") if skill.strip()]
+            
+            personalCategory = next((cat for cat in personalSkills 
+                                   if cat.get("categoryName", "").strip().lower() == categoryName.lower()), None)
+            
+            if personalCategory:
+                personalSkillsList = [skill.strip() for skill in personalCategory.get("skills", "").split(",") if skill.strip()]
+                currentLength = len(categoryName) + len(cleanedSkillsText)
+                
+                if currentLength < charLimit:
+                    for personalSkill in personalSkillsList:
+                        if personalSkill not in skillsList:
+                            skillWithSeparator = f", {personalSkill}" if skillsList else personalSkill
+                            potentialLength = currentLength + len(skillWithSeparator)
+                            
+                            if currentLength < charLimit:
+                                skillsList.append(personalSkill)
+                                currentLength = potentialLength
+                            else:
+                                break
+            
+            mergedCategory = aiCategory.copy()
+            mergedCategory["skills"] = ", ".join(skillsList)
+            mergedSkills.append(mergedCategory)
+
+        updatedTailoredResume = sessionData["tailoredResume"].copy()
+        updatedTailoredResume["technicalSkillsCategories"] = mergedSkills
+
+        updateData = {
+            "tailoredResume": updatedTailoredResume,
+            "lastUpdated": datetime.now().isoformat(),
+        }
+
+        success = dbOps.updateSession(userId, session_id, updateData)
+        if not success:
+            raise HTTPException(status_code=500, detail="Failed to update session")
+
+        return {"success": True, "mergedSkills": mergedSkills}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to merge skills: {str(e)}")
 
 
 # Questions Endpoints

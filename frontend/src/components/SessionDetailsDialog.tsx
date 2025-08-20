@@ -23,7 +23,8 @@ import {
   Code as CodeIcon,
   Refresh as RefreshIcon,
   ContentCopy as CopyIcon,
-  QuestionAnswer as QuestionAnswerIcon
+  QuestionAnswer as QuestionAnswerIcon,
+  Merge as MergeIcon
 } from '@mui/icons-material';
 import { questionsAPI } from '../utils/apiClient';
 import AddressTab from './AddressTab';
@@ -84,11 +85,13 @@ interface SessionDetailsDialogProps {
   onDownloadPDF: (sessionId: string) => void;
   onRegenerateLatex: (sessionId: string) => void;
   onDownloadLatexFile: (sessionId: string) => void;
+  onMergeSkills: (sessionId: string) => void;
   onCopyToClipboard: (content: string, type: string) => void;
   workflowLoading: string | null;
   downloadPDFLoading: string | null;
   downloadLatexLoading: string | null;
   regenerateLatexLoading: string | null;
+  mergeSkillsLoading: string | null;
   onSaveJson: () => void;
   saveJsonLoading: boolean;
   structuredData: any;
@@ -322,11 +325,13 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
   onDownloadPDF,
   onRegenerateLatex,
   onDownloadLatexFile,
+  onMergeSkills,
   onCopyToClipboard,
   workflowLoading,
   downloadPDFLoading,
   downloadLatexLoading,
   regenerateLatexLoading,
+  mergeSkillsLoading,
   onSaveJson,
   saveJsonLoading,
   structuredData,
@@ -1513,6 +1518,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
             disabled={
               workflowLoading === selectedSession?.sessionId || 
               downloadPDFLoading === selectedSession?.sessionId ||
+              mergeSkillsLoading === selectedSession?.sessionId ||
               selectedSession?.status === 'queued' ||
               selectedSession?.status === 'processing'
             }
@@ -1568,7 +1574,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
           <Button 
             variant="contained" 
             onClick={() => onDownloadPDF(selectedSession.sessionId)}
-            disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId}
+            disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || mergeSkillsLoading === selectedSession?.sessionId}
             startIcon={downloadPDFLoading === selectedSession?.sessionId ? <CircularProgress size={16} /> : null}
             sx={{ 
               mr: 'auto',
@@ -1623,8 +1629,29 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
           <>
             <Button 
               variant="outlined" 
+              onClick={() => onMergeSkills(selectedSession.sessionId)}
+              disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || regenerateLatexLoading === selectedSession?.sessionId || mergeSkillsLoading === selectedSession?.sessionId}
+              startIcon={mergeSkillsLoading === selectedSession?.sessionId ? <CircularProgress size={16} /> : <MergeIcon />}
+              sx={{ 
+                px: 3,
+                py: 1.5,
+                borderRadius: 2,
+                border: '1px solid rgba(16, 185, 129, 0.5)',
+                color: '#10B981',
+                '&:hover': {
+                  backgroundColor: 'rgba(16, 185, 129, 0.1)',
+                  borderColor: '#10B981',
+                  transform: 'translateY(-1px)'
+                },
+                transition: 'all 0.3s ease'
+              }}
+            >
+              {mergeSkillsLoading === selectedSession?.sessionId ? 'Merging...' : 'Merge Skills'}
+            </Button>
+            <Button 
+              variant="outlined" 
               onClick={() => onRegenerateLatex(selectedSession.sessionId)}
-              disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || regenerateLatexLoading === selectedSession?.sessionId}
+              disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || regenerateLatexLoading === selectedSession?.sessionId || mergeSkillsLoading === selectedSession?.sessionId}
               startIcon={regenerateLatexLoading === selectedSession?.sessionId ? <CircularProgress size={16} /> : <RefreshIcon />}
               sx={{ 
                 px: 3,
@@ -1645,13 +1672,13 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
             <Button 
               variant="outlined" 
               onClick={() => onDownloadLatexFile(selectedSession.sessionId)}
-              disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || regenerateLatexLoading === selectedSession?.sessionId}
+              disabled={downloadPDFLoading === selectedSession?.sessionId || downloadLatexLoading === selectedSession?.sessionId || regenerateLatexLoading === selectedSession?.sessionId || mergeSkillsLoading === selectedSession?.sessionId}
               startIcon={downloadLatexLoading === selectedSession?.sessionId ? <CircularProgress size={16} /> : null}
               sx={{ 
                 px: 3,
                 py: 1.5,
                 borderRadius: 2,
-                border: '1px solid rgba(245, 158, 11, 0.5)',
+                border: '1px solid rgba(245, 158, 11, 0.3)',
                 color: '#F59E0B',
                 '&:hover': {
                   backgroundColor: 'rgba(245, 158, 11, 0.1)',

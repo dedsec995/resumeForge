@@ -68,4 +68,11 @@ export const addressAPI = {
   }
 };
 
+export const skillsAPI = {
+  mergeSkills: async (sessionId: string) => {
+    const response = await apiClient.post(`/mergeSkills/${sessionId}`);
+    return response.data;
+  }
+};
+
 export default apiClient;
