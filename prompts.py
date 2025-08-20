@@ -32,18 +32,17 @@ EDIT_SUMMARY_PROMPT = """You are an expert Resume Architect specializing in prof
 
 INSTRUCTIONS:
 1. Analyze the job description for key requirements, responsibilities, and company culture
-2. Rewrite the summary to highlight relevant experience and skills for this specific role
+2. Rewrite the summary to highlight relevant experience and skills for this specific role refering to the resume data
 3. Integrate key keywords from the job description naturally
 4. Emphasize achievements and experience that match the job requirements
-5. Keep the summary concise (3-5 sentences) and impactful
+5. Keep the summary concise (3-4 sentences) and impactful
 6. Use strong action verbs and professional language
-7. Bold important keywords using **keyword** markdown format
 
 CONSTRAINTS:
 - Only modify the 'summary' field
 - Maintain professional tone and readability
 - Ensure the summary flows naturally
-- Do not exceed 5 sentences
+- Do not exceed 4 sentences
 
 Your response must be ONLY the updated summary text, wrapped in ```json ... ``` format.
 

@@ -11,6 +11,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 import re
 from agent import workflow, extract_info
+from answer_questions import answer_question
 from auth_routes import authRouter
 from auth_middleware import verifyFirebaseToken, optionalAuth
 from database_operations import dbOps
@@ -491,7 +492,7 @@ def run_workflow_sync(userId: str, sessionId: str):
         try:
             selected_provider = session_data.get("selectedProvider", "openai")
             print(f"Background workflow using provider: {selected_provider}")
-            
+
             workflow_input = {
                 "resume_data": combined_data,
                 "user_id": userId,
@@ -548,7 +549,7 @@ def run_workflow_sync(userId: str, sessionId: str):
                 if not person_name:
                     print(f"Warning: No person name found in profile for user {userId}")
                     person_name = "Unknown"
-                
+
                 company_name = session_data.get("companyName", "")
                 position = session_data.get("position", "")
                 latex_filename = generate_resume_filename(
@@ -959,15 +960,19 @@ async def deleteResumeSessionEndpoint(
             if session_for_cleanup:
                 user_data = dbOps.getUser(userId)
                 person_name = (
-                    user_data.get("profile", {})
-                    .get("personalInfo", {})
-                    .get("name", "")
-                ) if user_data else ""
-                
+                    (
+                        user_data.get("profile", {})
+                        .get("personalInfo", {})
+                        .get("name", "")
+                    )
+                    if user_data
+                    else ""
+                )
+
                 if not person_name:
                     print(f"Warning: No person name found in profile for user {userId}")
                     person_name = "Unknown"
-                
+
                 company_name = session_for_cleanup.get("companyName", "")
                 position = session_for_cleanup.get("position", "")
 
@@ -1048,15 +1053,15 @@ async def generateLatexEndpoint(
 
         user_data = dbOps.getUser(userId)
         person_name = (
-            user_data.get("profile", {})
-            .get("personalInfo", {})
-            .get("name", "")
-        ) if user_data else ""
-        
+            (user_data.get("profile", {}).get("personalInfo", {}).get("name", ""))
+            if user_data
+            else ""
+        )
+
         if not person_name:
             print(f"Warning: No person name found in profile for user {userId}")
             person_name = "Unknown"
-        
+
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         latex_filename = generate_resume_filename(
@@ -1120,15 +1125,15 @@ async def downloadPDFEndpoint(
 
             user_data = dbOps.getUser(userId)
             person_name = (
-                user_data.get("profile", {})
-                .get("personalInfo", {})
-                .get("name", "")
-            ) if user_data else ""
-            
+                (user_data.get("profile", {}).get("personalInfo", {}).get("name", ""))
+                if user_data
+                else ""
+            )
+
             if not person_name:
                 print(f"Warning: No person name found in profile for user {userId}")
                 person_name = "Unknown"
-            
+
             company_name = session_data.get("companyName", "")
             position = session_data.get("position", "")
             latex_filename = generate_resume_filename(
@@ -1161,10 +1166,10 @@ async def downloadPDFEndpoint(
 
         user_data = dbOps.getUser(userId)
         person_name = (
-            user_data.get("profile", {})
-            .get("personalInfo", {})
-            .get("name", "")
-        ) if user_data else ""
+            (user_data.get("profile", {}).get("personalInfo", {}).get("name", ""))
+            if user_data
+            else ""
+        )
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         pdf_filename = generate_resume_filename(
@@ -1213,10 +1218,14 @@ async def downloadLatexEndpoint(
 
                 user_data = dbOps.getUser(userId)
                 person_name = (
-                    user_data.get("profile", {})
-                    .get("personalInfo", {})
-                    .get("name", "")
-                ) if user_data else ""
+                    (
+                        user_data.get("profile", {})
+                        .get("personalInfo", {})
+                        .get("name", "")
+                    )
+                    if user_data
+                    else ""
+                )
                 company_name = session_data.get("companyName", "")
                 position = session_data.get("position", "")
                 latex_filename = generate_resume_filename(
@@ -1235,15 +1244,15 @@ async def downloadLatexEndpoint(
 
         user_data = dbOps.getUser(userId)
         person_name = (
-            user_data.get("profile", {})
-            .get("personalInfo", {})
-            .get("name", "")
-        ) if user_data else ""
-        
+            (user_data.get("profile", {}).get("personalInfo", {}).get("name", ""))
+            if user_data
+            else ""
+        )
+
         if not person_name:
             print(f"Warning: No person name found in profile for user {userId}")
             person_name = "Unknown"
-        
+
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         latex_filename = generate_resume_filename(
@@ -1487,12 +1496,14 @@ async def updateSessionJsonEndpoint(
 
 
 @app.post("/mergeSkills/{session_id}")
-async def mergeSkillsEndpoint(session_id: str, userId: str = Depends(verifyFirebaseToken)):
+async def mergeSkillsEndpoint(
+    session_id: str, userId: str = Depends(verifyFirebaseToken)
+):
     try:
         import re
-        
+
         charLimit = 115  # Maximum characters allowed per skills category (category name + skills)
-        
+
         sessionData = dbOps.getSession(userId, session_id)
         if not sessionData or not sessionData.get("tailoredResume"):
             raise HTTPException(status_code=404, detail="Resume session not found")
@@ -1503,41 +1514,56 @@ async def mergeSkillsEndpoint(session_id: str, userId: str = Depends(verifyFireb
 
         personalSkills = userData["profile"].get("technicalSkillsCategories", [])
         aiSkills = sessionData["tailoredResume"].get("technicalSkillsCategories", [])
-        
+
         if not personalSkills or not aiSkills:
             return {"success": True, "message": "No skills to merge"}
 
         mergedSkills = []
-        
+
         for aiCategory in aiSkills:
             categoryName = aiCategory.get("categoryName", "").strip()
             skillsText = aiCategory.get("skills", "").strip()
-            
+
             if not categoryName or not skillsText:
                 continue
-                
-            cleanedSkillsText = re.sub(r'\s*\([^)]*\)', '', skillsText)
-            skillsList = [skill.strip() for skill in cleanedSkillsText.split(",") if skill.strip()]
-            
-            personalCategory = next((cat for cat in personalSkills 
-                                   if cat.get("categoryName", "").strip().lower() == categoryName.lower()), None)
-            
+
+            cleanedSkillsText = re.sub(r"\s*\([^)]*\)", "", skillsText)
+            skillsList = [
+                skill.strip() for skill in cleanedSkillsText.split(",") if skill.strip()
+            ]
+
+            personalCategory = next(
+                (
+                    cat
+                    for cat in personalSkills
+                    if cat.get("categoryName", "").strip().lower()
+                    == categoryName.lower()
+                ),
+                None,
+            )
+
             if personalCategory:
-                personalSkillsList = [skill.strip() for skill in personalCategory.get("skills", "").split(",") if skill.strip()]
+                personalSkillsList = [
+                    skill.strip()
+                    for skill in personalCategory.get("skills", "").split(",")
+                    if skill.strip()
+                ]
                 currentLength = len(categoryName) + len(cleanedSkillsText)
-                
+
                 if currentLength < charLimit:
                     for personalSkill in personalSkillsList:
                         if personalSkill not in skillsList:
-                            skillWithSeparator = f", {personalSkill}" if skillsList else personalSkill
+                            skillWithSeparator = (
+                                f", {personalSkill}" if skillsList else personalSkill
+                            )
                             potentialLength = currentLength + len(skillWithSeparator)
-                            
+
                             if currentLength < charLimit:
                                 skillsList.append(personalSkill)
                                 currentLength = potentialLength
                             else:
                                 break
-            
+
             mergedCategory = aiCategory.copy()
             mergedCategory["skills"] = ", ".join(skillsList)
             mergedSkills.append(mergedCategory)
@@ -1577,10 +1603,23 @@ async def addQuestionEndpoint(
         if not question:
             raise HTTPException(status_code=400, detail="Question text is required")
 
-        # For now, provide a dummy answer
-        dummy_answer = "This is a placeholder answer. The LLM integration will be implemented lateraceholder answer. The LLM integration will be implemented later to provide detailed, contextual responses based on the job description and resume content."
+        job_description = session_data.get("jobDescription", "")
+        tailored_resume = session_data.get("tailoredResume", {})
 
-        question_id = dbOps.addQuestion(userId, session_id, question, dummy_answer)
+        # Get user tier and selected provider
+        user_data = dbOps.getUser(userId)
+        user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
+        selected_provider = session_data.get("selectedProvider", "openai")
+
+        final_answer = answer_question(
+            job_description,
+            tailored_resume,
+            question,
+            userId,
+            user_tier,
+            selected_provider,
+        )
+        question_id = dbOps.addQuestion(userId, session_id, question, final_answer)
         if not question_id:
             raise HTTPException(status_code=500, detail="Failed to add question")
 
