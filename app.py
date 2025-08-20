@@ -545,7 +545,11 @@ def run_workflow_sync(userId: str, sessionId: str):
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
 
-                person_name = tailored_resume.get("resumeData", {}).get("personalInfo", {}).get("name", "")
+                person_name = resume_data.get("personalInfo", {}).get("name", "")
+                if not person_name:
+                    print(f"Warning: No person name found in profile for user {userId}")
+                    person_name = "Unknown"
+                
                 company_name = session_data.get("companyName", "")
                 position = session_data.get("position", "")
                 latex_filename = generate_resume_filename(
@@ -954,11 +958,17 @@ async def deleteResumeSessionEndpoint(
 
         try:
             if session_for_cleanup:
+                user_data = dbOps.getUser(userId)
                 person_name = (
-                    session_for_cleanup.get("tailoredResume", {})
+                    user_data.get("profile", {})
                     .get("personalInfo", {})
                     .get("name", "")
-                )
+                ) if user_data else ""
+                
+                if not person_name:
+                    print(f"Warning: No person name found in profile for user {userId}")
+                    person_name = "Unknown"
+                
                 company_name = session_for_cleanup.get("companyName", "")
                 position = session_for_cleanup.get("position", "")
 
@@ -1028,7 +1038,6 @@ async def generateLatexEndpoint(
 
         from resume_templates import generate_complete_resume_template
 
-        # Get location from session data
         location = session_data.get("location", "Open to Relocation")
         latex_content = generate_complete_resume_template(
             session_data["tailoredResume"], location
@@ -1038,11 +1047,17 @@ async def generateLatexEndpoint(
         if not os.path.exists(output_dir):
             os.makedirs(output_dir)
 
+        user_data = dbOps.getUser(userId)
         person_name = (
-            session_data.get("tailoredResume", {})
+            user_data.get("profile", {})
             .get("personalInfo", {})
             .get("name", "")
-        )
+        ) if user_data else ""
+        
+        if not person_name:
+            print(f"Warning: No person name found in profile for user {userId}")
+            person_name = "Unknown"
+        
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         latex_filename = generate_resume_filename(
@@ -1104,11 +1119,17 @@ async def downloadPDFEndpoint(
             if not os.path.exists(output_dir):
                 os.makedirs(output_dir)
 
+            user_data = dbOps.getUser(userId)
             person_name = (
-                session_data.get("tailoredResume", {})
+                user_data.get("profile", {})
                 .get("personalInfo", {})
                 .get("name", "")
-            )
+            ) if user_data else ""
+            
+            if not person_name:
+                print(f"Warning: No person name found in profile for user {userId}")
+                person_name = "Unknown"
+            
             company_name = session_data.get("companyName", "")
             position = session_data.get("position", "")
             latex_filename = generate_resume_filename(
@@ -1139,11 +1160,12 @@ async def downloadPDFEndpoint(
                 detail=f"LaTeX compilation failed: {str(compile_error)}",
             )
 
+        user_data = dbOps.getUser(userId)
         person_name = (
-            session_data.get("tailoredResume", {})
+            user_data.get("profile", {})
             .get("personalInfo", {})
             .get("name", "")
-        )
+        ) if user_data else ""
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         pdf_filename = generate_resume_filename(
@@ -1190,11 +1212,12 @@ async def downloadLatexEndpoint(
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
 
+                user_data = dbOps.getUser(userId)
                 person_name = (
-                    session_data.get("tailoredResume", {})
+                    user_data.get("profile", {})
                     .get("personalInfo", {})
                     .get("name", "")
-                )
+                ) if user_data else ""
                 company_name = session_data.get("companyName", "")
                 position = session_data.get("position", "")
                 latex_filename = generate_resume_filename(
@@ -1211,11 +1234,17 @@ async def downloadLatexEndpoint(
             else:
                 raise HTTPException(status_code=404, detail="LaTeX file not found")
 
+        user_data = dbOps.getUser(userId)
         person_name = (
-            session_data.get("tailoredResume", {})
+            user_data.get("profile", {})
             .get("personalInfo", {})
             .get("name", "")
-        )
+        ) if user_data else ""
+        
+        if not person_name:
+            print(f"Warning: No person name found in profile for user {userId}")
+            person_name = "Unknown"
+        
         company_name = session_data.get("companyName", "")
         position = session_data.get("position", "")
         latex_filename = generate_resume_filename(

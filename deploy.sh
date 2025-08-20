@@ -2,6 +2,13 @@
 
 echo "🚀 Starting Docker deployment of resume-forge Backend..."
 
+print_step "Pulling latest changes from git..."
+if git pull; then
+    print_status "Git pull successful"
+else
+    print_warning "Git pull failed or no changes to pull"
+fi
+
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'

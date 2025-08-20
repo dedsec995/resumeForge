@@ -98,6 +98,7 @@ const CreateResumeSection = () => {
   const [downloadLatexLoading, setDownloadLatexLoading] = useState<string | null>(null);
   const [regenerateLatexLoading, setRegenerateLatexLoading] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState(0);
+  const [userProfileData, setUserProfileData] = useState<any>(null);
   const [showNewResumeForm, setShowNewResumeForm] = useState(false);
   const [showNewResumeDialog, setShowNewResumeDialog] = useState(false);
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
@@ -185,6 +186,7 @@ const CreateResumeSection = () => {
     loadIndividualCounter();
     loadUserInfo();
     loadApiConfig();
+    loadUserProfile();
   }, []);
 
   // Set default provider for non-FREE users ONLY on initial load, not on manual changes
@@ -786,18 +788,20 @@ const CreateResumeSection = () => {
         
         // Generate filename based on person name, company and position
         const generateFilename = () => {
-          const personName = (sessionData?.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+          const personName = userProfileData?.personalInfo?.name || '';
+          if (!personName) {
+            console.warn('No person name found in user profile data');
+          }
+          
           const companyName = sessionData?.companyName || '';
           const position = sessionData?.position || '';
           
-          if (personName || companyName || position) {
-            const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-            const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-            const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-            const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
-            return `${parts.join('_')}.pdf`;
-          }
-          return `resume_${sessionId}.pdf`;
+          const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+          
+          const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
+          return `${parts.join('_')}.pdf`;
         };
 
         const url = window.URL.createObjectURL(new Blob([pdfResponse.data]));
@@ -840,20 +844,21 @@ const CreateResumeSection = () => {
       // Get session data for filename generation
       const sessionData = sessions.find(s => s.sessionId === sessionId);
 
-      // Generate filename based on person name, company and position
       const generateFilename = () => {
-        const personName = (sessionData?.tailoredResume as { personalInfo?: { name?: string } })?.personalInfo?.name || '';
+        const personName = userProfileData?.personalInfo?.name || '';
+        if (!personName) {
+          console.warn('No person name found in user profile data');
+        }
+        
         const companyName = sessionData?.companyName || '';
         const position = sessionData?.position || '';
         
-        if (personName || companyName || position) {
-          const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
-          const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
-          return `${parts.join('_')}.tex`;
-        }
-        return `resume_${sessionId}.tex`;
+        const cleanPerson = personName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+        const cleanCompany = companyName.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+        const cleanPosition = position.replace(/[^\w\s-]/g, '').replace(/\s+/g, '_');
+        
+        const parts = [cleanPerson, cleanCompany, cleanPosition].filter(part => part);
+        return `${parts.join('_')}.tex`;
       };
 
       const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -963,6 +968,17 @@ const CreateResumeSection = () => {
       console.error('Error loading API config:', error);
       // Even on error, mark as set to prevent auto-changes
       setHasSetInitialProvider(true);
+    }
+  };
+
+  const loadUserProfile = async () => {
+    try {
+      const response = await apiClient.get('/parseResume');
+      if (response.data.success) {
+        setUserProfileData(response.data.resumeData);
+      }
+    } catch (error) {
+      console.error('Error loading user profile:', error);
     }
   };
 
