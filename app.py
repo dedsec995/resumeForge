@@ -545,7 +545,7 @@ def run_workflow_sync(userId: str, sessionId: str):
                 if not os.path.exists(output_dir):
                     os.makedirs(output_dir)
 
-                person_name = resume_data.get("personalInfo", {}).get("name", "")
+                person_name = tailored_resume.get("resumeData", {}).get("personalInfo", {}).get("name", "")
                 company_name = session_data.get("companyName", "")
                 position = session_data.get("position", "")
                 latex_filename = generate_resume_filename(
