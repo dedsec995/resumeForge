@@ -160,7 +160,8 @@ def get_llm_for_task(
         elif task_name == "judge_quality":
             return ChatOpenRouter(
                 temperature=temperature,
-                model="moonshotai/kimi-k2:free",
+                model="openai/gpt-oss-120b:free",
+                # model="moonshotai/kimi-k2:free",
                 api_key=OPENROUTER_API_KEY,
             )
         elif task_name == "keywords_editor":

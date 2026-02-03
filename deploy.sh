@@ -109,38 +109,151 @@ print_status "To stop: docker-compose down"
 
 echo ""
 print_step "Frontend Deployment"
-read -p "Do you want to deploy the frontend as well? (y/n): " -n 1 -r
-echo ""
 
-if [[ $REPLY =~ ^[Yy]$ ]]; then
-    print_step "Starting frontend deployment..."
-    
-    # Check if frontend directory exists
-    if [ ! -d "frontend" ]; then
-        print_error "Frontend directory 'frontend' not found!"
-        print_error "Please ensure the frontend code is in the frontend directory."
-        exit 1
-    fi
+print_step "Starting frontend deployment..."
 
-    print_status "Deploying frontend..."
-    cd frontend
-
-    # Check if frontend deploy script exists
-    if [ ! -f "deploy.sh" ]; then
-        print_error "Frontend deploy script not found!"
-        print_error "Please ensure the frontend deploy script exists in frontend/deploy.sh"
-        exit 1
-    fi
-
-    # Run frontend deployment
-    ./deploy.sh
-
-    print_status "cd frontend && ./deploy.sh"
-    
-    cd ..
-    
-    print_status "🎉 Full deployment (backend + frontend) complete!"
-else
-    print_status "Frontend deployment skipped. You can deploy it manually by running:"
-    print_status "cd frontend && ./deploy.sh"
+# Check if frontend directory exists
+if [ ! -d "frontend" ]; then
+    print_error "Frontend directory 'frontend' not found!"
+    print_error "Please ensure the frontend code is in the frontend directory."
+    exit 1
 fi
+
+print_status "Deploying frontend..."
+cd frontend
+
+# Check if frontend deploy script exists
+if [ ! -f "deploy.sh" ]; then
+    print_error "Frontend deploy script not found!"
+    print_error "Please ensure the frontend deploy script exists in frontend/deploy.sh"
+    exit 1
+fi
+
+# Run frontend deployment
+./deploy.sh
+
+print_status "cd frontend && ./deploy.sh"
+
+cd ..
+
+print_status "🎉 Full deployment (backend + frontend) complete!"
+
+echo ""
+print_step "Nginx Configuration Setup"
+
+# Domain configuration
+DOMAIN="resumeforge.thatinsaneguy.com"
+NGINX_CONF_FILE="nginx-resumeforge.conf"
+NGINX_AVAILABLE="/etc/nginx/sites-available/${DOMAIN}"
+NGINX_ENABLED="/etc/nginx/sites-enabled/${DOMAIN}"
+
+# Check if nginx is installed
+if ! command -v nginx &> /dev/null; then
+    print_warning "Nginx is not installed. Skipping nginx setup."
+    print_warning "Install nginx: sudo pacman -S nginx"
+    exit 0
+fi
+
+# Check if running with sudo
+if [ "$EUID" -ne 0 ] && [ -z "$SUDO_USER" ]; then
+    print_warning "Not running as root. Nginx setup requires sudo."
+    print_warning "To set up nginx manually, run:"
+    echo "  sudo cp $NGINX_CONF_FILE $NGINX_AVAILABLE"
+    echo "  sudo ln -sf $NGINX_AVAILABLE $NGINX_ENABLED"
+    echo "  sudo nginx -t && sudo systemctl reload nginx"
+    echo "  echo '1' | sudo certbot --nginx -d $DOMAIN"
+    exit 0
+fi
+
+# Check if nginx config file exists
+if [ ! -f "$NGINX_CONF_FILE" ]; then
+    print_error "Nginx config file '$NGINX_CONF_FILE' not found!"
+    print_error "Please ensure the nginx config file exists in the project root."
+    exit 1
+fi
+
+# Copy nginx config
+print_step "Copying nginx configuration..."
+cp "$NGINX_CONF_FILE" "$NGINX_AVAILABLE"
+
+# Enable the site
+print_step "Enabling nginx site..."
+ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+
+# Remove default site if it exists
+rm -f /etc/nginx/sites-enabled/default
+
+# Test nginx configuration
+print_step "Testing nginx configuration..."
+if nginx -t; then
+    print_status "Nginx configuration is valid"
+    print_step "Reloading nginx..."
+    systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
+    print_status "✅ Nginx configuration deployed"
+else
+    print_error "Nginx configuration test failed!"
+    exit 1
+fi
+
+# SSL Certificate Setup
+echo ""
+print_step "SSL Certificate Setup"
+
+# Check if certbot is installed
+if ! command -v certbot &> /dev/null; then
+    print_warning "Certbot is not installed. Installing certbot..."
+    if command -v pacman &> /dev/null; then
+        # Arch Linux
+        pacman -Sy --noconfirm certbot certbot-nginx 2>/dev/null || {
+            print_error "Failed to install certbot. Please install manually: sudo pacman -S certbot certbot-nginx"
+            exit 1
+        }
+    elif command -v apt &> /dev/null; then
+        # Ubuntu/Debian
+        apt update && apt install -y certbot python3-certbot-nginx 2>/dev/null || {
+            print_error "Failed to install certbot. Please install manually: sudo apt install certbot python3-certbot-nginx"
+            exit 1
+        }
+    else
+        print_error "Could not determine package manager. Please install certbot manually."
+        exit 1
+    fi
+fi
+
+# Get SSL certificate
+print_step "Setting up SSL certificate..."
+print_status "If prompted to reinstall/renew certificate, automatically selecting option 1 (reinstall existing)..."
+
+# Run certbot with automatic selection of option 1 if prompted
+# First try non-interactive mode (works for new certs or valid existing certs)
+if certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos --keep-until-expiring 2>/dev/null; then
+    print_status "✅ SSL certificate configured successfully"
+else
+    # If non-interactive fails (e.g., cert exists and certbot wants to prompt for reinstall choice)
+    # Use interactive mode and pipe "1" to automatically select "reinstall existing certificate"
+    print_status "Running certbot with automatic selection of option 1 (reinstall existing)..."
+    # Handle prompts: email (skip/use existing), agreement (A), reinstall choice (1)
+    # Using printf to handle multiple prompts: empty for email (use existing), A for agree, 1 for reinstall
+    if printf "\nA\n1\n" | certbot --nginx -d ${DOMAIN} 2>/dev/null; then
+        print_status "✅ SSL certificate configured successfully"
+    else
+        print_warning "⚠️  Certbot encountered an issue. This might be normal if certificate already exists."
+        print_warning "You can manually run: printf '\nA\n1\n' | sudo certbot --nginx -d ${DOMAIN}"
+    fi
+fi
+
+# Test nginx configuration after SSL setup
+print_step "Testing nginx configuration after SSL setup..."
+if nginx -t; then
+    print_status "Nginx configuration is valid"
+    systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
+    print_status "✅ Nginx reloaded with SSL configuration"
+else
+    print_error "Nginx configuration test failed after SSL setup!"
+    exit 1
+fi
+
+echo ""
+print_status "🎉 Nginx and SSL setup complete!"
+print_status "Site available at: https://${DOMAIN}"
+print_status "API available at: https://${DOMAIN}/api/"
