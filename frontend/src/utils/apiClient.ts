@@ -4,7 +4,7 @@ import { auth } from '../firebase-config';
 const apiClient = axios.create({
   baseURL: process.env.NODE_ENV === 'production' 
     ? 'https://resumeforge.thatinsaneguy.com/api'  
-    : 'http://localhost:8002', 
+    : 'http://localhost:9241', 
   timeout: 10000,
 });
 

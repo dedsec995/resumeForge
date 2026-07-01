@@ -26,8 +26,8 @@ import { toast } from 'react-hot-toast';
 
 interface ApiKeysConfigurationProps {
   userInfo: { accountTier?: string; email?: string; displayName?: string } | null;
-  selectedProvider: 'openai' | 'groq-google';
-  onProviderChange: (provider: 'openai' | 'groq-google') => void;
+  selectedProvider: 'openai' | 'google';
+  onProviderChange: (provider: 'openai' | 'google') => void;
   onApiConfigChange?: (apiConfig: {
     hasOpenAiKey?: boolean;
     hasGroqKey?: boolean;
@@ -48,7 +48,6 @@ interface UserApiConfig {
 
 interface LoadingStates {
   openAiKey: boolean;
-  groqKey: boolean;
   googleGenAiKey: boolean;
 }
 
@@ -60,14 +59,11 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
 }: ApiKeysConfigurationProps) => {
   const [userApiConfig, setUserApiConfig] = useState<UserApiConfig | null>(null);
   const [openAiKey, setOpenAiKey] = useState('');
-  const [groqKey, setGroqKey] = useState('');
   const [googleGenAiKey, setGoogleGenAiKey] = useState('');
   const [showOpenAiKey, setShowOpenAiKey] = useState(false);
-  const [showGroqKey, setShowGroqKey] = useState(false);
   const [showGoogleGenAiKey, setShowGoogleGenAiKey] = useState(false);
   const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     openAiKey: false,
-    groqKey: false,
     googleGenAiKey: false
   });
   const [showApiConfig, setShowApiConfig] = useState(false);
@@ -111,7 +107,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         const getSuccessMessage = (keyType: string) => {
           switch (keyType) {
             case 'openAiKey': return 'OpenAI API key updated successfully!';
-            case 'groqKey': return 'Groq API key updated successfully!';
             case 'googleGenAiKey': return 'Google Gen AI key updated successfully!';
             default: return 'API key updated successfully!';
           }
@@ -121,7 +116,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         
         // Clear the input field after successful save
         if (key === 'openAiKey') setOpenAiKey('');
-        if (key === 'groqKey') setGroqKey('');
         if (key === 'googleGenAiKey') setGoogleGenAiKey('');
       } else {
         // Handle specific backend validation errors
@@ -130,7 +124,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
           const getInvalidKeyMessage = (keyType: string) => {
             switch (keyType) {
               case 'openAiKey': return 'Invalid OpenAI API key format. Please check your key.';
-              case 'groqKey': return 'Invalid Groq API key format. Please check your key.';
               case 'googleGenAiKey': return 'Invalid Google Gen AI key format. Please check your key.';
               default: return 'Invalid API key format. Please check your key.';
             }
@@ -140,7 +133,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
           const getGenericErrorMessage = (keyType: string) => {
             switch (keyType) {
               case 'openAiKey': return 'Failed to save OpenAI key.';
-              case 'groqKey': return 'Failed to save Groq key.';
               case 'googleGenAiKey': return 'Failed to save Google Gen AI key.';
               default: return 'Failed to save API key.';
             }
@@ -156,7 +148,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         const getInvalidKeyMessage = (keyType: string) => {
           switch (keyType) {
             case 'openAiKey': return 'Invalid OpenAI API key. Please verify your key.';
-            case 'groqKey': return 'Invalid Groq API key. Please verify your key.';
             case 'googleGenAiKey': return 'Invalid Google Gen AI key. Please verify your key.';
             default: return 'Invalid API key. Please verify your key.';
           }
@@ -166,7 +157,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         const getErrorMessage = (keyType: string) => {
           switch (keyType) {
             case 'openAiKey': return 'Error saving OpenAI key. Please try again.';
-            case 'groqKey': return 'Error saving Groq key. Please try again.';
             case 'googleGenAiKey': return 'Error saving Google Gen AI key. Please try again.';
             default: return 'Error saving API key. Please try again.';
           }
@@ -194,7 +184,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         const getDeleteSuccessMessage = (keyType: string) => {
           switch (keyType) {
             case 'openAiKey': return 'OpenAI API key deleted successfully!';
-            case 'groqKey': return 'Groq API key deleted successfully!';
             case 'googleGenAiKey': return 'Google Gen AI key deleted successfully!';
             default: return 'API key deleted successfully!';
           }
@@ -205,7 +194,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         const getDeleteErrorMessage = (keyType: string) => {
           switch (keyType) {
             case 'openAiKey': return 'Failed to delete OpenAI key.';
-            case 'groqKey': return 'Failed to delete Groq key.';
             case 'googleGenAiKey': return 'Failed to delete Google Gen AI key.';
             default: return 'Failed to delete API key.';
           }
@@ -217,7 +205,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
       const getDeleteErrorMessage = (keyType: string) => {
         switch (keyType) {
           case 'openAiKey': return 'Error deleting OpenAI key. Please try again.';
-          case 'groqKey': return 'Error deleting Groq key. Please try again.';
           case 'googleGenAiKey': return 'Error deleting Google Gen AI key. Please try again.';
           default: return 'Error deleting API key. Please try again.';
         }
@@ -238,10 +225,10 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
       <Paper
         elevation={2}
         sx={{
-          background: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGroqKey || !!userApiConfig?.hasGoogleGenAiKey) 
+          background: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGoogleGenAiKey) 
             ? 'rgba(34, 197, 94, 0.1)' 
             : 'rgba(239, 68, 68, 0.1)',
-          border: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGroqKey || !!userApiConfig?.hasGoogleGenAiKey) 
+          border: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGoogleGenAiKey) 
             ? '1px solid rgba(34, 197, 94, 0.3)' 
             : '1px solid rgba(239, 68, 68, 0.3)',
           borderRadius: 2,
@@ -267,7 +254,7 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <KeyIcon sx={{ 
-              color: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGroqKey || !!userApiConfig?.hasGoogleGenAiKey) 
+              color: (!!userApiConfig?.hasOpenAiKey || !!userApiConfig?.hasGoogleGenAiKey) 
                 ? '#22C55E' 
                 : '#EF4444',
               fontSize: 24
@@ -329,26 +316,26 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   </Typography>
                 </Box>
 
-                {/* Groq & Google Bubble */}
+                {/* Google Gemini bubble */}
                 <Box
                   onClick={(e) => {
                     e.stopPropagation(); // Prevent dropdown from opening
-                    if (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) {
-                      onProviderChange('groq-google');
+                    if (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) {
+                      onProviderChange('google');
                     }
                   }}
                   sx={{
                     px: 2,
                     py: 1,
                     borderRadius: 2.5,
-                    cursor: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) ? 'pointer' : 'not-allowed',
+                    cursor: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) ? 'pointer' : 'not-allowed',
                     transition: 'all 0.3s ease',
                     border: '2px solid',
-                    opacity: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) ? 1 : 0.5,
-                    ...(userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey))
+                    opacity: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) ? 1 : 0.5,
+                    ...(userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey)
                       ? {
-                          borderColor: selectedProvider === 'groq-google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
-                          background: selectedProvider === 'groq-google' 
+                          borderColor: selectedProvider === 'google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
+                          background: selectedProvider === 'google' 
                             ? 'rgba(16, 185, 129, 0.15)' 
                             : 'rgba(16, 185, 129, 0.05)',
                           '&:hover': {
@@ -365,13 +352,13 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   }}
                 >
                   <Typography sx={{
-                    color: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) 
-                      ? (selectedProvider === 'groq-google' ? '#10B981' : '#E2E8F0')
+                    color: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) 
+                      ? (selectedProvider === 'google' ? '#10B981' : '#E2E8F0')
                       : '#64748B',
                     fontWeight: 600,
                     fontSize: '0.8rem'
                   }}>
-                    Groq & Google
+                    Google Gemini
                   </Typography>
                 </Box>
               </Box>
@@ -393,20 +380,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                 }}>
                   <Typography variant="caption" sx={{ color: '#6366F1', fontWeight: 600, fontSize: '0.7rem' }}>
                     OpenAI
-                  </Typography>
-                </Box>
-              )}
-              {userApiConfig?.hasGroqKey && (
-                <Box sx={{
-                  px: 1.5,
-                  py: 0.5,
-                  borderRadius: 2,
-                  background: 'rgba(16, 185, 129, 0.2)',
-                  border: '1px solid rgba(16, 185, 129, 0.4)',
-                  backdropFilter: 'blur(10px)'
-                }}>
-                  <Typography variant="caption" sx={{ color: '#10B981', fontWeight: 600, fontSize: '0.7rem' }}>
-                    Groq
                   </Typography>
                 </Box>
               )}
@@ -506,27 +479,27 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   </Typography>
                 </Box>
               
-                {/* Groq & Google Bubble */}
+                {/* Google Gemini bubble */}
                 <Box
                   onClick={() => {
-                    if (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) {
-                      onProviderChange('groq-google');
+                    if (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) {
+                      onProviderChange('google');
                     }
                   }}
                   sx={{
                     px: 3,
                     py: 2,
                     borderRadius: 3,
-                    cursor: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) ? 'pointer' : 'not-allowed',
+                    cursor: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) ? 'pointer' : 'not-allowed',
                     transition: 'all 0.3s ease',
                     border: '2px solid',
                     minWidth: '120px',
                     textAlign: 'center',
-                    opacity: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) ? 1 : 0.5,
-                    ...(userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey))
+                    opacity: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) ? 1 : 0.5,
+                    ...(userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey)
                       ? {
-                          borderColor: selectedProvider === 'groq-google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
-                          background: selectedProvider === 'groq-google' 
+                          borderColor: selectedProvider === 'google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
+                          background: selectedProvider === 'google' 
                             ? 'rgba(16, 185, 129, 0.15)' 
                             : 'rgba(16, 185, 129, 0.05)',
                           '&:hover': {
@@ -543,13 +516,13 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                   }}
                 >
                   <Typography sx={{
-                    color: (userInfo?.accountTier !== 'FREE' || (userApiConfig?.hasGroqKey && userApiConfig?.hasGoogleGenAiKey)) 
-                      ? (selectedProvider === 'groq-google' ? '#10B981' : '#E2E8F0')
+                    color: (userInfo?.accountTier !== 'FREE' || userApiConfig?.hasGoogleGenAiKey) 
+                      ? (selectedProvider === 'google' ? '#10B981' : '#E2E8F0')
                       : '#64748B',
                     fontWeight: 600,
                     fontSize: '0.9rem'
                   }}>
-                    Groq & Google
+                    Google Gemini
                   </Typography>
                 </Box>
               </Box>
@@ -686,171 +659,6 @@ const ApiKeysConfiguration: React.FC<ApiKeysConfigurationProps> = ({
                         }}
                       >
                         {loadingStates.openAiKey ? (
-                          <CircularProgress size={20} sx={{ color: '#EF4444' }} />
-                        ) : (
-                          <DeleteIcon fontSize="small" />
-                        )}
-                      </Button>
-                    ) : (
-                      // Show Disabled Save Button when no key and not editing
-                      <Button
-                        variant="outlined"
-                        color="success"
-                        disabled={true}
-                        sx={{
-                          borderColor: '#64748B',
-                          color: '#64748B',
-                          height: '40px',
-                          minWidth: '40px',
-                          width: '40px',
-                          padding: 0,
-                          margin: 0,
-                          borderRadius: '4px',
-                          '&:disabled': {
-                            borderColor: '#64748B',
-                            color: '#64748B'
-                          }
-                        }}
-                      >
-                        <CheckIcon fontSize="small" />
-                      </Button>
-                    )}
-                  </Box>
-                </Zoom>
-              </Box>
-            </Box>
-
-            {/* Groq API Key Input */}
-            <Box sx={{ mb: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                <Typography variant="subtitle2" sx={{ color: '#F8FAFC', fontWeight: 500 }}>
-                  Groq API Key
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', gap: 1, alignItems: 'flex-end' }}>
-                <TextField
-                  fullWidth
-                  label="Groq API Key"
-                  type={showGroqKey ? 'text' : 'password'}
-                  value={groqKey || userApiConfig?.groqKey || ''}
-                  onChange={(e) => setGroqKey(e.target.value)}
-                  placeholder={userApiConfig?.hasGroqKey ? "Update Groq API key..." : "gsk_..."}
-                  size="small"
-                  disabled={loadingStates.groqKey}
-                  InputProps={{
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          onClick={() => setShowGroqKey(!showGroqKey)}
-                          edge="end"
-                          size="small"
-                          disabled={loadingStates.groqKey}
-                          sx={{ color: '#94A3B8' }}
-                        >
-                          {showGroqKey ? <VisibilityOffIcon /> : <VisibilityIcon />}
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  sx={{
-                    '& .MuiOutlinedInput-root': {
-                      backgroundColor: 'rgba(15, 23, 42, 0.3)',
-                      borderRadius: 1,
-                      transition: 'all 0.3s ease',
-                      '& fieldset': {
-                        borderColor: userApiConfig?.hasGroqKey ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)',
-                        transition: 'border-color 0.3s ease',
-                      },
-                      '&:hover fieldset': {
-                        borderColor: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
-                      },
-                      '&.Mui-focused fieldset': {
-                        borderColor: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
-                      },
-                      '&.Mui-disabled': {
-                        backgroundColor: 'rgba(15, 23, 42, 0.1)',
-                        opacity: 0.7,
-                      }
-                    },
-                    '& .MuiInputLabel-root': {
-                      color: '#94A3B8',
-                      transition: 'color 0.3s ease',
-                      '&.Mui-focused': {
-                        color: userApiConfig?.hasGroqKey ? '#22C55E' : '#EF4444',
-                      },
-                    },
-                    '& .MuiOutlinedInput-input': {
-                      color: '#F8FAFC',
-                      transition: 'color 0.3s ease',
-                    },
-                  }}
-                />
-                {/* Action Button with Loading State */}
-                <Zoom in={true} style={{ transitionDelay: '200ms' }}>
-                  <Box>
-                    {groqKey.trim() !== '' ? (
-                      // Show Save Button when editing
-                      <Button
-                        variant="outlined"
-                        color="success"
-                        onClick={() => handleSaveIndividualKey('groqKey', groqKey.trim())}
-                        disabled={loadingStates.groqKey}
-                        sx={{
-                          borderColor: '#22C55E',
-                          color: '#22C55E',
-                          height: '40px',
-                          minWidth: '40px',
-                          width: '40px',
-                          padding: 0,
-                          margin: 0,
-                          borderRadius: '4px',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            borderColor: '#16A34A',
-                            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                            transform: 'scale(1.05)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#22C55E',
-                            color: '#22C55E',
-                          }
-                        }}
-                      >
-                        {loadingStates.groqKey ? (
-                          <CircularProgress size={20} sx={{ color: '#22C55E' }} />
-                        ) : (
-                          <CheckIcon fontSize="small" />
-                        )}
-                      </Button>
-                    ) : userApiConfig?.hasGroqKey ? (
-                      // Show Delete Button when key exists
-                      <Button
-                        variant="outlined"
-                        color="error"
-                        onClick={() => handleDeleteIndividualKey('groqKey')}
-                        disabled={loadingStates.groqKey}
-                        sx={{
-                          borderColor: '#EF4444',
-                          color: '#EF4444',
-                          height: '40px',
-                          minWidth: '40px',
-                          width: '40px',
-                          padding: 0,
-                          margin: 0,
-                          borderRadius: '4px',
-                          transition: 'all 0.3s ease',
-                          '&:hover': {
-                            borderColor: '#DC2626',
-                            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                            transform: 'scale(1.05)',
-                          },
-                          '&:disabled': {
-                            borderColor: '#EF4444',
-                            color: '#EF4444',
-                          }
-                        }}
-                      >
-                        {loadingStates.groqKey ? (
                           <CircularProgress size={20} sx={{ color: '#EF4444' }} />
                         ) : (
                           <DeleteIcon fontSize="small" />

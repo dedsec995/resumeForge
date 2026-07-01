@@ -74,7 +74,7 @@ sleep 5
 print_step "Checking container status..."
 if docker-compose ps | grep -q "Up"; then
     print_status "✅ Backend deployment successful!"
-    print_status "Backend is running on http://localhost:8002"
+    print_status "Backend is running on http://localhost:9241"
     print_status "Available at: https://resumeforge.thatinsaneguy.com/api/"
     
     print_status "Container Status:"
@@ -95,7 +95,7 @@ fi
 
 print_step "Performing health check..."
 sleep 3
-if curl -f http://localhost:8002/ > /dev/null 2>&1; then
+if curl -f http://localhost:9241/ > /dev/null 2>&1; then
     print_status "✅ Health check passed! Backend is responding."
 else
     print_warning "⚠️  Health check failed. Backend might still be starting up."
@@ -103,7 +103,7 @@ else
 fi
 
 print_status "🎉 Backend deployment complete!"
-print_status "Note: Make sure nginx is configured to proxy API requests to port 8002"
+print_status "Note: Make sure nginx is configured to proxy API requests to port 9241"
 print_status "To view logs: docker-compose logs -f"
 print_status "To stop: docker-compose down"
 
@@ -140,6 +140,10 @@ print_status "🎉 Full deployment (backend + frontend) complete!"
 
 echo ""
 print_step "Nginx Configuration Setup"
+
+SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../deployLib.sh
+source "${SCRIPT_ROOT}/../dktp/deployLib.sh"
 
 # Domain configuration
 DOMAIN="resumeforge.thatinsaneguy.com"
@@ -199,6 +203,10 @@ fi
 echo ""
 print_step "SSL Certificate Setup"
 
+if le_cert_exists "${DOMAIN}"; then
+    print_status "Certificate exists for ${DOMAIN} — skipped certbot."
+else
+
 # Check if certbot is installed
 if ! command -v certbot &> /dev/null; then
     print_warning "Certbot is not installed. Installing certbot..."
@@ -226,7 +234,7 @@ print_status "If prompted to reinstall/renew certificate, automatically selectin
 
 # Run certbot with automatic selection of option 1 if prompted
 # First try non-interactive mode (works for new certs or valid existing certs)
-if certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos --keep-until-expiring 2>/dev/null; then
+if certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos --redirect 2>/dev/null; then
     print_status "✅ SSL certificate configured successfully"
 else
     # If non-interactive fails (e.g., cert exists and certbot wants to prompt for reinstall choice)
@@ -251,6 +259,8 @@ if nginx -t; then
 else
     print_error "Nginx configuration test failed after SSL setup!"
     exit 1
+fi
+
 fi
 
 echo ""

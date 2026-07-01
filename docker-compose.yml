@@ -3,7 +3,7 @@ services:
     build: .
     container_name: resume-forge-backend
     ports:
-      - "8002:8002"
+      - "9241:9241"
     env_file:
       - .env
     volumes:
@@ -12,7 +12,7 @@ services:
     user: "1001:1001"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8002/"]
+      test: ["CMD", "curl", "-f", "http://localhost:9241/"]
       interval: 30s
       timeout: 10s
       retries: 3

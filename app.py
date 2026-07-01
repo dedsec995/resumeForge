@@ -23,6 +23,16 @@ from pipeline_processor import (
 )
 from addressFinder import findAddressesForLocation
 
+
+def normalize_selected_provider(provider: Optional[str]) -> str:
+    """Map legacy provider id; `groq-google` is now Google (Gemini) only."""
+    if not provider:
+        return "openai"
+    if provider == "groq-google":
+        return "google"
+    return provider
+
+
 app = FastAPI(
     title="Resume Forge API",
     description="AI-powered resume tailoring service",
@@ -490,7 +500,9 @@ def run_workflow_sync(userId: str, sessionId: str):
         }
 
         try:
-            selected_provider = session_data.get("selectedProvider", "openai")
+            selected_provider = normalize_selected_provider(
+                session_data.get("selectedProvider", "openai")
+            )
             print(f"Background workflow using provider: {selected_provider}")
 
             workflow_input = {
@@ -638,9 +650,9 @@ async def fullWorkflowEndpoint(
 
         # Get API config and selected provider from database
         api_config = dbOps.getUserApiConfig(userId)
-        selected_provider = (
-            api_config.get("selectedProvider", "") if api_config else ""
-        ) or "openai"
+        selected_provider = normalize_selected_provider(
+            (api_config.get("selectedProvider", "") if api_config else "") or "openai"
+        )
         print(
             f"Processing workflow with provider from DB: {selected_provider} for user tier: {user_tier}"
         )
@@ -653,15 +665,11 @@ async def fullWorkflowEndpoint(
                         status_code=400,
                         detail="API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue.",
                     )
-            elif selected_provider == "groq-google":
-                if (
-                    not api_config
-                    or not api_config.get("groqKey")
-                    or not api_config.get("googleGenAiKey")
-                ):
+            elif selected_provider == "google":
+                if not api_config or not api_config.get("googleGenAiKey"):
                     raise HTTPException(
                         status_code=400,
-                        detail="API_KEY_ERROR: Please add both Groq and Google Gen AI API keys in the API Config section to continue.",
+                        detail="API_KEY_ERROR: Please add your Google Gen AI API key in the API Config section to continue.",
                     )
 
         if session_data.get("status") == "processing":
@@ -762,9 +770,9 @@ async def createResumeSessionEndpoint(
     try:
         # Get selected provider from database
         api_config = dbOps.getUserApiConfig(userId)
-        selected_provider = (
-            api_config.get("selectedProvider", "") if api_config else ""
-        ) or "openai"
+        selected_provider = normalize_selected_provider(
+            (api_config.get("selectedProvider", "") if api_config else "") or "openai"
+        )
         print(f"Creating session with provider from DB: {selected_provider}")
         sessionId = dbOps.createSession(
             userId, request.jobDescription, selected_provider
@@ -1304,10 +1312,11 @@ async def updateApiConfigEndpoint(
                 if request.googleGenAiKey is not None
                 else existingApiData.get("googleGenAiKey", "")
             ),
-            "selectedProvider": (
+            "selectedProvider": normalize_selected_provider(
                 request.selectedProvider
                 if request.selectedProvider is not None
                 else existingApiData.get("selectedProvider", "")
+                or ""
             ),
             "timestamp": datetime.now().isoformat(),
         }
@@ -1360,11 +1369,14 @@ async def getApiConfigEndpoint(userId: str = Depends(verifyFirebaseToken)):
 
         # Return the actual API keys for display in input fields
         # This is secure as it's only accessible to the authenticated user
+        sp_out = apiData.get("selectedProvider", "")
+        if sp_out == "groq-google":
+            sp_out = "google"
         safeApiData = {
             "openAiKey": apiData.get("openAiKey", ""),
             "groqKey": apiData.get("groqKey", ""),
             "googleGenAiKey": apiData.get("googleGenAiKey", ""),
-            "selectedProvider": apiData.get("selectedProvider", ""),
+            "selectedProvider": sp_out,
             "hasOpenAiKey": bool(apiData.get("openAiKey")),
             "hasGroqKey": bool(apiData.get("groqKey")),
             "hasGoogleGenAiKey": bool(apiData.get("googleGenAiKey")),
@@ -1609,7 +1621,9 @@ async def addQuestionEndpoint(
         # Get user tier and selected provider
         user_data = dbOps.getUser(userId)
         user_tier = user_data.get("accountTier", "FREE") if user_data else "FREE"
-        selected_provider = session_data.get("selectedProvider", "openai")
+        selected_provider = normalize_selected_provider(
+            session_data.get("selectedProvider", "openai")
+        )
 
         final_answer = answer_question(
             job_description,
@@ -1723,4 +1737,4 @@ if __name__ == "__main__":
     import uvicorn
 
     print("Starting Resume Forge API server...")
-    uvicorn.run("app:app", host="0.0.0.0", port=8002, reload=True)
+    uvicorn.run("app:app", host="0.0.0.0", port=int(os.getenv("PORT", "9241")), reload=True)

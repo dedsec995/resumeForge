@@ -1,5 +1,4 @@
 langchain
-langchain-groq
 huggingface_hub
 langchain-openai
 langchain-google-genai

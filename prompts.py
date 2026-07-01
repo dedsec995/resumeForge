@@ -1,10 +1,10 @@
 """
 Prompts for the Resume Forge agent workflow
-Optimized for specific models: Google Gemini, OpenRouter (Qwen), and Groq
+Optimized for: Google Gemini (Google provider path), OpenAI + OpenRouter (ChatGPT provider path for judge).
 """
 
 # Extract company, position, and location from job description
-# Used with: Google Gemini (gemma-3-27b-it) - temperature=0
+# Used with: Google Gemini (GEMINI_FLASH, model_config) - temperature=0
 EXTRACT_INFO_PROMPT = """You are a precise information extraction specialist. Extract exactly three pieces of information from the job description below.
 
 TASK: Extract company name, position title, and job location.
@@ -85,7 +85,7 @@ Original Technical Skills Section:
 """
 
 # Edit work experience section
-# Used with: Groq (openai/gpt-oss-120b) - temperature=0.3
+# Used with: Google Gemini (GEMINI_RESUME_EDITOR) or GPT-4 on OpenAI path - temperature=0.3
 EDIT_EXPERIENCE_PROMPT = """You are an expert Resume Architect specializing in work experience optimization. Transform the work experience section to be highly targeted and achievement-oriented.
 
 {feedback_context}
@@ -123,7 +123,7 @@ Original Work Experience Section:
 """
 
 # Edit projects section
-# Used with: Groq (openai/gpt-oss-120b) - temperature=0.3
+# Used with: Google Gemini (GEMINI_RESUME_EDITOR) or GPT-4 on OpenAI path - temperature=0.3
 EDIT_PROJECTS_PROMPT = """You are an expert Resume Architect specializing in project optimization. Transform the projects section to showcase relevant technical achievements.
 
 {feedback_context}
@@ -197,7 +197,7 @@ Resume to Evaluate:
 """
 
 # Extract keywords for ATS
-# Used with: Google Gemini (gemma-3-27b-it) - temperature=0
+# Used with: Google Gemini (GEMINI_FLASH, model_config) - temperature=0
 KEYWORDS_EXTRACTION_PROMPT = """You are an ATS (Applicant Tracking System) optimization specialist. Extract the most important keywords that will help the resume pass ATS screening.
 
 TASK: Identify 15 strategic keywords that bridge the candidate's skills with job requirements.

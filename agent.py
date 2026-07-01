@@ -1,6 +1,5 @@
 import json, os, re
 from typing import TypedDict, Dict, Any, Optional
-from langchain_groq import ChatGroq
 from langgraph.graph import StateGraph, END
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
@@ -8,6 +7,7 @@ from openrouter import ChatOpenRouter
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
+from model_config import GEMINI_FLASH, GEMINI_RESUME_EDITOR
 from utils import extract_and_parse_json
 from prompts import (
     EXTRACT_INFO_PROMPT,
@@ -24,7 +24,6 @@ from prompts import (
 
 load_dotenv()
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -58,11 +57,13 @@ def get_user_context(state):
     user_id = state.get("user_id", "")
     user_tier = state.get("user_tier", "FREE")
     selected_provider = state.get("selected_provider", "openai")
+    if selected_provider == "groq-google":
+        selected_provider = "google"
     return user_id, user_tier, selected_provider
 
 
 def get_user_api_keys(user_id: str, user_tier: str) -> Dict[str, Optional[str]]:
-    """Get user's API keys based on their tier"""
+    """Get user's API keys based on their tier (OpenAI and/or Google only)."""
     if user_tier == "FREE":
         try:
             from database_operations import dbOps
@@ -71,20 +72,22 @@ def get_user_api_keys(user_id: str, user_tier: str) -> Dict[str, Optional[str]]:
             if api_data:
                 return {
                     "openai": api_data.get("openAiKey"),
-                    "groq": api_data.get("groqKey"),
                     "google": api_data.get("googleGenAiKey"),
                 }
-            return {"openai": None, "groq": None, "google": None}
+            return {"openai": None, "google": None}
         except Exception as e:
             console.print(f"[bold red]Error getting user API keys: {e}[/bold red]")
-            return {"openai": None, "groq": None, "google": None}
+            return {"openai": None, "google": None}
     elif user_tier == "ADMI":
         return {
             "openai": OPENAI_API_KEY,
-            "groq": GROQ_API_KEY,
             "google": GOOGLE_API_KEY,
         }
-    return {"openai": None, "groq": None, "google": None}
+    return {"openai": None, "google": None}
+
+
+def _is_google_provider(selected_provider: str) -> bool:
+    return selected_provider in ("google", "groq-google")
 
 
 def get_llm_for_task(
@@ -94,23 +97,59 @@ def get_llm_for_task(
     user_tier: str,
     selected_provider: str = "openai",
 ):
+    if selected_provider == "groq-google":
+        selected_provider = "google"
     # Get API keys based on user tier
     api_keys = get_user_api_keys(user_id, user_tier)
 
-    # Validate API keys based on selected provider
+    if _is_google_provider(selected_provider):
+        if not api_keys["google"]:
+            raise Exception(
+                "API_KEY_ERROR: Please add your Google Gen AI API key in the API Config section to continue."
+            )
+        # All workflow steps use Google Gemini only
+        if task_name == "extract_info":
+            return ChatGoogleGenerativeAI(
+                temperature=temperature,
+                model=GEMINI_FLASH,
+                api_key=api_keys["google"],
+            )
+        if task_name in [
+            "edit_summary",
+            "edit_technical_skills",
+            "edit_experience",
+            "edit_projects",
+        ]:
+            return ChatGoogleGenerativeAI(
+                temperature=temperature,
+                model=GEMINI_RESUME_EDITOR,
+                api_key=api_keys["google"],
+            )
+        if task_name == "judge_quality":
+            return ChatGoogleGenerativeAI(
+                temperature=temperature,
+                model=GEMINI_FLASH,
+                api_key=api_keys["google"],
+            )
+        if task_name == "keywords_editor":
+            return ChatGoogleGenerativeAI(
+                temperature=temperature,
+                model=GEMINI_FLASH,
+                api_key=api_keys["google"],
+            )
+
     if selected_provider == "openai":
         if not api_keys["openai"]:
             raise Exception(
                 "API_KEY_ERROR: Please add your OpenAI API key in the API Config section to continue."
             )
-        # Use OpenAI for all tasks
         if task_name == "extract_info":
             return ChatOpenAI(
                 temperature=temperature,
                 model="gpt-3.5-turbo",
                 api_key=api_keys["openai"],
             )
-        elif task_name in [
+        if task_name in [
             "edit_summary",
             "edit_technical_skills",
             "edit_experience",
@@ -119,59 +158,19 @@ def get_llm_for_task(
             return ChatOpenAI(
                 temperature=temperature, model="gpt-4", api_key=api_keys["openai"]
             )
-        elif task_name == "judge_quality":
-            # Always use OpenRouter for judging, regardless of selected provider
+        if task_name == "judge_quality":
             return ChatOpenRouter(
                 temperature=temperature,
                 model="moonshotai/kimi-k2:free",
                 api_key=OPENROUTER_API_KEY,
             )
-        elif task_name == "keywords_editor":
+        if task_name == "keywords_editor":
             return ChatOpenAI(
                 temperature=temperature,
                 model="gpt-3.5-turbo",
                 api_key=api_keys["openai"],
             )
 
-    elif selected_provider == "groq-google":
-        if not api_keys["groq"] or not api_keys["google"]:
-            raise Exception(
-                "API_KEY_ERROR: Please add both Groq and Google Gen AI API keys in the API Config section to continue."
-            )
-        # Use Groq + Google combination
-        if task_name == "extract_info":
-            return ChatGoogleGenerativeAI(
-                temperature=temperature,
-                model="gemma-3-27b-it",
-                api_key=api_keys["google"],
-            )
-        elif task_name in ["edit_summary", "edit_technical_skills"]:
-            return ChatGoogleGenerativeAI(
-                temperature=temperature,
-                model="gemini-2.0-flash-exp",
-                api_key=api_keys["google"],
-            )
-        elif task_name in ["edit_experience", "edit_projects"]:
-            return ChatGroq(
-                temperature=temperature,
-                model="openai/gpt-oss-120b",
-                api_key=api_keys["groq"],
-            )
-        elif task_name == "judge_quality":
-            return ChatOpenRouter(
-                temperature=temperature,
-                model="openai/gpt-oss-120b:free",
-                # model="moonshotai/kimi-k2:free",
-                api_key=OPENROUTER_API_KEY,
-            )
-        elif task_name == "keywords_editor":
-            return ChatGoogleGenerativeAI(
-                temperature=temperature,
-                model="gemma-3-27b-it",
-                api_key=api_keys["google"],
-            )
-
-    # Default fallback
     raise Exception(
         f"API_KEY_ERROR: Invalid provider '{selected_provider}' or missing required API keys."
     )
@@ -191,6 +190,8 @@ def get_initial_data(state):
     user_id = state.get("user_id", "")
     user_tier = state.get("user_tier", "FREE")
     selected_provider = state.get("selected_provider", "openai")
+    if selected_provider == "groq-google":
+        selected_provider = "google"
 
     return {
         "resume_data": resume_data,

@@ -123,12 +123,12 @@ const CreateResumeSection = () => {
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'groq-google'>('openai');
+  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'google'>('openai');
   // Flag to prevent auto-switching after initial load
   const [hasSetInitialProvider, setHasSetInitialProvider] = useState(false);
 
   // Helper functions for provider management
-  const saveSelectedProvider = async (provider: 'openai' | 'groq-google') => {
+  const saveSelectedProvider = async (provider: 'openai' | 'google') => {
     try {
       const response = await apiClient.post('/apiConfig', {
         selectedProvider: provider
@@ -141,7 +141,7 @@ const CreateResumeSection = () => {
     }
   };
 
-  const handleProviderChange = useCallback((provider: 'openai' | 'groq-google') => {
+  const handleProviderChange = useCallback((provider: 'openai' | 'google') => {
     setSelectedProvider(provider);
     saveSelectedProvider(provider);
     // Mark as manually set to prevent future auto-changes
@@ -192,16 +192,16 @@ const CreateResumeSection = () => {
   }, []);
 
   // Set default provider for non-FREE users ONLY on initial load, not on manual changes
-  // ADMI and other non-FREE users get 'groq-google' as default on first login
+  // ADMI and other non-FREE users get 'google' as default on first login
   useEffect(() => {
     // Auto-set provider for users who are not FREE (including ADMI) on first login only
     if (userInfo?.accountTier && 
         userInfo.accountTier !== 'FREE' && 
         !hasSetInitialProvider) {
-      // Only set to groq-google if it's the default openai (meaning no saved preference)
+      // Only set to google if it's the default openai (meaning no saved preference)
       if (selectedProvider === 'openai') {
-        console.log(`Setting default provider to groq-google for ${userInfo.accountTier} user`);
-        handleProviderChange('groq-google');
+        console.log(`Setting default provider to google for ${userInfo.accountTier} user`);
+        handleProviderChange('google');
       }
     }
   }, [userInfo?.accountTier, selectedProvider, handleProviderChange, hasSetInitialProvider]);
@@ -446,8 +446,8 @@ const CreateResumeSection = () => {
             const getApiKeyErrorMessage = () => {
               if (selectedProvider === 'openai') {
                 return 'OpenAI API key required. Please add your OpenAI API key below.';
-              } else if (selectedProvider === 'groq-google') {
-                return 'Groq and Google API keys required. Please add both keys below.';
+              } else if (selectedProvider === 'google') {
+                return 'Google Gen AI API key required. Please add your key below.';
               }
               return 'API keys required. Please add your API keys below.';
             };
@@ -457,8 +457,8 @@ const CreateResumeSection = () => {
             const getInvalidKeyMessage = () => {
               if (selectedProvider === 'openai') {
                 return 'Invalid OpenAI API key. Please check your key.';
-              } else if (selectedProvider === 'groq-google') {
-                return 'Invalid Groq or Google API key. Please verify both keys.';
+              } else if (selectedProvider === 'google') {
+                return 'Invalid Google Gen AI API key. Please verify your key.';
               }
               return 'Invalid API key. Please check your keys.';
             };
@@ -653,8 +653,8 @@ const CreateResumeSection = () => {
                 const getApiKeyErrorMessage = () => {
                   if (selectedProvider === 'openai') {
                     return 'OpenAI API key required. Please add your OpenAI API key below.';
-                  } else if (selectedProvider === 'groq-google') {
-                    return 'Groq and Google API keys required. Please add both keys below.';
+                  } else if (selectedProvider === 'google') {
+                    return 'Google Gen AI API key required. Please add your key below.';
                   }
                   return 'API keys required. Please add your API keys below.';
                 };
@@ -664,8 +664,8 @@ const CreateResumeSection = () => {
                 const getInvalidKeyMessage = () => {
                   if (selectedProvider === 'openai') {
                     return 'Invalid OpenAI API key. Please check your key.';
-                  } else if (selectedProvider === 'groq-google') {
-                    return 'Invalid Groq or Google API key. Please verify both keys.';
+                  } else if (selectedProvider === 'google') {
+                    return 'Invalid Google Gen AI API key. Please verify your key.';
                   }
                   return 'Invalid API key. Please check your keys.';
                 };
@@ -722,8 +722,8 @@ const CreateResumeSection = () => {
         const getApiKeyErrorMessage = () => {
           if (selectedProvider === 'openai') {
             return 'OpenAI API key required. Please add your OpenAI API key below.';
-          } else if (selectedProvider === 'groq-google') {
-            return 'Groq and Google API keys required. Please add both keys below.';
+          } else if (selectedProvider === 'google') {
+            return 'Google Gen AI API key required. Please add your key below.';
           }
           return 'API keys required. Please add your API keys below.';
         };
@@ -733,8 +733,8 @@ const CreateResumeSection = () => {
         const getInvalidKeyMessage = () => {
           if (selectedProvider === 'openai') {
             return 'Invalid OpenAI API key. Please check your key.';
-          } else if (selectedProvider === 'groq-google') {
-            return 'Invalid Groq or Google API key. Please verify both keys.';
+          } else if (selectedProvider === 'google') {
+            return 'Invalid Google Gen AI API key. Please verify your key.';
           }
           return 'Invalid API key. Please check your keys.';
         };
@@ -995,7 +995,7 @@ const CreateResumeSection = () => {
       const response = await apiClient.get('/apiConfig');
       if (response.data.success && response.data.apiData) {
         const savedProvider = response.data.apiData.selectedProvider;
-        if (savedProvider && (savedProvider === 'openai' || savedProvider === 'groq-google')) {
+        if (savedProvider && (savedProvider === 'openai' || savedProvider === 'google')) {
           setSelectedProvider(savedProvider);
         }
       }
@@ -1397,9 +1397,9 @@ const CreateResumeSection = () => {
                               </Typography>
                             </Box>
 
-                            {/* Groq & Google Bubble */}
+                            {/* Google Gemini bubble */}
                             <Box
-                              onClick={() => handleProviderChange('groq-google')}
+                              onClick={() => handleProviderChange('google')}
                               sx={{
                                 px: 2,
                                 py: 1,
@@ -1407,8 +1407,8 @@ const CreateResumeSection = () => {
                                 cursor: 'pointer',
                                 transition: 'all 0.3s ease',
                                 border: '2px solid',
-                                borderColor: selectedProvider === 'groq-google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
-                                background: selectedProvider === 'groq-google' 
+                                borderColor: selectedProvider === 'google' ? '#10B981' : 'rgba(16, 185, 129, 0.3)',
+                                background: selectedProvider === 'google' 
                                   ? 'rgba(16, 185, 129, 0.15)' 
                                   : 'rgba(16, 185, 129, 0.05)',
                                 '&:hover': {
@@ -1420,11 +1420,11 @@ const CreateResumeSection = () => {
                               }}
                             >
                               <Typography sx={{
-                                color: selectedProvider === 'groq-google' ? '#10B981' : '#E2E8F0',
+                                color: selectedProvider === 'google' ? '#10B981' : '#E2E8F0',
                                 fontWeight: 600,
                                 fontSize: '0.8rem'
                               }}>
-                                Groq & Google
+                                Google Gemini
                               </Typography>
                             </Box>
                           </Box>
@@ -1804,7 +1804,7 @@ const CreateResumeSection = () => {
                   fontWeight: 600,
                   fontSize: '0.8rem'
                 }}>
-                  {selectedProvider === 'openai' ? 'Chat-GPT' : 'Groq & Google'}
+                  {selectedProvider === 'openai' ? 'Chat-GPT' : 'Google Gemini'}
                 </Typography>
               </Box>
               

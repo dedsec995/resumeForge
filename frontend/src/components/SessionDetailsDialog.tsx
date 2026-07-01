@@ -476,7 +476,7 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
               fontWeight: 600,
               fontSize: '0.8rem'
             }}>
-              {selectedProvider === 'openai' ? 'Chat-GPT' : 'Groq & Google'}
+              {selectedProvider === 'openai' ? 'Chat-GPT' : 'Google Gemini'}
             </Typography>
           </Box>
           

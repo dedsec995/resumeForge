@@ -100,6 +100,8 @@ class PipelineProcessor:
 
             # Get selected provider from session data
             selected_provider = session_data.get("selectedProvider", "openai")
+            if selected_provider == "groq-google":
+                selected_provider = "google"
             print(
                 f"Session data selectedProvider: {session_data.get('selectedProvider')}"
             )

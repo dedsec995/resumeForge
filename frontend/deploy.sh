@@ -52,7 +52,7 @@ fi
 pm2 delete frontend 2>/dev/null || true
 
 # Start the application with PM2
-pm2 serve dist/ 3006 --name frontend --spa
+pm2 serve dist/ 9240 --name frontend --spa
 
 # Wait a moment for PM2 to start the process
 sleep 2
