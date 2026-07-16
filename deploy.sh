@@ -1,19 +1,14 @@
 #!/bin/bash
+set -euo pipefail
 
-echo "🚀 Starting Docker deployment of resume-forge Backend..."
-
-print_step "Pulling latest changes from git..."
-if git pull; then
-    print_status "Git pull successful"
-else
-    print_warning "Git pull failed or no changes to pull"
-fi
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 print_status() {
     echo -e "${GREEN}[INFO]${NC} $1"
@@ -31,13 +26,28 @@ print_step() {
     echo -e "${BLUE}[STEP]${NC} $1"
 }
 
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed. Please install Docker first."
-    exit 1
+compose() {
+    if docker compose version &>/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose &>/dev/null; then
+        docker-compose "$@"
+    else
+        print_error "Docker Compose is not installed (need 'docker compose' or docker-compose)."
+        exit 1
+    fi
+}
+
+echo "🚀 Starting Docker deployment of resume-forge Backend..."
+
+print_step "Pulling latest changes from git..."
+if git pull; then
+    print_status "Git pull successful"
+else
+    print_warning "Git pull failed or no changes to pull"
 fi
 
-if ! command -v docker-compose &> /dev/null; then
-    print_error "Docker Compose is not installed. Please install Docker Compose first."
+if ! command -v docker &> /dev/null; then
+    print_error "Docker is not installed. Please install Docker first."
     exit 1
 fi
 
@@ -46,22 +56,14 @@ if [ ! -f ".env" ]; then
 fi
 
 print_step "Stopping existing Docker containers..."
-if docker-compose down; then
+if compose down; then
     print_status "Existing containers stopped successfully"
 else
     print_warning "No existing containers to stop or error occurred"
 fi
 
-print_step "Building Docker image..."
-# if docker-compose build --no-cache; then
-#     print_status "Docker image built successfully"
-# else
-#     print_error "Docker build failed!"
-#     exit 1
-# fi
-
 print_step "Starting Docker containers..."
-if docker-compose up --build -d; then
+if compose up --build -d; then
     print_status "Docker containers started successfully"
 else
     print_error "Failed to start Docker containers!"
@@ -72,24 +74,24 @@ print_step "Waiting for containers to initialize..."
 sleep 5
 
 print_step "Checking container status..."
-if docker-compose ps | grep -q "Up"; then
+if compose ps | grep -q "Up"; then
     print_status "✅ Backend deployment successful!"
     print_status "Backend is running on http://localhost:9241"
     print_status "Available at: https://resumeforge.thatinsaneguy.com/api/"
-    
+
     print_status "Container Status:"
-    docker-compose ps
-    
+    compose ps
+
     print_status "Recent logs:"
-    docker-compose logs --tail=10
-    
+    compose logs --tail=10
+
     print_status "Resource usage:"
     docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
-    
+
 else
     print_error "❌ Backend deployment failed!"
     print_error "Container is not running properly."
-    print_error "Check logs with: docker-compose logs"
+    print_error "Check logs with: docker compose logs"
     exit 1
 fi
 
@@ -99,13 +101,13 @@ if curl -f http://localhost:9241/ > /dev/null 2>&1; then
     print_status "✅ Health check passed! Backend is responding."
 else
     print_warning "⚠️  Health check failed. Backend might still be starting up."
-    print_warning "You can check logs with: docker-compose logs -f"
+    print_warning "You can check logs with: docker compose logs -f"
 fi
 
 print_status "🎉 Backend deployment complete!"
 print_status "Note: Make sure nginx is configured to proxy API requests to port 9241"
-print_status "To view logs: docker-compose logs -f"
-print_status "To stop: docker-compose down"
+print_status "To view logs: docker compose logs -f"
+print_status "To stop: docker compose down"
 
 echo ""
 print_step "Frontend Deployment"
