@@ -22,11 +22,14 @@ from pipeline_processor import (
     cleanup_on_startup,
 )
 from addressFinder import findAddressesForLocation
+from model_config import LOCAL_LLM_MODEL, is_local_llm_configured
 
 
 def normalize_selected_provider(provider: Optional[str]) -> str:
     """Map legacy provider id; `groq-google` is now Google (Gemini) only."""
     if not provider:
+        if is_local_llm_configured():
+            return "local"
         return "openai"
     if provider == "groq-google":
         return "google"
@@ -249,10 +252,27 @@ class QueueSessionRequest(BaseModel):
     sessionId: str
 
 
+class LlmConfigResponse(BaseModel):
+    localLlmConfigured: bool
+    localLlmModel: str
+    defaultProviderForAdmin: str
+
+
 @app.get("/")
 async def rootEndpoint():
     """Health check endpoint"""
     return {"message": "Resume Forge API is running", "status": "healthy"}
+
+
+@app.get("/llm/config", response_model=LlmConfigResponse)
+async def getLlmConfigEndpoint():
+    """Expose server-side local LLM availability for the frontend."""
+    configured = is_local_llm_configured()
+    return LlmConfigResponse(
+        localLlmConfigured=configured,
+        localLlmModel=LOCAL_LLM_MODEL if configured else "",
+        defaultProviderForAdmin="local" if configured else "google",
+    )
 
 
 @app.get("/globalCounter")
@@ -671,6 +691,16 @@ async def fullWorkflowEndpoint(
                         status_code=400,
                         detail="API_KEY_ERROR: Please add your Google Gen AI API key in the API Config section to continue.",
                     )
+            elif selected_provider == "local":
+                raise HTTPException(
+                    status_code=400,
+                    detail="LOCAL_LLM_ERROR: Local LLM is only available for hosted (ADMI) accounts.",
+                )
+        elif selected_provider == "local" and not is_local_llm_configured():
+            raise HTTPException(
+                status_code=503,
+                detail="LOCAL_LLM_ERROR: Local LLM is not configured on the server.",
+            )
 
         if session_data.get("status") == "processing":
             return WorkflowResponse(

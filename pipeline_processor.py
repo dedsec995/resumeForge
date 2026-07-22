@@ -208,6 +208,13 @@ class PipelineProcessor:
                     "errorType": "API_KEY_ERROR",
                     "failedAt": datetime.now().isoformat(),
                 }
+            elif "LOCAL_LLM_ERROR" in error_msg:
+                error_update_data = {
+                    "status": "failed",
+                    "error": error_msg,
+                    "errorType": "LOCAL_LLM_ERROR",
+                    "failedAt": datetime.now().isoformat(),
+                }
             elif "MODEL_ERROR" in error_msg:
                 error_update_data = {
                     "status": "failed",

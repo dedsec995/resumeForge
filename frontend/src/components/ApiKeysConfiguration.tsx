@@ -22,12 +22,13 @@ import {
   CheckCircle as SuccessIcon,
 } from '@mui/icons-material';
 import apiClient from '../utils/apiClient';
+import type { LlmProvider } from '../utils/providerUtils';
 import { toast } from 'react-hot-toast';
 
 interface ApiKeysConfigurationProps {
   userInfo: { accountTier?: string; email?: string; displayName?: string } | null;
-  selectedProvider: 'openai' | 'google';
-  onProviderChange: (provider: 'openai' | 'google') => void;
+  selectedProvider: LlmProvider;
+  onProviderChange: (provider: LlmProvider) => void;
   onApiConfigChange?: (apiConfig: {
     hasOpenAiKey?: boolean;
     hasGroqKey?: boolean;

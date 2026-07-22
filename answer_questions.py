@@ -4,7 +4,8 @@ from typing import Dict, Optional
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from dotenv import load_dotenv
-from model_config import GEMINI_FLASH
+from model_config import GEMINI_FLASH, LOCAL_LLM_MAX_TOKENS, LOCAL_LLM_MODEL, is_local_llm_configured
+from local_llm import ChatLocalLLM
 
 load_dotenv()
 
@@ -46,6 +47,18 @@ def answer_question(
         selected_provider = "google"
     api_keys = get_user_api_keys(user_id, user_tier)
     prompt = f"""Based on this job description: "{job_description}" and this resume: {json.dumps(resume)}, please answer the following question in maximum 4 lines: {question}"""
+
+    if selected_provider == "local":
+        if not is_local_llm_configured():
+            raise Exception(
+                "LOCAL_LLM_ERROR: Local LLM is not configured on the server."
+            )
+        model = ChatLocalLLM(
+            model=LOCAL_LLM_MODEL,
+            max_tokens=min(200, LOCAL_LLM_MAX_TOKENS),
+        )
+        response = model.invoke(prompt)
+        return response.content.strip()
 
     if selected_provider == "openai" and api_keys["openai"]:
         model = ChatOpenAI(

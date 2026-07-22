@@ -7,7 +7,14 @@ from openrouter import ChatOpenRouter
 from rich.console import Console
 from rich.panel import Panel
 from dotenv import load_dotenv
-from model_config import GEMINI_FLASH, GEMINI_RESUME_EDITOR
+from model_config import (
+    GEMINI_FLASH,
+    GEMINI_RESUME_EDITOR,
+    LOCAL_LLM_MAX_TOKENS,
+    LOCAL_LLM_MODEL,
+    is_local_llm_configured,
+)
+from local_llm import ChatLocalLLM
 from utils import extract_and_parse_json
 from prompts import (
     EXTRACT_INFO_PROMPT,
@@ -101,6 +108,18 @@ def get_llm_for_task(
         selected_provider = "google"
     # Get API keys based on user tier
     api_keys = get_user_api_keys(user_id, user_tier)
+
+    if selected_provider == "local":
+        if not is_local_llm_configured():
+            raise Exception(
+                "LOCAL_LLM_ERROR: Local LLM is not configured on the server. "
+                "Set LOCAL_LLM_BASE_URL and LOCAL_LLM_MODEL in the environment."
+            )
+        return ChatLocalLLM(
+            temperature=temperature,
+            model=LOCAL_LLM_MODEL,
+            max_tokens=LOCAL_LLM_MAX_TOKENS,
+        )
 
     if _is_google_provider(selected_provider):
         if not api_keys["google"]:

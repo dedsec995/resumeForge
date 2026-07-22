@@ -46,11 +46,12 @@ RUN useradd -m -u 1001 appuser && chown -R appuser:appuser /app
 USER appuser
 
 # Expose port
-EXPOSE 8002
+ENV PORT=9241
+EXPOSE 9241
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8002/ || exit 1
+HEALTHCHECK --interval=30s --timeout=30s --start-period=40s --retries=3 \
+    CMD curl -f http://localhost:9241/ || exit 1
 
 # Run the application
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8002"] 
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "9241"] 

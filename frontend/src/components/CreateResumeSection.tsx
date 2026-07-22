@@ -37,8 +37,9 @@ import {
   Psychology as AIIcon,
   Merge as MergeIcon,
 } from '@mui/icons-material';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import apiClient from '../utils/apiClient';
+import { getProviderColor, getProviderLabel, isLlmProvider, type LlmProvider } from '../utils/providerUtils';
 import { toast } from 'react-hot-toast';
 
 // Import reusable components
@@ -123,12 +124,14 @@ const CreateResumeSection = () => {
   const [saveJsonLoading, setSaveJsonLoading] = useState(false);
   const [structuredData, setStructuredData] = useState<Record<string, unknown> | null>(null);
   const [userInfo, setUserInfo] = useState<{ accountTier?: string; email?: string; displayName?: string } | null>(null);
-  const [selectedProvider, setSelectedProvider] = useState<'openai' | 'google'>('openai');
+  const [selectedProvider, setSelectedProvider] = useState<LlmProvider>('openai');
+  const [localLlmConfigured, setLocalLlmConfigured] = useState(false);
+  const defaultProviderAppliedRef = useRef(false);
   // Flag to prevent auto-switching after initial load
   const [hasSetInitialProvider, setHasSetInitialProvider] = useState(false);
 
   // Helper functions for provider management
-  const saveSelectedProvider = async (provider: 'openai' | 'google') => {
+  const saveSelectedProvider = async (provider: LlmProvider) => {
     try {
       const response = await apiClient.post('/apiConfig', {
         selectedProvider: provider
@@ -141,7 +144,7 @@ const CreateResumeSection = () => {
     }
   };
 
-  const handleProviderChange = useCallback((provider: 'openai' | 'google') => {
+  const handleProviderChange = useCallback((provider: LlmProvider) => {
     setSelectedProvider(provider);
     saveSelectedProvider(provider);
     // Mark as manually set to prevent future auto-changes
@@ -191,20 +194,22 @@ const CreateResumeSection = () => {
     loadUserProfile();
   }, []);
 
-  // Set default provider for non-FREE users ONLY on initial load, not on manual changes
-  // ADMI and other non-FREE users get 'google' as default on first login
+  // Apply default provider once for hosted users without a saved preference
   useEffect(() => {
-    // Auto-set provider for users who are not FREE (including ADMI) on first login only
-    if (userInfo?.accountTier && 
-        userInfo.accountTier !== 'FREE' && 
-        !hasSetInitialProvider) {
-      // Only set to google if it's the default openai (meaning no saved preference)
-      if (selectedProvider === 'openai') {
-        console.log(`Setting default provider to google for ${userInfo.accountTier} user`);
-        handleProviderChange('google');
-      }
+    if (!hasSetInitialProvider || !userInfo?.accountTier || defaultProviderAppliedRef.current) {
+      return;
     }
-  }, [userInfo?.accountTier, selectedProvider, handleProviderChange, hasSetInitialProvider]);
+
+    if (userInfo.accountTier === 'FREE' || selectedProvider !== 'openai') {
+      defaultProviderAppliedRef.current = true;
+      return;
+    }
+
+    const defaultProvider: LlmProvider = localLlmConfigured ? 'local' : 'google';
+    console.log(`Applying default provider ${defaultProvider} for ${userInfo.accountTier} user`);
+    handleProviderChange(defaultProvider);
+    defaultProviderAppliedRef.current = true;
+  }, [userInfo?.accountTier, hasSetInitialProvider, localLlmConfigured, selectedProvider, handleProviderChange]);
 
   // Real-time status updates for active sessions
   useEffect(() => {
@@ -992,18 +997,28 @@ const CreateResumeSection = () => {
 
   const loadApiConfig = async () => {
     try {
+      try {
+        const llmResponse = await apiClient.get('/llm/config');
+        if (llmResponse.data?.localLlmConfigured) {
+          setLocalLlmConfigured(true);
+        }
+      } catch (llmError) {
+        console.error('Error loading LLM config:', llmError);
+      }
+
       const response = await apiClient.get('/apiConfig');
       if (response.data.success && response.data.apiData) {
         const savedProvider = response.data.apiData.selectedProvider;
-        if (savedProvider && (savedProvider === 'openai' || savedProvider === 'google')) {
+        if (savedProvider && isLlmProvider(savedProvider)) {
           setSelectedProvider(savedProvider);
+          defaultProviderAppliedRef.current = true;
+          setHasSetInitialProvider(true);
+          return;
         }
       }
-      // Always mark as set after loading API config to prevent auto-changes
       setHasSetInitialProvider(true);
     } catch (error) {
       console.error('Error loading API config:', error);
-      // Even on error, mark as set to prevent auto-changes
       setHasSetInitialProvider(true);
     }
   };
@@ -1427,6 +1442,38 @@ const CreateResumeSection = () => {
                                 Google Gemini
                               </Typography>
                             </Box>
+
+                            {localLlmConfigured && (
+                              <Box
+                                onClick={() => handleProviderChange('local')}
+                                sx={{
+                                  px: 2,
+                                  py: 1,
+                                  borderRadius: 2.5,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.3s ease',
+                                  border: '2px solid',
+                                  borderColor: selectedProvider === 'local' ? '#F59E0B' : 'rgba(245, 158, 11, 0.3)',
+                                  background: selectedProvider === 'local'
+                                    ? 'rgba(245, 158, 11, 0.15)'
+                                    : 'rgba(245, 158, 11, 0.05)',
+                                  '&:hover': {
+                                    borderColor: '#F59E0B',
+                                    background: 'rgba(245, 158, 11, 0.1)',
+                                    transform: 'scale(1.05)',
+                                    boxShadow: '0 4px 12px rgba(245, 158, 11, 0.2)'
+                                  }
+                                }}
+                              >
+                                <Typography sx={{
+                                  color: selectedProvider === 'local' ? '#F59E0B' : '#E2E8F0',
+                                  fontWeight: 600,
+                                  fontSize: '0.8rem'
+                                }}>
+                                  Local LLM
+                                </Typography>
+                              </Box>
+                            )}
                           </Box>
                         )}
 
@@ -1791,20 +1838,18 @@ const CreateResumeSection = () => {
                 py: 1,
                 borderRadius: 2.5,
                 border: '2px solid',
-                borderColor: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
-                background: selectedProvider === 'openai' 
-                  ? 'rgba(99, 102, 241, 0.15)' 
-                  : 'rgba(16, 185, 129, 0.15)',
+                borderColor: getProviderColor(selectedProvider),
+                background: `${getProviderColor(selectedProvider)}26`,
                 display: 'flex',
                 alignItems: 'center',
                 gap: 1
               }}>
                 <Typography sx={{
-                  color: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+                  color: getProviderColor(selectedProvider),
                   fontWeight: 600,
                   fontSize: '0.8rem'
                 }}>
-                  {selectedProvider === 'openai' ? 'Chat-GPT' : 'Google Gemini'}
+                  {getProviderLabel(selectedProvider)}
                 </Typography>
               </Box>
               

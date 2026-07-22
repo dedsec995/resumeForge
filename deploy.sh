@@ -1,271 +1,202 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# ResumeForge — Docker backend + PM2 frontend + nginx/SSL
+#
+#   ./deploy.sh
+#   sudo ./deploy.sh
+#
+# Optional env:
+#   DEPLOY_USER=you          # PM2/npm user when run with sudo (default: SUDO_USER)
+#   SKIP_NGINX=1             # app only (docker + PM2, no nginx/certbot)
+
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../dktp/deployLib.sh
+source "${ROOT}/../dktp/deployLib.sh"
+cd "$ROOT"
 
-RED='\033[0;31m'
+DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-$USER}}"
+
+BLUE='\033[0;34m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+RED='\033[0;31m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
-print_status() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+step()   { echo -e "${BLUE}[resumeforge]${NC} $*"; }
+info()   { echo -e "${GREEN}[resumeforge]${NC} $*"; }
+warn()   { echo -e "${YELLOW}[resumeforge]${NC} $*" >&2; }
+err()    { echo -e "${RED}[resumeforge]${NC} $*" >&2; }
+banner() {
+  echo ""
+  echo -e "${CYAN}================================================================================${NC}"
+  echo -e "${CYAN} $*${NC}"
+  echo -e "${CYAN}================================================================================${NC}"
+  echo ""
 }
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-print_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
+run_as_deploy_user() {
+  if [[ "$(id -u)" -eq 0 && "$DEPLOY_USER" != "root" && "$(id -un)" != "$DEPLOY_USER" ]]; then
+    sudo -u "$DEPLOY_USER" -H bash -lc "$*"
+  else
+    bash -lc "$*"
+  fi
 }
 
 compose() {
-    if docker compose version &>/dev/null 2>&1; then
-        docker compose "$@"
-    elif command -v docker-compose &>/dev/null; then
-        docker-compose "$@"
-    else
-        print_error "Docker Compose is not installed (need 'docker compose' or docker-compose)."
-        exit 1
-    fi
+  if docker compose version &>/dev/null 2>&1; then
+    docker compose "$@"
+  elif command -v docker-compose &>/dev/null; then
+    docker-compose "$@"
+  else
+    err "Docker Compose is not installed (need 'docker compose' or docker-compose)."
+    exit 1
+  fi
 }
 
-echo "🚀 Starting Docker deployment of resume-forge Backend..."
-
-print_step "Pulling latest changes from git..."
-if git pull; then
-    print_status "Git pull successful"
-else
-    print_warning "Git pull failed or no changes to pull"
-fi
-
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed. Please install Docker first."
-    exit 1
-fi
-
-if [ ! -f ".env" ]; then
-    print_warning ".env file not found. Please ensure your environment variables are configured."
-fi
-
-print_step "Stopping existing Docker containers..."
-if compose down; then
-    print_status "Existing containers stopped successfully"
-else
-    print_warning "No existing containers to stop or error occurred"
-fi
-
-print_step "Starting Docker containers..."
-if compose up --build -d; then
-    print_status "Docker containers started successfully"
-else
-    print_error "Failed to start Docker containers!"
-    exit 1
-fi
-
-print_step "Waiting for containers to initialize..."
-sleep 5
-
-print_step "Checking container status..."
-if compose ps | grep -q "Up"; then
-    print_status "✅ Backend deployment successful!"
-    print_status "Backend is running on http://localhost:9241"
-    print_status "Available at: https://resumeforge.thatinsaneguy.com/api/"
-
-    print_status "Container Status:"
-    compose ps
-
-    print_status "Recent logs:"
-    compose logs --tail=10
-
-    print_status "Resource usage:"
-    docker stats --no-stream --format "table {{.Container}}\t{{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}"
-
-else
-    print_error "❌ Backend deployment failed!"
-    print_error "Container is not running properly."
-    print_error "Check logs with: docker compose logs"
-    exit 1
-fi
-
-print_step "Performing health check..."
-sleep 3
-if curl -f http://localhost:9241/ > /dev/null 2>&1; then
-    print_status "✅ Health check passed! Backend is responding."
-else
-    print_warning "⚠️  Health check failed. Backend might still be starting up."
-    print_warning "You can check logs with: docker compose logs -f"
-fi
-
-print_status "🎉 Backend deployment complete!"
-print_status "Note: Make sure nginx is configured to proxy API requests to port 9241"
-print_status "To view logs: docker compose logs -f"
-print_status "To stop: docker compose down"
-
-echo ""
-print_step "Frontend Deployment"
-
-print_step "Starting frontend deployment..."
-
-# Check if frontend directory exists
-if [ ! -d "frontend" ]; then
-    print_error "Frontend directory 'frontend' not found!"
-    print_error "Please ensure the frontend code is in the frontend directory."
-    exit 1
-fi
-
-print_status "Deploying frontend..."
-cd frontend
-
-# Check if frontend deploy script exists
-if [ ! -f "deploy.sh" ]; then
-    print_error "Frontend deploy script not found!"
-    print_error "Please ensure the frontend deploy script exists in frontend/deploy.sh"
-    exit 1
-fi
-
-# Run frontend deployment
-./deploy.sh
-
-print_status "cd frontend && ./deploy.sh"
-
-cd ..
-
-print_status "🎉 Full deployment (backend + frontend) complete!"
-
-echo ""
-print_step "Nginx Configuration Setup"
-
-SCRIPT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=../deployLib.sh
-source "${SCRIPT_ROOT}/../dktp/deployLib.sh"
-
-# Domain configuration
 DOMAIN="resumeforge.thatinsaneguy.com"
 NGINX_CONF_FILE="nginx-resumeforge.conf"
 NGINX_AVAILABLE="/etc/nginx/sites-available/${DOMAIN}"
 NGINX_ENABLED="/etc/nginx/sites-enabled/${DOMAIN}"
+BACKEND_PORT=9241
+FRONTEND_PORT=9240
 
-# Check if nginx is installed
-if ! command -v nginx &> /dev/null; then
-    print_warning "Nginx is not installed. Skipping nginx setup."
-    print_warning "Install nginx: sudo pacman -S nginx"
-    exit 0
+START_TS=$(date +%s)
+banner "ResumeForge deploy"
+info "Domain: https://${DOMAIN}"
+if [[ "$(id -u)" -eq 0 && "$DEPLOY_USER" != "root" ]]; then
+  info "Running as root — PM2/npm as ${DEPLOY_USER}, Docker/nginx as root"
 fi
 
-# Check if running with sudo
-if [ "$EUID" -ne 0 ] && [ -z "$SUDO_USER" ]; then
-    print_warning "Not running as root. Nginx setup requires sudo."
-    print_warning "To set up nginx manually, run:"
-    echo "  sudo cp $NGINX_CONF_FILE $NGINX_AVAILABLE"
-    echo "  sudo ln -sf $NGINX_AVAILABLE $NGINX_ENABLED"
-    echo "  sudo nginx -t && sudo systemctl reload nginx"
-    echo "  echo '1' | sudo certbot --nginx -d $DOMAIN"
-    exit 0
+if [[ -d "${ROOT}/.git" ]] && command -v git &>/dev/null; then
+  step "Git pull (optional)…"
+  (git pull --ff-only 2>/dev/null) && info "git pull OK" || warn "git pull skipped or failed"
 fi
 
-# Check if nginx config file exists
-if [ ! -f "$NGINX_CONF_FILE" ]; then
-    print_error "Nginx config file '$NGINX_CONF_FILE' not found!"
-    print_error "Please ensure the nginx config file exists in the project root."
-    exit 1
+if [[ ! -f "${ROOT}/.env" ]]; then
+  warn ".env file not found — ensure environment variables are configured."
 fi
 
-# Copy nginx config
-print_step "Copying nginx configuration..."
-cp "$NGINX_CONF_FILE" "$NGINX_AVAILABLE"
+banner "Docker backend (port ${BACKEND_PORT})"
+if ! command -v docker &>/dev/null; then
+  err "Docker is not installed."
+  exit 1
+fi
 
-# Enable the site
-print_step "Enabling nginx site..."
-ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+step "Stopping existing containers…"
+compose down >/dev/null 2>&1 || true
 
-# Remove default site if it exists
-rm -f /etc/nginx/sites-enabled/default
+step "Building and starting backend…"
+compose up --build -d
 
-# Test nginx configuration
-print_step "Testing nginx configuration..."
-if nginx -t; then
-    print_status "Nginx configuration is valid"
-    print_step "Reloading nginx..."
-    systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
-    print_status "✅ Nginx configuration deployed"
+step "Waiting for backend…"
+HEALTH_OK=false
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+  if curl -fsS "http://localhost:${BACKEND_PORT}/" >/dev/null 2>&1; then
+    HEALTH_OK=true
+    break
+  fi
+  sleep 3
+done
+
+if [[ "$HEALTH_OK" == true ]]; then
+  info "Backend healthy on http://localhost:${BACKEND_PORT}"
 else
-    print_error "Nginx configuration test failed!"
-    exit 1
+  warn "Backend health check did not pass yet — check: docker compose logs -f"
 fi
 
-# SSL Certificate Setup
-echo ""
-print_step "SSL Certificate Setup"
+banner "Frontend (PM2, port ${FRONTEND_PORT})"
+if [[ ! -d "${ROOT}/frontend" ]]; then
+  err "Frontend directory not found: ${ROOT}/frontend"
+  exit 1
+fi
+if [[ ! -f "${ROOT}/frontend/deploy.sh" ]]; then
+  err "Frontend deploy script not found: ${ROOT}/frontend/deploy.sh"
+  exit 1
+fi
 
-if le_cert_exists "${DOMAIN}"; then
-    print_status "Certificate exists for ${DOMAIN} — skipped certbot."
+if [[ "$(id -u)" -eq 0 && "$DEPLOY_USER" != "root" ]]; then
+  chown -R "${DEPLOY_USER}:${DEPLOY_USER}" \
+    "${ROOT}/frontend/node_modules" \
+    "${ROOT}/frontend/dist" 2>/dev/null || true
+fi
+
+step "Building and starting frontend as ${DEPLOY_USER}…"
+run_as_deploy_user "cd '${ROOT}/frontend' && bash ./deploy.sh"
+
+banner "Nginx + SSL (${DOMAIN})"
+if [[ "${SKIP_NGINX:-0}" == "1" ]]; then
+  warn "SKIP_NGINX=1 — nginx/certbot skipped"
+elif ! command -v nginx &>/dev/null; then
+  warn "nginx not installed — skipping vhost/SSL"
+  warn "Install: sudo pacman -S nginx  or  sudo apt install nginx"
+elif [[ "$(id -u)" -ne 0 ]]; then
+  warn "Not root — nginx/SSL skipped. Use: sudo bash ${ROOT}/deploy.sh"
+  warn "Manual nginx:"
+  echo "  sudo cp ${NGINX_CONF_FILE} ${NGINX_AVAILABLE}"
+  echo "  sudo ln -sf ${NGINX_AVAILABLE} ${NGINX_ENABLED}"
+  echo "  sudo nginx -t && sudo systemctl reload nginx"
+elif [[ ! -f "$NGINX_CONF_FILE" ]]; then
+  err "Missing nginx config: ${NGINX_CONF_FILE}"
+  exit 1
 else
+  step "Installing nginx vhost…"
+  cp "$NGINX_CONF_FILE" "$NGINX_AVAILABLE"
+  chmod 644 "$NGINX_AVAILABLE"
+  ln -sf "$NGINX_AVAILABLE" "$NGINX_ENABLED"
+  rm -f /etc/nginx/sites-enabled/default
 
-# Check if certbot is installed
-if ! command -v certbot &> /dev/null; then
-    print_warning "Certbot is not installed. Installing certbot..."
-    if command -v pacman &> /dev/null; then
-        # Arch Linux
-        pacman -Sy --noconfirm certbot certbot-nginx 2>/dev/null || {
-            print_error "Failed to install certbot. Please install manually: sudo pacman -S certbot certbot-nginx"
-            exit 1
-        }
-    elif command -v apt &> /dev/null; then
-        # Ubuntu/Debian
-        apt update && apt install -y certbot python3-certbot-nginx 2>/dev/null || {
-            print_error "Failed to install certbot. Please install manually: sudo apt install certbot python3-certbot-nginx"
-            exit 1
-        }
+  step "nginx test + reload"
+  if nginx -t >/dev/null 2>&1; then
+    systemctl reload nginx >/dev/null 2>&1 || service nginx reload >/dev/null 2>&1 || true
+    info "Nginx configured"
+  else
+    err "nginx -t failed"
+    exit 1
+  fi
+
+  if le_cert_exists "${DOMAIN}"; then
+    if le_nginx_has_ssl "${DOMAIN}"; then
+      info "Certificate exists for ${DOMAIN} — HTTPS vhost OK."
     else
-        print_error "Could not determine package manager. Please install certbot manually."
-        exit 1
+      step "Applying existing certificate to nginx (${DOMAIN})…"
+      le_install_nginx_ssl "${DOMAIN}" \
+        || warn "Could not apply SSL — run: sudo certbot install --cert-name ${DOMAIN}"
     fi
-fi
-
-# Get SSL certificate
-print_step "Setting up SSL certificate..."
-print_status "If prompted to reinstall/renew certificate, automatically selecting option 1 (reinstall existing)..."
-
-# Run certbot with automatic selection of option 1 if prompted
-# First try non-interactive mode (works for new certs or valid existing certs)
-if certbot --nginx -d ${DOMAIN} --non-interactive --agree-tos --redirect 2>/dev/null; then
-    print_status "✅ SSL certificate configured successfully"
-else
-    # If non-interactive fails (e.g., cert exists and certbot wants to prompt for reinstall choice)
-    # Use interactive mode and pipe "1" to automatically select "reinstall existing certificate"
-    print_status "Running certbot with automatic selection of option 1 (reinstall existing)..."
-    # Handle prompts: email (skip/use existing), agreement (A), reinstall choice (1)
-    # Using printf to handle multiple prompts: empty for email (use existing), A for agree, 1 for reinstall
-    if printf "\nA\n1\n" | certbot --nginx -d ${DOMAIN} 2>/dev/null; then
-        print_status "✅ SSL certificate configured successfully"
+  elif command -v certbot &>/dev/null; then
+    step "Certbot: ${DOMAIN}"
+    if certbot --nginx -d "${DOMAIN}" --non-interactive --agree-tos --redirect 2>/dev/null; then
+      info "SSL certificate configured"
+    elif printf '\nA\n1\n' | certbot --nginx -d "${DOMAIN}" 2>/dev/null; then
+      info "SSL certificate configured"
     else
-        print_warning "⚠️  Certbot encountered an issue. This might be normal if certificate already exists."
-        print_warning "You can manually run: printf '\nA\n1\n' | sudo certbot --nginx -d ${DOMAIN}"
+      warn "Certbot issue for ${DOMAIN} — check manually"
     fi
+    nginx -t >/dev/null 2>&1 && (systemctl reload nginx >/dev/null 2>&1 || service nginx reload >/dev/null 2>&1 || true)
+  else
+    warn "certbot not installed — HTTP vhost only"
+  fi
 fi
 
-# Test nginx configuration after SSL setup
-print_step "Testing nginx configuration after SSL setup..."
-if nginx -t; then
-    print_status "Nginx configuration is valid"
-    systemctl reload nginx 2>/dev/null || service nginx reload 2>/dev/null || true
-    print_status "✅ Nginx reloaded with SSL configuration"
-else
-    print_error "Nginx configuration test failed after SSL setup!"
-    exit 1
-fi
+ELAPSED=$(( $(date +%s) - START_TS ))
+banner "Deploy summary (${ELAPSED}s)"
+info "ResumeForge deploy finished."
 
-fi
+cat <<EOF
 
-echo ""
-print_status "🎉 Nginx and SSL setup complete!"
-print_status "Site available at: https://${DOMAIN}"
-print_status "API available at: https://${DOMAIN}/api/"
+Live URLs:
+  Site:  https://${DOMAIN}
+  API:   https://${DOMAIN}/api/
+
+Local ports:
+  Frontend: http://localhost:${FRONTEND_PORT}
+  Backend:  http://localhost:${BACKEND_PORT}
+
+Useful commands:
+  docker compose logs -f
+  docker compose ps
+  pm2 status
+  pm2 logs resumeforge-frontend
+  pm2 restart resumeforge-frontend
+EOF

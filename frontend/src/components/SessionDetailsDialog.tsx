@@ -28,6 +28,7 @@ import {
 } from '@mui/icons-material';
 import { questionsAPI } from '../utils/apiClient';
 import AddressTab from './AddressTab';
+import { getProviderColor, getProviderLabel } from '../utils/providerUtils';
 
 interface WorkflowResult {
   score: number;
@@ -463,20 +464,18 @@ const SessionDetailsDialog: React.FC<SessionDetailsDialogProps> = ({
             py: 1,
             borderRadius: 2.5,
             border: '2px solid',
-            borderColor: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
-            background: selectedProvider === 'openai' 
-              ? 'rgba(99, 102, 241, 0.15)' 
-              : 'rgba(16, 185, 129, 0.15)',
+            borderColor: getProviderColor(selectedProvider),
+            background: `${getProviderColor(selectedProvider)}26`,
             display: 'flex',
             alignItems: 'center',
             gap: 1
           }}>
             <Typography sx={{
-              color: selectedProvider === 'openai' ? '#6366F1' : '#10B981',
+              color: getProviderColor(selectedProvider),
               fontWeight: 600,
               fontSize: '0.8rem'
             }}>
-              {selectedProvider === 'openai' ? 'Chat-GPT' : 'Google Gemini'}
+              {getProviderLabel(selectedProvider)}
             </Typography>
           </Box>
           
