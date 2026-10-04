@@ -4,6 +4,10 @@ set -euo pipefail
 
 APP_NAME="resumeforge-frontend"
 PORT=9240
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=../../dktp/deployLib.sh
+source "${SCRIPT_DIR}/../../dktp/deployLib.sh"
+for arg in "$@"; do [[ "$arg" == "--build" ]] && export DEPLOY_FORCE_BUILD=1; done
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -26,11 +30,8 @@ if ! command -v pm2 &>/dev/null; then
   exit 1
 fi
 
-print_status "Installing dependencies…"
-npm install
-
-print_status "Building React application…"
-npm run build
+print_status "Dependencies + build (only if changed)…"
+npmBuildIfChanged resumeforge-frontend "$SCRIPT_DIR" "${SCRIPT_DIR}/dist/index.html"
 
 if [[ ! -d dist ]]; then
   print_error "Build failed — dist/ not found."

@@ -13,6 +13,7 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=../dktp/deployLib.sh
 source "${ROOT}/../dktp/deployLib.sh"
+for arg in "$@"; do [[ "$arg" == "--build" ]] && export DEPLOY_FORCE_BUILD=1; done
 cd "$ROOT"
 
 DEPLOY_USER="${DEPLOY_USER:-${SUDO_USER:-$USER}}"
@@ -87,8 +88,17 @@ fi
 step "Stopping existing containers…"
 compose down >/dev/null 2>&1 || true
 
-step "Building and starting backend…"
-compose up --build -d
+step "Building backend image (only if changed)…"
+# Dockerfile does COPY . . — everything except the separately deployed frontend counts.
+backendImage="$(compose config --images 2>/dev/null | head -1)"
+backendHash="$(buildInputsHash "$ROOT" . ':!frontend' ':!output' ':!deploy.sh' ':!*.md' ':!nginx-resumeforge.conf')"
+if needsBuild resumeforge-backend "$backendHash" "image:${backendImage:-resumeforge-resume-forge-backend}:latest"; then
+  compose build
+  markBuilt resumeforge-backend "$backendHash" "image:${backendImage:-resumeforge-resume-forge-backend}:latest"
+fi
+
+step "Starting backend…"
+compose up -d
 
 step "Waiting for backend…"
 HEALTH_OK=false
@@ -123,7 +133,7 @@ if [[ "$(id -u)" -eq 0 && "$DEPLOY_USER" != "root" ]]; then
 fi
 
 step "Building and starting frontend as ${DEPLOY_USER}…"
-run_as_deploy_user "cd '${ROOT}/frontend' && bash ./deploy.sh"
+run_as_deploy_user "cd '${ROOT}/frontend' && DEPLOY_FORCE_BUILD=${DEPLOY_FORCE_BUILD:-0} bash ./deploy.sh"
 
 banner "Nginx + SSL (${DOMAIN})"
 if [[ "${SKIP_NGINX:-0}" == "1" ]]; then
